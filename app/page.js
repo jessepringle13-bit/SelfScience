@@ -257,12 +257,15 @@ const CATEGORY_PILLS = ['Genomics', 'Nutrition', 'Performance', 'Longevity', 'We
 
 const NavBar = ({ transparent = false }) => (
   <header
-    className={`absolute inset-x-0 top-0 z-30 ${
-      transparent ? 'bg-transparent' : 'bg-white'
+    className={`absolute inset-x-0 top-0 z-30 border-b ${
+      transparent
+        ? 'border-white/15 bg-ss-teal/40 backdrop-blur-md'
+        : 'border-ss-border-warm bg-white'
     }`}
   >
     <div className="container flex h-16 items-center justify-between">
-      <a href="/" className="text-xl font-extrabold tracking-tight text-white">
+      <a href="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-white">
+        <span className="inline-block h-2 w-2 rounded-full bg-ss-orange" />
         SelfScience
       </a>
       <nav className="hidden items-center gap-8 text-sm font-medium text-white/90 md:flex">
@@ -293,12 +296,49 @@ export default function App() {
       <section className="relative flex min-h-[100vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
         <NavBar transparent />
 
-        {/* subtle decorative gradient */}
+        {/* Horizontal DNA image band across the right half, fading into teal on the left */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-40"
+          className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[72%]"
+          aria-hidden="true"
+        >
+          <div
+            className="h-full w-full bg-cover bg-center"
+            style={{
+              backgroundImage:
+                "url('https://images.unsplash.com/photo-1633167606207-d840b5070fc2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDJ8MHwxfHNlYXJjaHwyfHxETkElMjBhYnN0cmFjdHxlbnwwfHx8fDE3ODM2MjA0NDV8MA&ixlib=rb-4.1.0&q=85')",
+              opacity: 0.85,
+              WebkitMaskImage:
+                'linear-gradient(to right, transparent 0%, black 28%, black 82%, transparent 100%)',
+              maskImage:
+                'linear-gradient(to right, transparent 0%, black 28%, black 82%, transparent 100%)',
+            }}
+          />
+        </div>
+
+        {/* Teal color-wash on top of image so it blends into the brand palette */}
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
           style={{
             background:
-              'radial-gradient(60% 50% at 50% 40%, rgba(196,88,32,0.20) 0%, rgba(27,71,77,0) 70%)',
+              'linear-gradient(90deg, rgba(27,71,77,0.98) 0%, rgba(27,71,77,0.70) 32%, rgba(27,71,77,0.35) 55%, rgba(27,71,77,0.55) 85%, rgba(27,71,77,0.95) 100%)',
+          }}
+        />
+
+        {/* Orange radial glow to tie in the accent */}
+        <div
+          className="pointer-events-none absolute inset-0 z-0 opacity-70"
+          style={{
+            background:
+              'radial-gradient(45% 55% at 70% 45%, rgba(196,88,32,0.35) 0%, rgba(27,71,77,0) 70%)',
+          }}
+        />
+
+        {/* Bottom fade so hero blends into next section smoothly */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24"
+          style={{
+            background:
+              'linear-gradient(to bottom, rgba(27,71,77,0) 0%, rgba(27,71,77,1) 100%)',
           }}
         />
 
