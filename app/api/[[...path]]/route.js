@@ -648,7 +648,59 @@ async function handleInterpretGenome(request) {
         { status: 502 }
       )
     }
-    return NextResponse.json({ ...parsed, aiProvider: provider, aiModel: model })
+    // Map new Session-5 schema to the shape the frontend genome-client expects
+    const overall = parsed.overall_summary || {}
+    const normalized = {
+      // New Session-5 schema (raw)
+      ...parsed,
+      // Compat aliases for existing UI:
+      overview: {
+        strengths: (overall.top_strengths || []).map((s) => ({
+          name: s.label || s.strength_name || '',
+          plain: s.one_line || '',
+          pillar: s.pillar || '',
+          rsid: s.rsid || '',
+          gene: s.gene || '',
+          genotype: s.genotype || '',
+        })),
+        areasToExplore: (overall.top_awareness_areas || []).map((a) => ({
+          name: a.label || a.awareness_name || '',
+          plain: a.one_line || '',
+          pillar: a.pillar || '',
+          rsid: a.rsid || '',
+          gene: a.gene || '',
+          genotype: a.genotype || '',
+        })),
+        systemView: overall.system_view || '',
+      },
+      fullReport: (parsed.pillar_reports || []).map((p) => ({
+        pillar: p.pillar,
+        variants: [
+          ...(p.strengths || []).map((v) => ({
+            gene: v.gene, rsid: v.rsid, genotype: v.genotype,
+            classification: 'Strength',
+            explanation: v.user_explanation || '',
+            landmarkStudy: v.landmark_study?.title
+              ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
+              : '',
+            searches: v.search_queries || [],
+          })),
+          ...(p.awareness_areas || []).map((v) => ({
+            gene: v.gene, rsid: v.rsid, genotype: v.genotype,
+            classification: 'Awareness',
+            explanation: v.user_explanation || v.research_direction || '',
+            landmarkStudy: v.landmark_study?.title
+              ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
+              : '',
+            searches: v.search_queries || [],
+          })),
+        ],
+      })),
+      researchRoadmap: (parsed.research_roadmap?.pillars || []).map((r) => ({
+        priority: r.priority, pillar: r.pillar, why: r.reason, searches: r.top_searches || [],
+      })),
+    }
+    return NextResponse.json({ ...normalized, aiProvider: provider, aiModel: model })
   } catch (err) {
     console.error('interpret-genome error:', err?.message)
     return NextResponse.json(
