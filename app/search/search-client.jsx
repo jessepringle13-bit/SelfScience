@@ -11,6 +11,8 @@ const SOURCE_OPTIONS = [
   { key: 'all', label: 'All sources' },
   { key: 'pubmed', label: 'PubMed only' },
   { key: 's2', label: 'Semantic Scholar only' },
+  { key: 'openalex', label: 'OpenAlex only' },
+  { key: 'crossref', label: 'Crossref only' },
 ]
 const DATE_OPTIONS = [
   { key: 'any', label: 'Any date' },
@@ -91,8 +93,9 @@ export default function SearchClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
-  const [analyses, setAnalyses] = useState({}) // id -> {reliability, reliabilityLabel, ...}
-  const [analyzing, setAnalyzing] = useState(0) // count in flight
+  const [analyses, setAnalyses] = useState({}) // id -> {reliability, ...}
+  const [analyzing, setAnalyzing] = useState(0) // in flight
+  const [analyzedCount, setAnalyzedCount] = useState(0) // items we've kicked off
 
   const runSearch = useCallback(async (q, s, pill) => {
     if (!q.trim()) {
@@ -102,6 +105,7 @@ export default function SearchClient() {
     setLoading(true)
     setError(null)
     setAnalyses({})
+    setAnalyzedCount(0)
     try {
       const url = new URL('/api/search', window.location.origin)
       url.searchParams.set('q', q)
@@ -111,12 +115,17 @@ export default function SearchClient() {
       if (!res.ok) throw new Error(`Search failed (${res.status})`)
       const json = await res.json()
       setData(json)
-      // Kick off AI analysis for top results only; rate-friendly for free tier.
-      // Concurrency 2 keeps latency reasonable while respecting Gemini free RPM.
-      const initial = (json.results || []).slice(0, 6)
-      analyzeInPool(initial, 2, (id, analysis) => {
-        setAnalyses((prev) => ({ ...prev, [id]: analysis }))
-      }, setAnalyzing)
+      // Kick off AI analysis for the first batch
+      const results = json.results || []
+      const batchSize = 6
+      const firstBatch = results.slice(0, batchSize)
+      setAnalyzedCount(firstBatch.length)
+      analyzeInPool(
+        firstBatch,
+        2,
+        (id, analysis) => setAnalyses((prev) => ({ ...prev, [id]: analysis })),
+        setAnalyzing
+      )
     } catch (e) {
       setError(e.message || 'Something went wrong')
       setData(null)
@@ -124,6 +133,21 @@ export default function SearchClient() {
       setLoading(false)
     }
   }, [])
+
+  const scoreMore = useCallback(() => {
+    if (!data?.results) return
+    const batchSize = 6
+    const start = analyzedCount
+    const nextBatch = data.results.slice(start, start + batchSize)
+    if (nextBatch.length === 0) return
+    setAnalyzedCount(start + nextBatch.length)
+    analyzeInPool(
+      nextBatch,
+      2,
+      (id, analysis) => setAnalyses((prev) => ({ ...prev, [id]: analysis })),
+      setAnalyzing
+    )
+  }, [data, analyzedCount])
 
   // Run search when submittedQ/source/pillar change
   useEffect(() => {
@@ -257,10 +281,12 @@ export default function SearchClient() {
                 )}
               </h1>
               {data && (
-                <span className="inline-flex items-center gap-3 text-xs text-ss-muted">
-                  <span>
-                    Showing {filtered.length} of {data.total} · PubMed: {data.sources?.pubmed ?? 0} · Semantic Scholar: {data.sources?.semanticScholar ?? 0}
-                  </span>
+                <span className="inline-flex flex-wrap items-center gap-2 text-xs text-ss-muted">
+                  <span>Showing {filtered.length} of {data.total}</span>
+                  {data.sources?.pubmed ? <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-ss-border-warm">PubMed {data.sources.pubmed}</span> : null}
+                  {data.sources?.semanticScholar ? <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-ss-border-warm">Semantic Scholar {data.sources.semanticScholar}</span> : null}
+                  {data.sources?.openAlex ? <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-ss-border-warm">OpenAlex {data.sources.openAlex}</span> : null}
+                  {data.sources?.crossref ? <span className="rounded-full bg-white px-2 py-0.5 ring-1 ring-ss-border-warm">Crossref {data.sources.crossref}</span> : null}
                   {analyzing > 0 && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-ss-privacy-tint px-2.5 py-1 font-semibold text-ss-teal">
                       <Loader2 size={12} className="animate-spin" />
@@ -294,11 +320,31 @@ export default function SearchClient() {
             )}
 
             {!loading && !error && filtered.length > 0 && (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {filtered.map((item) => (
-                  <ResultCard key={item.id} item={item} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                  {filtered.map((item) => (
+                    <ResultCard key={item.id} item={item} />
+                  ))}
+                </div>
+
+                {/* Score more button */}
+                {data && analyzedCount < data.results.length && analyzing === 0 && (
+                  <div className="mt-8 flex flex-col items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={scoreMore}
+                      className="inline-flex items-center gap-2 rounded-full bg-ss-teal px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-teal-dark"
+                    >
+                      <Loader2 size={14} className="opacity-70" />
+                      Score {Math.min(6, data.results.length - analyzedCount)} more result
+                      {Math.min(6, data.results.length - analyzedCount) === 1 ? '' : 's'}
+                    </button>
+                    <p className="text-[11px] text-ss-muted">
+                      {analyzedCount} of {data.results.length} analyzed
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

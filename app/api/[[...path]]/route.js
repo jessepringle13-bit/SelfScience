@@ -209,6 +209,147 @@ async function searchSemanticScholar(query, limit = 10) {
   }
 }
 
+/* ------------------------------ OpenAlex ---------------------------------- */
+
+/**
+ * OpenAlex uses an inverted index for abstracts.
+ * Reconstruct the plain text from { word: [positions...] }.
+ */
+function reconstructOpenAlexAbstract(inv) {
+  if (!inv || typeof inv !== 'object') return ''
+  const positions = []
+  for (const [word, poss] of Object.entries(inv)) {
+    for (const p of poss || []) positions[p] = word
+  }
+  return positions.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+}
+
+const OPENALEX_MAILTO = process.env.CONTACT_EMAIL || 'contact@selfscience.io'
+
+async function searchOpenAlex(query, limit = 10) {
+  try {
+    const url =
+      `https://api.openalex.org/works?search=${encodeURIComponent(query)}` +
+      `&per-page=${limit}&mailto=${encodeURIComponent(OPENALEX_MAILTO)}` +
+      `&filter=is_paratext:false,type:article|preprint|review|book-chapter|dataset` +
+      `&select=id,doi,title,publication_year,authorships,primary_location,type,abstract_inverted_index,open_access,cited_by_count`
+    const res = await fetch(url, { cache: 'no-store' })
+    if (!res.ok) {
+      console.warn('OpenAlex returned', res.status)
+      return []
+    }
+    const data = await safeJson(res)
+    const works = data?.results || []
+    return works.map((w) => {
+      const doi = w.doi ? String(w.doi).replace(/^https?:\/\/doi\.org\//i, '') : null
+      const authors = (w.authorships || []).map((a) => a.author?.display_name).filter(Boolean)
+      const journal = w.primary_location?.source?.display_name || ''
+      const isPreprint = /preprint/i.test(w.type || '') || /biorxiv|medrxiv|arxiv|ssrn/i.test(journal)
+      const openAccess = w.open_access || {}
+      const oaUrl = openAccess.oa_url || null
+      return {
+        id: `oa:${(w.id || '').split('/').pop()}`,
+        provider: 'OpenAlex',
+        source: isPreprint ? 'preprint' : 'peer-reviewed',
+        title: w.title || '(untitled)',
+        journal,
+        year: w.publication_year || null,
+        authors,
+        authorsShort:
+          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
+        abstract: reconstructOpenAlexAbstract(w.abstract_inverted_index),
+        doi,
+        url: doi ? `https://doi.org/${doi}` : w.id,
+        pmid: null,
+        citationCount: w.cited_by_count ?? null,
+        oaUrl,
+        oaStatus: openAccess.oa_status || null,
+        reliability: null,
+        reliabilityLabel: null,
+        reliabilityNote: null,
+        plain: null,
+        flags: [],
+      }
+    })
+  } catch (err) {
+    console.error('OpenAlex error:', err)
+    return []
+  }
+}
+
+/* ------------------------------ Crossref ---------------------------------- */
+
+function stripJats(str) {
+  if (!str) return ''
+  return String(str)
+    .replace(/<jats:[^>]+>/gi, '')
+    .replace(/<\/jats:[^>]+>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+async function searchCrossref(query, limit = 10) {
+  try {
+    const url =
+      `https://api.crossref.org/works?query=${encodeURIComponent(query)}` +
+      `&rows=${limit}` +
+      `&mailto=${encodeURIComponent(OPENALEX_MAILTO)}`
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: { 'User-Agent': `SelfScience/0.4 (mailto:${OPENALEX_MAILTO})` },
+    })
+    if (!res.ok) {
+      console.warn('Crossref returned', res.status)
+      return []
+    }
+    const data = await safeJson(res)
+    const items = data?.message?.items || []
+    return items.map((it) => {
+      const doi = it.DOI || null
+      const authors = (it.author || [])
+        .map((a) => [a.given, a.family].filter(Boolean).join(' '))
+        .filter(Boolean)
+      const journal = (it['container-title'] || [])[0] || ''
+      const year =
+        it.published?.['date-parts']?.[0]?.[0] ||
+        it['published-online']?.['date-parts']?.[0]?.[0] ||
+        it['published-print']?.['date-parts']?.[0]?.[0] ||
+        null
+      const isPreprint = it.subtype === 'preprint' || /preprint/i.test(it.type || '')
+      return {
+        id: `crossref:${(doi || it.title?.[0] || '').slice(0, 60)}`,
+        provider: 'Crossref',
+        source: isPreprint ? 'preprint' : 'peer-reviewed',
+        title: (it.title || [])[0] || '(untitled)',
+        journal,
+        year,
+        authors,
+        authorsShort:
+          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
+        abstract: stripJats(it.abstract),
+        doi,
+        url: doi ? `https://doi.org/${doi}` : null,
+        pmid: null,
+        citationCount: null,
+        oaUrl: null,
+        reliability: null,
+        reliabilityLabel: null,
+        reliabilityNote: null,
+        plain: null,
+        flags: [],
+      }
+    })
+  } catch (err) {
+    console.error('Crossref error:', err)
+    return []
+  }
+}
+
 /* ---------------------------- Merge + dedupe ------------------------------ */
 
 const normalizeTitle = (t) =>
@@ -218,23 +359,40 @@ const normalizeTitle = (t) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-function mergeResults(pubmed, s2) {
-  const seen = new Map() // key -> item
-  const push = (item) => {
-    const key = item.doi ? `doi:${item.doi.toLowerCase()}` : `title:${normalizeTitle(item.title)}`
+// Provider priority when the same paper is found in multiple sources.
+// Later sources fill in missing fields (e.g., abstract, oaUrl, citationCount).
+const PROVIDER_RANK = { PubMed: 0, 'Semantic Scholar': 1, OpenAlex: 2, Crossref: 3 }
+
+function mergeResults(...arrays) {
+  const seen = new Map()
+  const all = []
+  for (const arr of arrays) for (const it of arr) all.push(it)
+
+  // Sort so higher-priority providers land first and become the "base" record
+  all.sort((a, b) => (PROVIDER_RANK[a.provider] ?? 9) - (PROVIDER_RANK[b.provider] ?? 9))
+
+  for (const item of all) {
+    const key = item.doi
+      ? `doi:${item.doi.toLowerCase()}`
+      : `title:${normalizeTitle(item.title)}`
+    if (!key || key === 'title:') continue
     if (!seen.has(key)) {
-      seen.set(key, item)
+      seen.set(key, { ...item, providers: [item.provider] })
     } else {
-      // Prefer PubMed record; but fill in abstract if missing
       const existing = seen.get(key)
+      if (!existing.providers.includes(item.provider)) existing.providers.push(item.provider)
+      // Fill in missing fields from lower-priority sources
       if (!existing.abstract && item.abstract) existing.abstract = item.abstract
+      if (!existing.oaUrl && item.oaUrl) existing.oaUrl = item.oaUrl
+      if (!existing.oaStatus && item.oaStatus) existing.oaStatus = item.oaStatus
       if (!existing.citationCount && item.citationCount)
         existing.citationCount = item.citationCount
+      if (!existing.journal && item.journal) existing.journal = item.journal
+      if (!existing.doi && item.doi) existing.doi = item.doi
+      if (!existing.pmid && item.pmid) existing.pmid = item.pmid
     }
   }
-  ;[...pubmed, ...s2].forEach(push)
 
-  // Interleave to preserve variety, then sort by year desc if year present
   const list = [...seen.values()]
   list.sort((a, b) => (b.year || 0) - (a.year || 0))
   return list
@@ -245,26 +403,30 @@ function mergeResults(pubmed, s2) {
 async function handleSearch(request) {
   const { searchParams } = new URL(request.url)
   const q = (searchParams.get('q') || '').trim()
-  const sourceFilter = searchParams.get('source') || 'all' // all | pubmed | s2
-  const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 30)
+  const sourceFilter = searchParams.get('source') || 'all'
+  const limit = Math.min(parseInt(searchParams.get('limit') || '25', 10), 40)
   const pillar = searchParams.get('pillar') || ''
 
   if (!q) {
     return NextResponse.json({ query: '', results: [], total: 0, sources: {} })
   }
 
-  // Bias the query with the pillar name for a simple UX-side filter
   const effectiveQuery = pillar ? `${q} ${pillar}` : q
+  const wants = (name) => sourceFilter === 'all' || sourceFilter === name
 
-  const pubmedPromise =
-    sourceFilter === 's2' ? Promise.resolve([]) : searchPubmed(effectiveQuery, 12)
-  const s2Promise =
-    sourceFilter === 'pubmed'
-      ? Promise.resolve([])
-      : searchSemanticScholar(effectiveQuery, 10)
+  const [pubmedResults, s2Results, openAlexResults, crossrefResults] = await Promise.all([
+    wants('pubmed') ? searchPubmed(effectiveQuery, 12) : Promise.resolve([]),
+    wants('s2') ? searchSemanticScholar(effectiveQuery, 10) : Promise.resolve([]),
+    wants('openalex') ? searchOpenAlex(effectiveQuery, 10) : Promise.resolve([]),
+    wants('crossref') ? searchCrossref(effectiveQuery, 10) : Promise.resolve([]),
+  ])
 
-  const [pubmedResults, s2Results] = await Promise.all([pubmedPromise, s2Promise])
-  const merged = mergeResults(pubmedResults, s2Results).slice(0, limit)
+  const merged = mergeResults(
+    pubmedResults,
+    s2Results,
+    openAlexResults,
+    crossrefResults
+  ).slice(0, limit)
 
   return NextResponse.json({
     query: q,
@@ -273,6 +435,8 @@ async function handleSearch(request) {
     sources: {
       pubmed: pubmedResults.length,
       semanticScholar: s2Results.length,
+      openAlex: openAlexResults.length,
+      crossref: crossrefResults.length,
     },
     results: merged,
   })

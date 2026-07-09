@@ -59,13 +59,36 @@ export function ResultCard({ item, variant = 'stacked' }) {
       style={{ borderLeft: `4px solid ${meta.color}` }}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SourceBadge type={item.source} />
-          {item.provider && (
+          {item.providers?.length > 1 ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-ss-privacy-tint px-2 py-0.5 text-[10px] font-semibold text-ss-teal"
+              title={`Also found in: ${item.providers.slice(1).join(', ')}`}
+            >
+              +{item.providers.length - 1} source{item.providers.length > 2 ? 's' : ''}
+            </span>
+          ) : item.provider ? (
             <span className="text-[10px] uppercase tracking-wider text-ss-muted">
               {item.provider}
             </span>
-          )}
+          ) : null}
+          {item.oaUrl ? (
+            <a
+              href={item.oaUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1 rounded-full bg-ss-green/10 px-2 py-0.5 text-[10px] font-semibold text-ss-green ring-1 ring-ss-green/30 hover:bg-ss-green hover:text-white"
+              title="Free full text (open access)"
+            >
+              ● Free Full Text
+            </a>
+          ) : null}
+          {typeof item.citationCount === 'number' && item.citationCount > 0 ? (
+            <span className="text-[10px] font-semibold text-ss-muted">
+              {item.citationCount.toLocaleString()} citation{item.citationCount === 1 ? '' : 's'}
+            </span>
+          ) : null}
         </div>
         <span className="text-xs text-ss-muted">{item.year || '—'}</span>
       </div>
