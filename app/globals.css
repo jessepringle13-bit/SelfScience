@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 44 27% 96%;
+    --foreground: 42 15% 14%;
+    --card: 45 25% 97%;
+    --card-foreground: 42 15% 14%;
+    --popover: 45 25% 97%;
+    --popover-foreground: 42 15% 14%;
+    --primary: 186 47% 20%;
+    --primary-foreground: 45 25% 97%;
+    --secondary: 44 20% 90%;
+    --secondary-foreground: 42 15% 14%;
+    --muted: 44 20% 90%;
+    --muted-foreground: 40 3% 47%;
+    --accent: 20 71% 45%;
+    --accent-foreground: 45 25% 97%;
+    --destructive: 322 58% 41%;
+    --destructive-foreground: 45 25% 97%;
+    --border: 43 15% 80%;
+    --input: 43 15% 80%;
+    --ring: 186 47% 20%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+  body {
+    @apply bg-ss-bg text-ss-text;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+}
+
+/* Hide scrollbar for horizontal scroll on featured research */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
