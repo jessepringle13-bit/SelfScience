@@ -3,7 +3,7 @@ import { callAI, extractJson } from '@/lib/ai'
 import { buildAnalysisPrompt, buildGenomePrompt } from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
 
-const NCBI_KEY = process.env.NCBI_API_KEY || ''
+const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
 const S2_BASE = 'https://api.semanticscholar.org/graph/v1'
 
@@ -518,9 +518,33 @@ function normalizeAnalysis(parsed, item) {
       }))
       .slice(0, 4)
   }
-  // Guarantee preprint flag rule
   if (item?.source === 'preprint' && !flags.find((f) => /peer.review/i.test(f.label))) {
     flags.push({ label: 'Not Yet Peer Reviewed', tone: 'amber' })
+  }
+
+  // Funding
+  let funding = null
+  if (parsed?.funding && typeof parsed.funding === 'object') {
+    const fRaw = parseInt(parsed.funding.score, 10)
+    const fScore = Math.min(5, Math.max(1, isFinite(fRaw) ? fRaw : 3))
+    funding = {
+      score: fScore,
+      funders: Array.isArray(parsed.funding.funders)
+        ? parsed.funding.funders.filter((x) => typeof x === 'string' && x.length).slice(0, 6)
+        : [],
+      authorConflicts: Array.isArray(parsed.funding.authorConflicts)
+        ? parsed.funding.authorConflicts.filter((x) => typeof x === 'string' && x.length).slice(0, 4)
+        : [],
+      note: (parsed.funding.note || '').toString().slice(0, 240),
+    }
+  }
+
+  // Related searches
+  let relatedSearches = []
+  if (Array.isArray(parsed?.relatedSearches)) {
+    relatedSearches = parsed.relatedSearches
+      .filter((x) => typeof x === 'string' && x.length)
+      .slice(0, 5)
   }
 
   return {
@@ -529,6 +553,8 @@ function normalizeAnalysis(parsed, item) {
     reliabilityNote: note,
     plain,
     flags,
+    funding,
+    relatedSearches,
   }
 }
 

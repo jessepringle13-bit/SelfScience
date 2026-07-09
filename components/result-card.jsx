@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ExternalLink,
   Share2,
@@ -8,6 +9,7 @@ import {
   Bookmark,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   ReliabilityBadge,
@@ -17,10 +19,12 @@ import {
 
 const SOURCE_META = {
   'peer-reviewed': { label: 'Peer-Reviewed', color: '#1B474D', bg: 'bg-ss-teal' },
-  preprint: { label: 'Preprint', color: '#B07D00', bg: 'bg-[#B07D00]' },
-  editorial: { label: 'Editorial', color: '#006494', bg: 'bg-[#006494]' },
-  blog: { label: 'Blog', color: '#7A7974', bg: 'bg-ss-muted' },
+  preprint:        { label: 'Preprint',      color: '#B07D00', bg: 'bg-[#B07D00]' },
+  editorial:       { label: 'Editorial',     color: '#006494', bg: 'bg-[#006494]' },
+  blog:            { label: 'Blog',          color: '#7A7974', bg: 'bg-ss-muted' },
 }
+
+const AMBER = '#964219'
 
 export function SourceBadge({ type }) {
   const meta = SOURCE_META[type] || SOURCE_META['peer-reviewed']
@@ -44,19 +48,76 @@ export function FlagPill({ label, tone = 'amber' }) {
   )
 }
 
+export function FundingTrailPanel({ funding }) {
+  const [open, setOpen] = useState(false)
+  if (!funding || funding.score > 2) return null
+  return (
+    <div className="mt-3 overflow-hidden rounded-md border border-ss-amber/40 bg-ss-amber/5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[12px] font-bold text-ss-amber hover:bg-ss-amber/10"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <AlertTriangle size={13} /> Funding & Conflict of Interest Report
+        </span>
+        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+      {open && (
+        <div className="space-y-2 border-t border-ss-amber/30 px-3 py-3 text-[12px] text-ss-text">
+          {funding.note ? <p className="italic text-ss-muted">{funding.note}</p> : null}
+          {funding.funders?.length ? (
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-ss-amber">Funders / Sponsors</div>
+              <ul className="mt-1 list-inside list-disc space-y-0.5 text-ss-text">
+                {funding.funders.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          {funding.authorConflicts?.length ? (
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-ss-amber">Author Conflicts</div>
+              <ul className="mt-1 list-inside list-disc space-y-0.5 text-ss-text">
+                {funding.authorConflicts.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          <div className="pt-1 text-[10px] italic text-ss-muted">
+            Verify via <a href={`https://openpaymentsdata.cms.gov/`} target="_blank" rel="noreferrer noopener" className="underline">CMS Open Payments</a> · <a href={`https://retractionwatch.com/`} target="_blank" rel="noreferrer noopener" className="underline">Retraction Watch</a>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ResultCard({ item, variant = 'stacked' }) {
   const [expanded, setExpanded] = useState(false)
+  const router = useRouter()
+
   const meta = SOURCE_META[item.source] || SOURCE_META['peer-reviewed']
   const hasReliability = typeof item.reliability === 'number' && item.reliability > 0
   const analysisError = item._analysisError === true
+  const fundingWarn = item.funding && item.funding.score <= 2
+
+  // Border color: amber overrides when funding is a concern
+  const leftBorderColor = fundingWarn ? AMBER : meta.color
 
   const widthClass =
     variant === 'carousel' ? 'w-[340px] shrink-0 md:w-[380px]' : 'w-full'
 
+  const openStudy = (e) => {
+    e?.preventDefault?.()
+    try {
+      sessionStorage.setItem(`ss:study:${item.id}`, JSON.stringify(item))
+    } catch {}
+    router.push(`/study/${encodeURIComponent(item.id)}`)
+  }
+
   return (
     <article
       className={`group flex ${widthClass} flex-col rounded-lg bg-white p-5 shadow-sm ring-1 ring-black/5 transition hover:shadow-md`}
-      style={{ borderLeft: `4px solid ${meta.color}` }}
+      style={{ borderLeft: `4px solid ${leftBorderColor}` }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -80,6 +141,7 @@ export function ResultCard({ item, variant = 'stacked' }) {
               rel="noreferrer noopener"
               className="inline-flex items-center gap-1 rounded-full bg-ss-green/10 px-2 py-0.5 text-[10px] font-semibold text-ss-green ring-1 ring-ss-green/30 hover:bg-ss-green hover:text-white"
               title="Free full text (open access)"
+              onClick={(e) => e.stopPropagation()}
             >
               ● Free Full Text
             </a>
@@ -93,20 +155,19 @@ export function ResultCard({ item, variant = 'stacked' }) {
         <span className="text-xs text-ss-muted">{item.year || '—'}</span>
       </div>
 
-      <a
-        href={item.url || '#'}
-        target={item.url ? '_blank' : undefined}
-        rel="noreferrer noopener"
-        className="mt-3 block text-[17px] font-bold leading-snug text-ss-teal hover:underline"
+      {/* Title now opens /study/[id] */}
+      <button
+        type="button"
+        onClick={openStudy}
+        className="mt-3 block text-left text-[17px] font-bold leading-snug text-ss-teal hover:underline"
       >
         {item.title}
-      </a>
+      </button>
       <p className="mt-1 text-xs text-ss-muted">
         {item.journal || '—'}
         {item.authorsShort ? <span className="ml-2">· {item.authorsShort}</span> : null}
       </p>
 
-      {/* Reliability visualization */}
       <div className="mt-4">
         {hasReliability ? (
           <ReliabilityBadge
@@ -128,6 +189,9 @@ export function ResultCard({ item, variant = 'stacked' }) {
           ))}
         </div>
       ) : null}
+
+      {/* Funding trail (only when score ≤ 2) */}
+      <FundingTrailPanel funding={item.funding} />
 
       {item.plain ? (
         <div className="mt-4">
@@ -175,8 +239,9 @@ export function ResultCard({ item, variant = 'stacked' }) {
           target={item.url ? '_blank' : undefined}
           rel="noreferrer noopener"
           className="inline-flex items-center gap-1 hover:text-ss-teal"
+          onClick={(e) => e.stopPropagation()}
         >
-          <ExternalLink size={13} /> View Study
+          <ExternalLink size={13} /> View Full Study
         </a>
         <button type="button" className="inline-flex items-center gap-1 hover:text-ss-teal">
           <Share2 size={13} /> Share
