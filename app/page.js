@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Search,
   Upload,
@@ -12,184 +13,102 @@ import {
   Heart,
   ArrowRight,
   ChevronRight,
-  ExternalLink,
-  Share2,
-  FileDown,
-  Bookmark,
 } from 'lucide-react'
-
-/* ----------------------------- Small primitives ---------------------------- */
-
-const SignalBars = ({ filled = 3, size = 'md' }) => {
-  const heights = size === 'sm' ? [6, 9, 12, 15, 18] : [8, 12, 16, 20, 24]
-  return (
-    <div className="flex items-end gap-1">
-      {heights.map((h, i) => (
-        <span
-          key={i}
-          style={{ height: h, width: size === 'sm' ? 4 : 5 }}
-          className={`rounded-sm ${i < filled ? 'bg-ss-teal' : 'bg-ss-border-warm'}`}
-        />
-      ))}
-    </div>
-  )
-}
-
-const SourceBadge = ({ type }) => {
-  const map = {
-    'peer-reviewed': { label: 'Peer-Reviewed', color: 'bg-ss-teal' },
-    'preprint': { label: 'Preprint', color: 'bg-[#B07D00]' },
-    'editorial': { label: 'Editorial', color: 'bg-[#006494]' },
-    'blog': { label: 'Blog', color: 'bg-ss-muted' },
-  }
-  const c = map[type] || map['peer-reviewed']
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white ${c.color}`}>
-      {c.label}
-    </span>
-  )
-}
-
-const FlagPill = ({ label, tone = 'amber' }) => {
-  const bg = tone === 'critical' ? 'bg-ss-critical' : 'bg-ss-amber'
-  return (
-    <span className={`inline-flex items-center rounded-full ${bg} px-2.5 py-0.5 text-[11px] font-semibold text-white`}>
-      {label}
-    </span>
-  )
-}
-
-/* ------------------------------ Result Card -------------------------------- */
-
-const reliabilityLabel = (n) =>
-  ['', 'Preliminary', 'Limited', 'Moderate', 'Strong', 'Excellent'][n] || 'Moderate'
-
-const ResultCard = ({ item }) => {
-  const borderColor = {
-    'peer-reviewed': '#1B474D',
-    'preprint': '#B07D00',
-    'editorial': '#006494',
-    'blog': '#7A7974',
-  }[item.source] || '#1B474D'
-
-  return (
-    <article
-      className="group flex w-[340px] shrink-0 flex-col rounded-lg bg-white p-5 shadow-sm ring-1 ring-black/5 transition hover:shadow-md md:w-[380px]"
-      style={{ borderLeft: `4px solid ${borderColor}` }}
-    >
-      <div className="flex items-center justify-between">
-        <SourceBadge type={item.source} />
-        <span className="text-xs text-ss-muted">{item.year}</span>
-      </div>
-
-      <h3 className="mt-3 text-[17px] font-bold leading-snug text-ss-teal group-hover:underline">
-        {item.title}
-      </h3>
-      <p className="mt-1 text-xs text-ss-muted">{item.journal}</p>
-
-      <div className="mt-4 flex items-center gap-3">
-        <SignalBars filled={item.reliability} size="sm" />
-        <span className="text-sm font-bold text-ss-teal">{reliabilityLabel(item.reliability)}</span>
-      </div>
-      <p className="mt-1 text-xs italic text-ss-muted">{item.reliabilityNote}</p>
-
-      {item.flags?.length ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {item.flags.map((f) => (
-            <FlagPill key={f.label} label={f.label} tone={f.tone} />
-          ))}
-        </div>
-      ) : null}
-
-      <div className="mt-4">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-ss-teal">In Plain Terms:</div>
-        <p className="mt-1 text-sm text-ss-text">{item.plain}</p>
-      </div>
-
-      <button className="mt-3 self-start text-xs font-semibold text-ss-muted hover:text-ss-teal">
-        Full Abstract ▾
-      </button>
-
-      <div className="mt-auto flex items-center gap-4 pt-4 text-xs text-ss-muted">
-        <button className="inline-flex items-center gap-1 hover:text-ss-teal">
-          <ExternalLink size={13} /> View Study
-        </button>
-        <button className="inline-flex items-center gap-1 hover:text-ss-teal">
-          <Share2 size={13} /> Share
-        </button>
-        <button className="inline-flex items-center gap-1 hover:text-ss-teal">
-          <FileDown size={13} /> Export
-        </button>
-        <button className="inline-flex items-center gap-1 hover:text-ss-teal">
-          <Bookmark size={13} /> Save
-        </button>
-      </div>
-    </article>
-  )
-}
+import SiteNav from '@/components/site-nav'
+import { ResultCard } from '@/components/result-card'
 
 /* -------------------------------- Sample data ------------------------------ */
 
 const FEATURED = [
   {
-    id: '1',
+    id: 'f1',
+    provider: 'PubMed',
     source: 'peer-reviewed',
     year: 2024,
     title: 'Time-restricted eating and metabolic markers in adults with prediabetes',
     journal: 'Cell Metabolism',
+    authorsShort: 'Chen L, Patel A, et al.',
     reliability: 4,
+    reliabilityLabel: 'Strong',
     reliabilityNote: 'Randomized controlled trial, n=180, 12-week follow-up.',
     flags: [],
     plain:
       'Eating within an 8-hour window improved fasting glucose and insulin sensitivity compared to unrestricted eating in this 12-week trial.',
+    abstract:
+      'This 12-week randomized controlled trial of 180 adults with prediabetes compared time-restricted eating (8-hour window) to unrestricted eating. Time-restricted eating produced statistically significant improvements in fasting glucose (-7.4 mg/dL) and HOMA-IR (-0.6), with no difference in weight loss between arms.',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/',
   },
   {
-    id: '2',
+    id: 'f2',
+    provider: 'PubMed',
     source: 'peer-reviewed',
     year: 2023,
     title: 'MTHFR C677T variant and folate metabolism: implications for supplementation',
     journal: 'American Journal of Clinical Nutrition',
+    authorsShort: 'Nguyen T, et al.',
     reliability: 3,
+    reliabilityLabel: 'Moderate',
     reliabilityNote: 'Meta-analysis of 22 observational studies.',
     flags: [{ label: 'Small Study', tone: 'amber' }],
     plain:
       'People with two copies of the MTHFR C677T variant convert folic acid less efficiently. Methylfolate may be a better form for this group.',
+    abstract:
+      'Meta-analysis of 22 studies (n=14,320) examined the MTHFR C677T polymorphism and folate metabolism. Homozygous TT carriers demonstrated 30–50% reduced enzyme activity, supporting methylfolate over folic acid in this subgroup.',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/',
   },
   {
-    id: '3',
+    id: 'f3',
+    provider: 'Semantic Scholar',
     source: 'preprint',
     year: 2025,
     title: 'Resistance training frequency and long-term muscle retention after 60',
     journal: 'bioRxiv',
+    authorsShort: 'Alvarez R, et al.',
     reliability: 2,
+    reliabilityLabel: 'Limited',
     reliabilityNote: 'Preprint, awaiting peer review.',
     flags: [{ label: 'Not Yet Peer Reviewed', tone: 'amber' }],
     plain:
       'Two full-body sessions per week appeared sufficient to maintain lean mass in older adults over a 24-month period.',
+    abstract:
+      'Prospective cohort of 240 adults aged 60–78 tracked over 24 months. Two full-body resistance sessions/week were associated with preserved lean mass (DXA) versus a control group, with no additional benefit at 3+ sessions/week in this population.',
+    url: 'https://www.biorxiv.org/',
   },
   {
-    id: '4',
+    id: 'f4',
+    provider: 'PubMed',
     source: 'peer-reviewed',
     year: 2024,
     title: 'Rapamycin, mTOR inhibition, and healthspan: current evidence in humans',
     journal: 'Nature Aging',
+    authorsShort: 'Kim H, et al.',
     reliability: 3,
+    reliabilityLabel: 'Moderate',
     reliabilityNote: 'Narrative review with mechanistic emphasis.',
     flags: [{ label: 'Industry Funded', tone: 'amber' }],
     plain:
       'Human data remains early. Animal evidence is strong but translation to human longevity outcomes has not yet been demonstrated.',
+    abstract:
+      'This narrative review synthesizes preclinical and early human data on rapamycin and mTOR inhibition. Animal models consistently show lifespan extension, but human evidence remains limited to biomarker studies with short follow-up.',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/',
   },
   {
-    id: '5',
+    id: 'f5',
+    provider: 'SelfScience',
     source: 'editorial',
     year: 2025,
     title: 'Understanding APOE genotypes: what your Alzheimer’s risk really means',
     journal: 'SelfScience Editorial',
+    authorsShort: 'SelfScience Editors',
     reliability: 4,
+    reliabilityLabel: 'Strong',
     reliabilityNote: 'Curated summary of consensus literature.',
     flags: [],
     plain:
       'APOE4 raises statistical risk but is not deterministic. Lifestyle, sleep, and cardiovascular health strongly modify outcomes.',
+    abstract:
+      'This editorial reviews the current literature on APOE variants and Alzheimer’s risk, emphasizing the interplay of genetics with modifiable lifestyle factors including sleep, exercise, and cardiovascular health.',
+    url: '/articles/apoe-explained',
   },
 ]
 
@@ -253,54 +172,45 @@ const PILLARS = [
 
 const CATEGORY_PILLS = ['Genomics', 'Nutrition', 'Performance', 'Longevity', 'Wellness']
 
-/* ---------------------------------- Nav ------------------------------------ */
-
-const NavBar = ({ transparent = false }) => (
-  <header
-    className={`absolute inset-x-0 top-0 z-30 border-b ${
-      transparent
-        ? 'border-white/15 bg-ss-teal/40 backdrop-blur-md'
-        : 'border-ss-border-warm bg-white'
-    }`}
-  >
-    <div className="container flex h-16 items-center justify-between">
-      <a href="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-white">
-        <span className="inline-block h-2 w-2 rounded-full bg-ss-orange" />
-        SelfScience
-      </a>
-      <nav className="hidden items-center gap-8 text-sm font-medium text-white/90 md:flex">
-        <a href="/" className="hover:text-white">Home</a>
-        <a href="/genome" className="hover:text-white">Genome</a>
-        <a href="/how-it-works" className="hover:text-white">How it works</a>
-        <a href="/about" className="hover:text-white">About</a>
-      </nav>
-      <a
-        href="/genome"
-        className="hidden rounded-full bg-ss-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark md:inline-flex"
-      >
-        Upload Genome
-      </a>
-    </div>
-  </header>
-)
-
 /* --------------------------------- Page ------------------------------------ */
 
-export default function App() {
+function App() {
+  const router = useRouter()
   const [query, setQuery] = useState('')
   const [activePill, setActivePill] = useState(null)
+
+  const goSearch = (q, pillar) => {
+    const term = (q ?? query).trim()
+    if (!term) return
+    const usp = new URLSearchParams()
+    usp.set('q', term)
+    if (pillar) usp.set('pillar', pillar)
+    router.push(`/search?${usp.toString()}`)
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    goSearch()
+  }
+
+  const handlePillar = (name) => {
+    setActivePill(name)
+    // If user has typed a query, run it with the pillar; otherwise run broad
+    goSearch(query.trim() || name, name)
+  }
+
+  const handleTopicClick = (topic, pillarName) => {
+    goSearch(topic, pillarName)
+  }
 
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
       {/* ============================= HERO ============================= */}
       <section className="relative flex min-h-[100vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
-        <NavBar transparent />
+        <SiteNav variant="dark" />
 
-        {/* Horizontal DNA image band across the right half, fading into teal on the left */}
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[72%]"
-          aria-hidden="true"
-        >
+        {/* Horizontal DNA image band, faded into teal */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[72%]" aria-hidden="true">
           <div
             className="h-full w-full bg-cover bg-center"
             style={{
@@ -315,7 +225,7 @@ export default function App() {
           />
         </div>
 
-        {/* Teal color-wash on top of image so it blends into the brand palette */}
+        {/* Teal color-wash */}
         <div
           className="pointer-events-none absolute inset-0 z-0"
           style={{
@@ -324,7 +234,7 @@ export default function App() {
           }}
         />
 
-        {/* Orange radial glow to tie in the accent */}
+        {/* Orange radial glow */}
         <div
           className="pointer-events-none absolute inset-0 z-0 opacity-70"
           style={{
@@ -333,25 +243,22 @@ export default function App() {
           }}
         />
 
-        {/* Bottom fade so hero blends into next section smoothly */}
+        {/* Bottom fade */}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24"
           style={{
-            background:
-              'linear-gradient(to bottom, rgba(27,71,77,0) 0%, rgba(27,71,77,1) 100%)',
+            background: 'linear-gradient(to bottom, rgba(27,71,77,0) 0%, rgba(27,71,77,1) 100%)',
           }}
         />
 
         <div className="container relative z-10 flex flex-col items-center pt-24 text-center">
-          <h1 className="text-5xl font-extrabold tracking-tight md:text-7xl">
-            SelfScience
-          </h1>
+          <h1 className="text-5xl font-extrabold tracking-tight md:text-7xl">SelfScience</h1>
           <p className="mt-4 max-w-2xl text-lg text-white/85 md:text-xl">
             Search the science. Understand your biology.
           </p>
 
-          {/* search bar */}
-          <div className="mt-10 w-full max-w-3xl">
+          {/* Search bar */}
+          <form onSubmit={handleSubmit} className="mt-10 w-full max-w-3xl">
             <div className="flex items-center overflow-hidden rounded-full bg-white text-ss-text shadow-lg ring-1 ring-black/5">
               <Search className="ml-5 shrink-0 text-ss-muted" size={20} />
               <input
@@ -361,21 +268,24 @@ export default function App() {
                 placeholder="Search a topic, gene, molecule, or study…  e.g. MTHFR, zone 2 training, rapamycin"
                 className="w-full bg-transparent px-4 py-4 text-base placeholder:text-ss-muted focus:outline-none md:py-5 md:text-lg"
               />
-              <button className="m-1.5 hidden rounded-full bg-ss-orange px-6 py-3 text-sm font-semibold text-white transition hover:bg-ss-orange-dark md:inline-flex">
+              <button
+                type="submit"
+                className="m-1.5 rounded-full bg-ss-orange px-6 py-3 text-sm font-semibold text-white transition hover:bg-ss-orange-dark"
+              >
                 Search
               </button>
             </div>
             <p className="mt-3 text-xs text-white/60">
               Sources: PubMed · Semantic Scholar · SelfScience Editorial. Every result gets a reliability score.
             </p>
-          </div>
+          </form>
 
-          {/* category pills */}
+          {/* Category pills */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
             {CATEGORY_PILLS.map((p) => (
               <button
                 key={p}
-                onClick={() => setActivePill(activePill === p ? null : p)}
+                onClick={() => handlePillar(p)}
                 className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
                   activePill === p
                     ? 'border-ss-orange bg-ss-orange text-white'
@@ -405,7 +315,6 @@ export default function App() {
             className="grid grid-cols-1 gap-8 rounded-2xl bg-ss-surface p-6 shadow-sm ring-1 ring-black/5 md:grid-cols-5 md:gap-10 md:p-10"
             style={{ borderLeft: '6px solid #1B474D' }}
           >
-            {/* left */}
             <div className="md:col-span-3">
               <div className="inline-flex items-center gap-2 rounded-full bg-ss-privacy-tint px-3 py-1 text-xs font-semibold text-ss-teal">
                 <Dna size={14} /> Personalized · Optional
@@ -414,16 +323,16 @@ export default function App() {
                 Your Genome. Your Research Starting Point.
               </h2>
               <p className="mt-4 max-w-xl text-ss-text">
-                Upload your raw DNA file from 23andMe, AncestryDNA, or a whole-genome service. SelfScience identifies your key genetic variants and builds a personalized research roadmap.
+                Upload your raw DNA file from 23andMe, AncestryDNA, or a whole-genome service.
+                SelfScience identifies your key genetic variants and builds a personalized research roadmap.
               </p>
-
               <div className="mt-5 flex items-start gap-2 text-sm text-ss-muted">
                 <Lock size={16} className="mt-0.5 shrink-0 text-ss-teal" />
                 <span>
-                  Processed entirely in your browser. No names. No storage. No transmission. Your session clears when you close the page.
+                  Processed entirely in your browser. No names. No storage. No transmission.
+                  Your session clears when you close the page.
                 </span>
               </div>
-
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <a
                   href="/genome"
@@ -440,7 +349,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* right: DNA → variants → roadmap flow */}
             <div className="relative hidden md:col-span-2 md:block">
               <div className="flex h-full items-center justify-center">
                 <div className="flex w-full items-center justify-between gap-3">
@@ -482,7 +390,7 @@ export default function App() {
               </p>
             </div>
             <a
-              href="/search"
+              href="/search?q=longevity"
               className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-ss-teal hover:underline md:inline-flex"
             >
               Browse all <ArrowRight size={14} />
@@ -492,7 +400,7 @@ export default function App() {
           <div className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4">
             {FEATURED.map((item) => (
               <div key={item.id} className="snap-start">
-                <ResultCard item={item} />
+                <ResultCard item={item} variant="carousel" />
               </div>
             ))}
           </div>
@@ -529,23 +437,25 @@ export default function App() {
                 <ul className="mt-4 space-y-2 text-sm">
                   {items.map((it) => (
                     <li key={it}>
-                      <a
-                        href="#"
-                        className="group flex items-start gap-1.5 text-ss-text hover:text-ss-teal"
+                      <button
+                        type="button"
+                        onClick={() => handleTopicClick(it, name)}
+                        className="group flex items-start gap-1.5 text-left text-ss-text hover:text-ss-teal"
                       >
                         <ChevronRight size={14} className="mt-1 shrink-0 text-ss-muted group-hover:text-ss-teal" />
                         <span className="leading-snug">{it}</span>
-                      </a>
+                      </button>
                     </li>
                   ))}
                 </ul>
 
-                <a
-                  href={`/${key}`}
+                <button
+                  type="button"
+                  onClick={() => goSearch(name, name)}
                   className="mt-6 inline-flex w-fit items-center gap-1 rounded-full border border-ss-teal px-4 py-1.5 text-xs font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
                 >
                   Explore {name} <ArrowRight size={12} />
-                </a>
+                </button>
               </div>
             ))}
           </div>
@@ -600,3 +510,5 @@ function FlowStep({ icon, label }) {
     </div>
   )
 }
+
+export default App
