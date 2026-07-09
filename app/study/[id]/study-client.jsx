@@ -71,9 +71,16 @@ export default function StudyClient({ id }) {
             abstract: item.abstract,
             reliabilityScore: rel.reliability,
             reliabilityLabel: rel.reliabilityLabel,
+            source: item.source,
+            flags: rel.flags || [],
           }),
-        }).then((r) => (r.ok ? r.json() : { plain: '', relatedSearches: [] }))
-        setAnalysis({ ...rel, plain: plainResp.plain || '', relatedSearches: plainResp.relatedSearches || [] })
+        }).then((r) => (r.ok ? r.json() : { plain: '', sections: null, relatedSearches: [] }))
+        setAnalysis({
+          ...rel,
+          plain: plainResp.plain || '',
+          sections: plainResp.sections || null,
+          relatedSearches: plainResp.relatedSearches || [],
+        })
       })
       .catch(() => setAnalysis({ _analysisError: true }))
       .finally(() => setAnalyzing(false))
@@ -259,31 +266,48 @@ export default function StudyClient({ id }) {
             </div>
           )}
 
-          {/* Plain language */}
-          {merged.plain ? (
-            <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-ss-teal">
-                In Plain Terms
-              </div>
-              <p className="mt-2 text-base leading-relaxed text-ss-text">{merged.plain}</p>
-            </div>
-          ) : null}
-
-          {/* Abstract */}
+          {/* Plain Language / Full Abstract toggle */}
           <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-black/5">
-            <button
-              onClick={() => setAbsOpen((v) => !v)}
-              className="flex w-full items-center justify-between"
-            >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-ss-teal">
-                Original Abstract — Source: {merged.journal || merged.provider}
-              </span>
-              {absOpen ? <ChevronUp size={16} className="text-ss-muted" /> : <ChevronDown size={16} className="text-ss-muted" />}
-            </button>
-            {absOpen && (
-              <p className="mt-3 whitespace-pre-line text-[14px] leading-relaxed text-ss-text/90">
-                {merged.abstract || 'No abstract available from source.'}
-              </p>
+            <div className="mb-4 flex items-center gap-1 rounded-full bg-ss-surface p-1 ring-1 ring-ss-border-warm/70 w-fit">
+              <button
+                type="button"
+                onClick={() => setAbsOpen(false)}
+                className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                  !absOpen ? 'bg-ss-teal text-white shadow-sm' : 'text-ss-muted hover:text-ss-teal'
+                }`}
+              >
+                Plain Language
+              </button>
+              <button
+                type="button"
+                onClick={() => setAbsOpen(true)}
+                className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                  absOpen ? 'bg-ss-teal text-white shadow-sm' : 'text-ss-muted hover:text-ss-teal'
+                }`}
+              >
+                Full Abstract
+              </button>
+            </div>
+
+            {!absOpen ? (
+              merged.sections ? (
+                <PlainLanguageSections sections={merged.sections} />
+              ) : merged.plain ? (
+                <p className="text-base leading-relaxed text-ss-text">{merged.plain}</p>
+              ) : (
+                <p className="text-sm italic text-ss-muted">
+                  Plain-language translation not yet available for this study.
+                </p>
+              )
+            ) : (
+              <div>
+                <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-ss-muted">
+                  Original Abstract — Source: {merged.journal || merged.provider}
+                </div>
+                <p className="whitespace-pre-line text-[14px] leading-relaxed text-ss-text/90">
+                  {merged.abstract || 'No abstract available from source.'}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -374,6 +398,42 @@ function MetaRow({ label, value }) {
     <div className="flex items-start justify-between gap-3 border-b border-ss-border-warm/60 py-1.5 last:border-b-0">
       <span className="text-[10px] font-bold uppercase tracking-wider text-ss-muted">{label}</span>
       <span className="text-right text-ss-text">{value || '—'}</span>
+    </div>
+  )
+}
+
+const SECTION_ORDER = [
+  { key: 'studyType',        header: 'What Kind of Study Is This?' },
+  { key: 'researchQuestion', header: 'What Were They Trying to Find Out?' },
+  { key: 'whatTheyFound',    header: 'What Did They Find?' },
+  { key: 'whatItMeasures',   header: 'What Does This Actually Measure?' },
+  { key: 'limitations',      header: 'What Are the Limitations?' },
+  { key: 'biggerPicture',    header: 'Where Does This Fit in the Bigger Picture?' },
+  { key: 'practicalMeaning', header: 'What Does This Mean Practically?' },
+]
+
+function PlainLanguageSections({ sections }) {
+  return (
+    <div className="space-y-6">
+      {SECTION_ORDER.map(({ key, header }) => {
+        const text = sections?.[key]
+        if (!text) return null
+        return (
+          <section key={key}>
+            <h3 className="text-[13px] font-extrabold text-ss-teal">{header}</h3>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-ss-text">{text}</p>
+          </section>
+        )
+      })}
+
+      {Array.isArray(sections?.terms) && sections.terms.length > 0 && (
+        <section>
+          <h3 className="text-[13px] font-extrabold text-ss-teal">Terms Used in This Study</h3>
+          <ul className="mt-1.5 list-inside list-disc space-y-1 text-[14px] text-ss-text">
+            {sections.terms.slice(0, 8).map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }

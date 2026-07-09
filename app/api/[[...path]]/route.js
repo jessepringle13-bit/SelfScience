@@ -561,12 +561,15 @@ async function handleTranslatePlainLanguage(request) {
         { status: 502 }
       )
     }
-    const plain = (parsed?.plainLanguage || parsed?.plain || '').toString().trim()
+    const plainRaw = (parsed?.plainLanguage || parsed?.plain || '').toString().trim()
+    const sections = parsed?.sections && typeof parsed.sections === 'object' ? parsed.sections : null
+    // Use "What Did They Find?" as the card preview when sections are present
+    const plain = sections?.whatTheyFound?.toString?.().trim?.() || plainRaw
     let relatedSearches = []
     if (Array.isArray(parsed?.relatedSearches)) {
       relatedSearches = parsed.relatedSearches.filter((x) => typeof x === 'string' && x.length).slice(0, 5)
     }
-    return NextResponse.json({ plain, relatedSearches, aiProvider: provider, aiModel: model })
+    return NextResponse.json({ plain, sections, relatedSearches, aiProvider: provider, aiModel: model })
   } catch (err) {
     console.error('translate-plain-language error:', err?.message)
     return NextResponse.json(

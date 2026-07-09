@@ -81,12 +81,15 @@ async function analyzeInPool(items, concurrency, onResult, onCount) {
                 abstract: item.abstract,
                 reliabilityScore: rel.reliability,
                 reliabilityLabel: rel.reliabilityLabel,
+                source: item.source,
+                flags: rel.flags || [],
               }),
-            }).then((r) => (r.ok ? r.json() : { plain: '', relatedSearches: [] }))
+            }).then((r) => (r.ok ? r.json() : { plain: '', sections: null, relatedSearches: [] }))
             const plainResp = await plainP
             onResult(item.id, {
               ...rel,
               plain: plainResp.plain || '',
+              sections: plainResp.sections || null,
               relatedSearches: plainResp.relatedSearches || [],
             })
           })
