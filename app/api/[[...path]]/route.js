@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
-import { callAI, extractJson } from '@/lib/ai'
-import { buildAnalysisPrompt, buildGenomePrompt } from '@/lib/prompts'
+import {
+  scoreReliability as callReliability,
+  translatePlainLanguage as callPlainLanguage,
+  interpretGenome as callGenome,
+  extractJson,
+} from '@/lib/ai'
+import {
+  buildReliabilityPrompt,
+  buildPlainLanguagePrompt,
+  buildGenomePrompt,
+} from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
 
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
@@ -499,132 +508,121 @@ const analysisCache = new Map()
 
 const VALID_LABELS = ['Preliminary', 'Limited', 'Moderate', 'Strong', 'Excellent']
 
-function normalizeAnalysis(parsed, item) {
+async function handleScoreReliability(request) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const item = body || {}
+  const cacheKey = item.id || item.doi || item.pmid || (item.title || '').slice(0, 120)
+  if (cacheKey && analysisCache.has(cacheKey)) {
+    return NextResponse.json({ ...analysisCache.get(cacheKey), cached: true })
+  }
+  try {
+    const prompt = buildReliabilityPrompt(item)
+    const { text, provider, model } = await callReliability(prompt)
+    const parsed = extractJson(text)
+    if (!parsed) {
+      return NextResponse.json(
+        { error: 'Model returned non-JSON output', raw: (text || '').slice(0, 400), provider, model },
+        { status: 502 }
+      )
+    }
+    const normalized = normalizeReliability(parsed, item)
+    normalized.aiProvider = provider
+    normalized.aiModel = model
+    if (cacheKey) analysisCache.set(cacheKey, normalized)
+    return NextResponse.json(normalized)
+  } catch (err) {
+    console.error('score-reliability error:', err?.message)
+    return NextResponse.json(
+      { error: 'Analysis temporarily unavailable. Results still accessible.', detail: err?.message?.slice(0, 200) },
+      { status: err?.status || 500 }
+    )
+  }
+}
+
+async function handleTranslatePlainLanguage(request) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  try {
+    const prompt = buildPlainLanguagePrompt(body || {})
+    const { text, provider, model } = await callPlainLanguage(prompt)
+    const parsed = extractJson(text)
+    if (!parsed) {
+      return NextResponse.json(
+        { error: 'Model returned non-JSON output', raw: (text || '').slice(0, 400), provider, model },
+        { status: 502 }
+      )
+    }
+    const plain = (parsed?.plainLanguage || parsed?.plain || '').toString().trim()
+    let relatedSearches = []
+    if (Array.isArray(parsed?.relatedSearches)) {
+      relatedSearches = parsed.relatedSearches.filter((x) => typeof x === 'string' && x.length).slice(0, 5)
+    }
+    return NextResponse.json({ plain, relatedSearches, aiProvider: provider, aiModel: model })
+  } catch (err) {
+    console.error('translate-plain-language error:', err?.message)
+    return NextResponse.json(
+      { error: 'Analysis temporarily unavailable. Results still accessible.', detail: err?.message?.slice(0, 200) },
+      { status: err?.status || 500 }
+    )
+  }
+}
+
+/* Response normalizer for reliability output */
+function normalizeReliability(parsed, item) {
   const scoreRaw = parseInt(parsed?.score, 10)
   const score = Math.min(5, Math.max(1, isFinite(scoreRaw) ? scoreRaw : 3))
-  const label = VALID_LABELS.includes(parsed?.label)
-    ? parsed.label
-    : VALID_LABELS[score - 1]
+  const label = VALID_LABELS.includes(parsed?.label) ? parsed.label : VALID_LABELS[score - 1]
   const note = (parsed?.note || '').toString().slice(0, 160)
-  const plain = (parsed?.plainLanguage || parsed?.plain || '').toString().trim()
 
   let flags = []
   if (Array.isArray(parsed?.flags)) {
     flags = parsed.flags
       .filter((f) => f && typeof f.label === 'string')
-      .map((f) => ({
-        label: f.label.slice(0, 40),
-        tone: f.tone === 'critical' ? 'critical' : 'amber',
-      }))
+      .map((f) => ({ label: f.label.slice(0, 40), tone: f.tone === 'critical' ? 'critical' : 'amber' }))
       .slice(0, 4)
   }
   if (item?.source === 'preprint' && !flags.find((f) => /peer.review/i.test(f.label))) {
     flags.push({ label: 'Not Yet Peer Reviewed', tone: 'amber' })
   }
 
-  // Funding
   let funding = null
   if (parsed?.funding && typeof parsed.funding === 'object') {
     const fRaw = parseInt(parsed.funding.score, 10)
     const fScore = Math.min(5, Math.max(1, isFinite(fRaw) ? fRaw : 3))
     funding = {
       score: fScore,
-      funders: Array.isArray(parsed.funding.funders)
-        ? parsed.funding.funders.filter((x) => typeof x === 'string' && x.length).slice(0, 6)
-        : [],
-      authorConflicts: Array.isArray(parsed.funding.authorConflicts)
-        ? parsed.funding.authorConflicts.filter((x) => typeof x === 'string' && x.length).slice(0, 4)
-        : [],
+      funders: Array.isArray(parsed.funding.funders) ? parsed.funding.funders.filter((x) => typeof x === 'string' && x.length).slice(0, 6) : [],
+      authorConflicts: Array.isArray(parsed.funding.authorConflicts) ? parsed.funding.authorConflicts.filter((x) => typeof x === 'string' && x.length).slice(0, 4) : [],
       note: (parsed.funding.note || '').toString().slice(0, 240),
     }
-  }
-
-  // Related searches
-  let relatedSearches = []
-  if (Array.isArray(parsed?.relatedSearches)) {
-    relatedSearches = parsed.relatedSearches
-      .filter((x) => typeof x === 'string' && x.length)
-      .slice(0, 5)
   }
 
   return {
     reliability: score,
     reliabilityLabel: label,
     reliabilityNote: note,
-    plain,
     flags,
     funding,
-    relatedSearches,
   }
 }
+/* ------------------- /api/interpret-genome ------------------- */
 
-async function handleAnalyze(request) {
+async function handleInterpretGenome(request) {
   let body
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-
-  const item = body || {}
-  const cacheKey = item.id || item.doi || item.pmid || (item.title || '').slice(0, 120)
-
-  if (cacheKey && analysisCache.has(cacheKey)) {
-    return NextResponse.json({ ...analysisCache.get(cacheKey), cached: true })
-  }
-
-  try {
-    const prompt = buildAnalysisPrompt(item)
-    const { text, provider } = await callAI(prompt, {
-      temperature: 0.1,
-      maxOutputTokens: 1200,
-      responseMimeType: 'application/json',
-      thinkingBudget: 0,
-    })
-    const parsed = extractJson(text)
-    if (!parsed) {
-      return NextResponse.json(
-        {
-          error: 'Model returned non-JSON output',
-          raw: text?.slice(0, 400),
-          provider,
-        },
-        { status: 502 }
-      )
-    }
-    const normalized = normalizeAnalysis(parsed, item)
-    normalized.aiProvider = provider
-    if (cacheKey) analysisCache.set(cacheKey, normalized)
-    return NextResponse.json(normalized)
-  } catch (err) {
-    console.error('Gemini analyze error:', err?.message)
-    return NextResponse.json(
-      {
-        error: err?.code === 'NO_KEY' ? 'GEMINI_API_KEY not configured' : err?.message || 'Analysis failed',
-      },
-      { status: err?.status || 500 }
-    )
-  }
-}
-
-export async function POST(request, { params }) {
-  const p = (await params)?.path || []
-  const route = Array.isArray(p) ? p[0] : p
-  if (route === 'analyze') return handleAnalyze(request)
-  if (route === 'genome') return handleGenome(request)
-  return NextResponse.json({ status: 'ok' })
-}
-
-/* ------------------------------ /api/genome ------------------------------- */
-
-async function handleGenome(request) {
-  let body
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-
   const rawVariants = body?.variants || {}
   // Server-side whitelist enforcement + no PII: only keep approved rsIDs.
   const variants = {}
@@ -634,35 +632,41 @@ async function handleGenome(request) {
     }
   }
   if (Object.keys(variants).length === 0) {
-    return NextResponse.json(
-      { error: 'No recognized variants in the submitted set.' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'No recognized variants in the submitted set.' }, { status: 400 })
   }
 
   try {
     const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
-    const { text, provider } = await callAI(prompt, {
-      temperature: 0.15,
-      maxOutputTokens: 12000,
-      responseMimeType: 'application/json',
-      thinkingBudget: 0,
-    })
+    const { text, provider, model } = await callGenome(prompt)
     const parsed = extractJson(text)
     if (!parsed) {
       return NextResponse.json(
-        { error: 'Model returned non-JSON output', raw: (text || '').slice(0, 500), provider },
+        { error: 'Analysis temporarily unavailable. Results still accessible.', raw: (text || '').slice(0, 500), provider, model },
         { status: 502 }
       )
     }
-    return NextResponse.json({ ...parsed, aiProvider: provider })
+    return NextResponse.json({ ...parsed, aiProvider: provider, aiModel: model })
   } catch (err) {
-    console.error('Genome analyze error:', err?.message)
+    console.error('interpret-genome error:', err?.message)
     return NextResponse.json(
-      {
-        error: err?.code === 'NO_KEY' ? 'No AI provider configured' : err?.message || 'Analysis failed',
-      },
+      { error: 'Analysis temporarily unavailable. Results still accessible.', detail: err?.message?.slice(0, 200) },
       { status: err?.status || 500 }
     )
   }
+}
+
+export async function POST(request, { params }) {
+  const p = (await params)?.path || []
+  const route = Array.isArray(p) ? p[0] : p
+
+  // New endpoints per spec
+  if (route === 'score-reliability') return handleScoreReliability(request)
+  if (route === 'translate-plain-language') return handleTranslatePlainLanguage(request)
+  if (route === 'interpret-genome') return handleInterpretGenome(request)
+
+  // Backward-compat aliases so existing clients keep working during migration
+  if (route === 'analyze') return handleScoreReliability(request)
+  if (route === 'genome') return handleInterpretGenome(request)
+
+  return NextResponse.json({ status: 'ok' })
 }

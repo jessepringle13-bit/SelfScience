@@ -55,26 +55,41 @@ async function analyzeInPool(items, concurrency, onResult, onCount) {
         const item = queue.shift()
         inFlight++
         kick()
-        fetch('/api/analyze', {
+
+        // Call BOTH endpoints in parallel per item:
+        //   1) /api/score-reliability  → reliability + flags + funding
+        //   2) /api/translate-plain-language → plain + related searches
+        const reliabilityP = fetch('/api/score-reliability', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: item.id,
-            doi: item.doi,
-            pmid: item.pmid,
-            title: item.title,
-            journal: item.journal,
-            year: item.year,
-            source: item.source,
-            authorsShort: item.authorsShort,
-            abstract: item.abstract,
+            id: item.id, doi: item.doi, pmid: item.pmid,
+            title: item.title, journal: item.journal,
+            year: item.year, source: item.source,
+            authorsShort: item.authorsShort, abstract: item.abstract,
           }),
-        })
-          .then(async (res) => {
-            if (!res.ok) throw new Error(String(res.status))
-            return res.json()
+        }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+
+        reliabilityP
+          .then(async (rel) => {
+            // Then fetch plain-language once we have reliability context
+            const plainP = fetch('/api/translate-plain-language', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: item.title,
+                abstract: item.abstract,
+                reliabilityScore: rel.reliability,
+                reliabilityLabel: rel.reliabilityLabel,
+              }),
+            }).then((r) => (r.ok ? r.json() : { plain: '', relatedSearches: [] }))
+            const plainResp = await plainP
+            onResult(item.id, {
+              ...rel,
+              plain: plainResp.plain || '',
+              relatedSearches: plainResp.relatedSearches || [],
+            })
           })
-          .then((json) => onResult(item.id, json))
           .catch(() => onResult(item.id, { _analysisError: true }))
           .finally(() => {
             inFlight--

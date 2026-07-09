@@ -67,7 +67,7 @@ export default function GenomeClient() {
     await stepThroughProgress()
 
     try {
-      const res = await fetch('/api/genome', {
+      const res = await fetch('/api/interpret-genome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ variants: parsed.variants }),

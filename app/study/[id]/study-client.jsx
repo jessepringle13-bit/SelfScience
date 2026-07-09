@@ -50,23 +50,31 @@ export default function StudyClient({ id }) {
       return
     }
     setAnalyzing(true)
-    fetch('/api/analyze', {
+    // Call both endpoints in parallel: reliability first, then plain language.
+    fetch('/api/score-reliability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: item.id,
-        doi: item.doi,
-        pmid: item.pmid,
-        title: item.title,
-        journal: item.journal,
-        year: item.year,
-        source: item.source,
-        authorsShort: item.authorsShort,
-        abstract: item.abstract,
+        id: item.id, doi: item.doi, pmid: item.pmid,
+        title: item.title, journal: item.journal,
+        year: item.year, source: item.source,
+        authorsShort: item.authorsShort, abstract: item.abstract,
       }),
     })
-      .then((r) => r.json())
-      .then((json) => setAnalysis(json))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(async (rel) => {
+        const plainResp = await fetch('/api/translate-plain-language', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: item.title,
+            abstract: item.abstract,
+            reliabilityScore: rel.reliability,
+            reliabilityLabel: rel.reliabilityLabel,
+          }),
+        }).then((r) => (r.ok ? r.json() : { plain: '', relatedSearches: [] }))
+        setAnalysis({ ...rel, plain: plainResp.plain || '', relatedSearches: plainResp.relatedSearches || [] })
+      })
       .catch(() => setAnalysis({ _analysisError: true }))
       .finally(() => setAnalyzing(false))
   }, [item])
