@@ -7,14 +7,11 @@ import {
   Upload,
   Lock,
   Dna,
-  Apple,
-  Activity,
-  Hourglass,
-  Heart,
   ArrowRight,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react'
-import SiteNav from '@/components/site-nav'
+import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
 
 /* -------------------------------- Sample data ------------------------------ */
@@ -112,65 +109,73 @@ const FEATURED = [
   },
 ]
 
-const PILLARS = [
+export const BOOKS = [
   {
-    key: 'genomics',
-    name: 'Genomics',
-    Icon: Dna,
-    desc: 'How your genetic variants shape metabolism, sensitivity, and long-term risk.',
-    items: [
-      'MTHFR variants and folate metabolism',
-      'APOE genotypes and cognitive aging',
-      'CYP1A2 and caffeine clearance',
-    ],
+    id: 'outlive',
+    title: 'Outlive',
+    subtitle: 'The Science and Art of Longevity',
+    author: 'Peter Attia, MD',
+    pillar: 'Longevity',
+    coverFrom: '#006494',
+    coverTo: '#1B474D',
+    searchQuery: 'healthspan biomarkers Peter Attia longevity',
   },
   {
-    key: 'nutrition',
-    name: 'Nutrition',
-    Icon: Apple,
-    desc: 'Evidence on diet patterns, macronutrients, and personalized nutrition.',
-    items: [
-      'Time-restricted eating in prediabetes',
-      'Protein timing and muscle synthesis',
-      'Omega-3 dosing and inflammation',
-    ],
+    id: 'genome-odyssey',
+    title: 'The Genome Odyssey',
+    subtitle: 'Medical Mysteries and the Quest to Solve Them',
+    author: 'Euan Angus Ashley',
+    pillar: 'Genomics',
+    coverFrom: '#1B474D',
+    coverTo: '#123539',
+    searchQuery: 'whole genome sequencing rare disease diagnosis',
   },
   {
-    key: 'performance',
-    name: 'Performance',
-    Icon: Activity,
-    desc: 'Training, recovery, and adaptation research for real-world athletes.',
-    items: [
-      'Zone 2 training and mitochondrial density',
-      'Creatine monohydrate — cognitive effects',
-      'Sleep debt and next-day power output',
-    ],
+    id: 'why-we-sleep',
+    title: 'Why We Sleep',
+    subtitle: 'Unlocking the Power of Sleep and Dreams',
+    author: 'Matthew Walker, PhD',
+    pillar: 'General Wellness',
+    coverFrom: '#A12C7B',
+    coverTo: '#6B1B4F',
+    searchQuery: 'sleep deprivation cognition memory consolidation',
   },
   {
-    key: 'longevity',
-    name: 'Longevity',
-    Icon: Hourglass,
-    desc: 'Interventions and biomarkers linked to healthspan and biological age.',
-    items: [
-      'Rapamycin — current human evidence',
-      'GlycanAge vs epigenetic clocks',
-      'Senolytics: state of the field 2025',
-    ],
-  },
-  {
-    key: 'wellness',
-    name: 'Wellness',
-    Icon: Heart,
-    desc: 'Sleep, stress, mental health, and daily practice research.',
-    items: [
-      'Morning light exposure and circadian rhythm',
-      'HRV, breath-work, and vagal tone',
-      'Sauna use and cardiovascular outcomes',
-    ],
+    id: 'comfort-crisis',
+    title: 'The Comfort Crisis',
+    subtitle: 'Embrace Discomfort to Reclaim Your Wild, Happy, Healthy Self',
+    author: 'Michael Easter',
+    pillar: 'Sports Performance',
+    coverFrom: '#C45820',
+    coverTo: '#8B3E15',
+    searchQuery: 'physical activity resilience VO2 max longevity',
   },
 ]
 
-const CATEGORY_PILLS = ['Genomics', 'Nutrition', 'Performance', 'Longevity', 'Wellness']
+const CATEGORY_PILLS = [
+  'Genomics',
+  'Nutrition',
+  'Performance',
+  'Longevity',
+  'Wellness',
+  'Pharmacogenomics',
+  'Mental Health',
+  'Environment',
+  'Hormones',
+]
+
+// Map pill short-label to full pillar name (for URL param)
+const PILL_TO_PILLAR = {
+  'Genomics': 'Genomics',
+  'Nutrition': 'Nutrition',
+  'Performance': 'Sports Performance',
+  'Longevity': 'Longevity',
+  'Wellness': 'General Wellness',
+  'Pharmacogenomics': 'Pharmacogenomics',
+  'Mental Health': 'Mental Health & Neurochemistry',
+  'Environment': 'Environmental Sensitivity',
+  'Hormones': 'Hormones & Endocrine Health',
+}
 
 /* --------------------------------- Page ------------------------------------ */
 
@@ -193,14 +198,10 @@ function App() {
     goSearch()
   }
 
-  const handlePillar = (name) => {
-    setActivePill(name)
-    // If user has typed a query, run it with the pillar; otherwise run broad
-    goSearch(query.trim() || name, name)
-  }
-
-  const handleTopicClick = (topic, pillarName) => {
-    goSearch(topic, pillarName)
+  const handlePill = (pillLabel) => {
+    setActivePill(pillLabel)
+    const pillar = PILL_TO_PILLAR[pillLabel] || pillLabel
+    goSearch(query.trim() || pillar, pillar)
   }
 
   return (
@@ -209,8 +210,11 @@ function App() {
       <section className="relative flex min-h-[100vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
         <SiteNav variant="dark" />
 
-        {/* Horizontal DNA image band, faded into teal */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[72%]" aria-hidden="true">
+        {/* Horizontal DNA image band */}
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full md:w-[72%]"
+          aria-hidden="true"
+        >
           <div
             className="h-full w-full bg-cover bg-center"
             style={{
@@ -225,7 +229,6 @@ function App() {
           />
         </div>
 
-        {/* Teal color-wash */}
         <div
           className="pointer-events-none absolute inset-0 z-0"
           style={{
@@ -234,7 +237,6 @@ function App() {
           }}
         />
 
-        {/* Orange radial glow */}
         <div
           className="pointer-events-none absolute inset-0 z-0 opacity-70"
           style={{
@@ -243,18 +245,17 @@ function App() {
           }}
         />
 
-        {/* Bottom fade */}
         <div
           className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-24"
-          style={{
-            background: 'linear-gradient(to bottom, rgba(27,71,77,0) 0%, rgba(27,71,77,1) 100%)',
-          }}
+          style={{ background: 'linear-gradient(to bottom, rgba(27,71,77,0) 0%, rgba(27,71,77,1) 100%)' }}
         />
 
         <div className="container relative z-10 flex flex-col items-center pt-24 text-center">
-          <h1 className="text-5xl font-extrabold tracking-tight md:text-7xl">SelfScience</h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/85 md:text-xl">
-            Search the science. Understand your biology.
+          <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl">
+            Search the science.<br className="hidden sm:block" /> Understand your biology.
+          </h1>
+          <p className="mt-4 max-w-2xl text-lg text-white/80">
+            AI-scored research across nine health pillars. Personalized by your own genome, if you choose.
           </p>
 
           {/* Search bar */}
@@ -276,17 +277,17 @@ function App() {
               </button>
             </div>
             <p className="mt-3 text-xs text-white/60">
-              Sources: PubMed · Semantic Scholar · SelfScience Editorial. Every result gets a reliability score.
+              Sources: PubMed · Semantic Scholar · OpenAlex · Crossref · SelfScience Editorial. Every result gets an AI reliability score.
             </p>
           </form>
 
-          {/* Category pills */}
+          {/* 9 category pills */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
             {CATEGORY_PILLS.map((p) => (
               <button
                 key={p}
-                onClick={() => handlePillar(p)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                onClick={() => handlePill(p)}
+                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
                   activePill === p
                     ? 'border-ss-orange bg-ss-orange text-white'
                     : 'border-white/25 bg-white/5 text-white/90 hover:bg-white/10'
@@ -313,7 +314,7 @@ function App() {
         <div className="container">
           <div
             className="grid grid-cols-1 gap-8 rounded-2xl bg-ss-surface p-6 shadow-sm ring-1 ring-black/5 md:grid-cols-5 md:gap-10 md:p-10"
-            style={{ borderLeft: '6px solid #1B474D' }}
+            style={{ borderLeft: '4px solid #1B474D' }}
           >
             <div className="md:col-span-3">
               <div className="inline-flex items-center gap-2 rounded-full bg-ss-privacy-tint px-3 py-1 text-xs font-semibold text-ss-teal">
@@ -323,14 +324,12 @@ function App() {
                 Your Genome. Your Research Starting Point.
               </h2>
               <p className="mt-4 max-w-xl text-ss-text">
-                Upload your raw DNA file from 23andMe, AncestryDNA, or a whole-genome service.
-                SelfScience identifies your key genetic variants and builds a personalized research roadmap.
+                Upload your raw DNA data file from 23andMe, AncestryDNA, or a whole genome service. Get a personalized research roadmap built around your specific genetic variants — processed entirely in your browser, never stored.
               </p>
               <div className="mt-5 flex items-start gap-2 text-sm text-ss-muted">
                 <Lock size={16} className="mt-0.5 shrink-0 text-ss-teal" />
                 <span>
-                  Processed entirely in your browser. No names. No storage. No transmission.
-                  Your session clears when you close the page.
+                  <b className="text-ss-teal">Your file never leaves your device.</b> No storage. No exposure.
                 </span>
               </div>
               <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -345,30 +344,13 @@ function App() {
                 </span>
               </div>
               <div className="mt-3 text-xs text-ss-muted">
-                Supported: 23andMe · AncestryDNA · MyHeritage · Whole Genome Sequencing
+                Supported: 23andMe · AncestryDNA · MyHeritage
               </div>
             </div>
 
+            {/* Right side illustration */}
             <div className="relative hidden md:col-span-2 md:block">
-              <div className="flex h-full items-center justify-center">
-                <div className="flex w-full items-center justify-between gap-3">
-                  <FlowStep icon={<Dna size={22} />} label="DNA File" />
-                  <ChevronRight className="shrink-0 text-ss-muted" />
-                  <FlowStep
-                    icon={
-                      <div className="flex gap-0.5">
-                        <span className="h-4 w-1 rounded-sm bg-ss-teal" />
-                        <span className="h-6 w-1 rounded-sm bg-ss-teal" />
-                        <span className="h-3 w-1 rounded-sm bg-ss-teal" />
-                        <span className="h-5 w-1 rounded-sm bg-ss-teal" />
-                      </div>
-                    }
-                    label="Variants"
-                  />
-                  <ChevronRight className="shrink-0 text-ss-muted" />
-                  <FlowStep icon={<Search size={22} />} label="Research Roadmap" />
-                </div>
-              </div>
+              <GenomeFlowIllustration />
             </div>
           </div>
         </div>
@@ -386,7 +368,7 @@ function App() {
                 Start Exploring
               </h2>
               <p className="mt-2 max-w-xl text-ss-muted">
-                Editor-curated studies across the five pillars, each with an AI reliability score and plain-language summary.
+                Editor-curated studies across the nine pillars, each with an AI reliability score and plain-language summary.
               </p>
             </div>
             <a
@@ -407,57 +389,80 @@ function App() {
         </div>
       </section>
 
-      {/* ============================ 5 PILLARS ========================== */}
-      <section className="bg-white py-20">
+      {/* ============================ 9 PILLARS ========================== */}
+      <section id="pillars" className="bg-white py-20">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
-              The Five Pillars
+              The Nine Pillars
             </div>
             <h2 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
-              Every question, organized around your biology
+              Explore by Topic
             </h2>
             <p className="mt-3 text-ss-muted">
-              Explore research grouped into the five domains that shape human health and performance.
+              Research grouped into the nine domains that shape human health and performance.
             </p>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
-            {PILLARS.map(({ key, name, Icon, desc, items }) => (
+          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {PILLARS.map(({ key, name, Icon, description }) => (
               <div
                 key={key}
                 className="flex flex-col rounded-xl bg-ss-surface p-6 ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
-                  <Icon size={22} />
+                  <Icon size={22} strokeWidth={1.5} />
                 </div>
                 <h3 className="mt-4 text-lg font-bold text-ss-teal">{name}</h3>
-                <p className="mt-1.5 text-sm text-ss-muted">{desc}</p>
-
-                <ul className="mt-4 space-y-2 text-sm">
-                  {items.map((it) => (
-                    <li key={it}>
-                      <button
-                        type="button"
-                        onClick={() => handleTopicClick(it, name)}
-                        className="group flex items-start gap-1.5 text-left text-ss-text hover:text-ss-teal"
-                      >
-                        <ChevronRight size={14} className="mt-1 shrink-0 text-ss-muted group-hover:text-ss-teal" />
-                        <span className="leading-snug">{it}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  type="button"
-                  onClick={() => goSearch(name, name)}
-                  className="mt-6 inline-flex w-fit items-center gap-1 rounded-full border border-ss-teal px-4 py-1.5 text-xs font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
+                <p className="mt-1.5 text-sm text-ss-muted">{description}</p>
+                <a
+                  href={`/search?pillar=${encodeURIComponent(name)}`}
+                  className="mt-6 inline-flex w-fit items-center gap-1 rounded-full border-2 border-ss-orange px-4 py-1.5 text-xs font-semibold text-ss-orange transition hover:bg-ss-orange hover:text-white"
                 >
-                  Explore {name} <ArrowRight size={12} />
-                </button>
+                  Explore <ArrowRight size={12} />
+                </a>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ========================== READING LIST ========================= */}
+      <section id="reading-list" className="bg-ss-bg py-20">
+        <div className="container">
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
+                <BookOpen size={14} /> Reading List
+              </div>
+              <h2 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
+                The SelfScience Reading List
+              </h2>
+              <p className="mt-2 max-w-xl text-ss-muted">
+                Books that connect to the research. Curated and annotated.
+              </p>
+            </div>
+            <a
+              href="/reading-list"
+              className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-ss-teal hover:underline md:inline-flex"
+            >
+              Browse all <ArrowRight size={14} />
+            </a>
+          </div>
+
+          <div className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4">
+            {BOOKS.map((book) => (
+              <BookCard key={book.id} book={book} onSearch={goSearch} />
+            ))}
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <a
+              href="/reading-list"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-6 py-2.5 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
+            >
+              <BookOpen size={14} /> Browse All Books
+            </a>
           </div>
         </div>
       </section>
@@ -469,6 +474,9 @@ function App() {
             <div className="mx-auto mb-6 h-1 w-14 rounded-full bg-ss-orange" />
             <p className="text-2xl font-medium leading-relaxed md:text-3xl md:leading-relaxed">
               “Most people have more genetic data than they know what to do with. SelfScience turns that data into a starting point — connecting your genomic profile to the research, resources, and plain-language explanations you need to begin your wellness journey.”
+            </p>
+            <p className="mt-8 text-xs uppercase tracking-[0.2em] text-white/60">
+              For educational purposes only. Not medical advice or diagnosis.
             </p>
           </blockquote>
         </div>
@@ -486,28 +494,108 @@ function App() {
           <nav className="flex flex-wrap items-center gap-6 text-sm">
             <a href="/about" className="hover:text-white">About</a>
             <a href="/how-it-works" className="hover:text-white">How It Works</a>
-            <a href="/terms" className="hover:text-white">Terms</a>
-            <a href="/privacy" className="hover:text-white">Privacy</a>
+            <a href="/reading-list" className="hover:text-white">Reading List</a>
+            <a href="/terms" className="hover:text-white">Terms of Use</a>
+            <a href="/privacy" className="hover:text-white">Privacy Policy</a>
           </nav>
         </div>
         <div className="container mt-8 border-t border-white/10 pt-6 text-xs text-white/50">
-          <p>© {new Date().getFullYear()} SelfScience. For educational purposes only. Not medical advice, diagnosis, or treatment recommendations.</p>
+          <p>© {new Date().getFullYear()} SelfScience. For educational purposes only. Not medical advice.</p>
         </div>
       </footer>
     </main>
   )
 }
 
-/* ------------------------------ Flow step ---------------------------------- */
+/* --------------------------- Book cover component -------------------------- */
 
-function FlowStep({ icon, label }) {
+function BookCard({ book, onSearch }) {
   return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-ss-teal ring-1 ring-ss-border-warm">
-        {icon}
+    <article className="flex w-[240px] shrink-0 flex-col rounded-lg bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md md:w-[260px]">
+      {/* Stylized cover */}
+      <div
+        className="relative flex aspect-[2/3] w-full flex-col justify-between overflow-hidden rounded-md p-4 text-white shadow-inner"
+        style={{
+          background: `linear-gradient(140deg, ${book.coverFrom} 0%, ${book.coverTo} 100%)`,
+        }}
+      >
+        <div className="absolute left-0 top-0 h-full w-1.5 bg-black/25" />
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-70">
+            SelfScience Reading List
+          </div>
+        </div>
+        <div>
+          <div className="text-lg font-bold leading-tight md:text-xl">{book.title}</div>
+          <div className="mt-1 text-[10px] font-medium uppercase tracking-widest opacity-80">
+            {book.author}
+          </div>
+        </div>
       </div>
-      <div className="text-xs font-semibold text-ss-text">{label}</div>
-    </div>
+      <div className="mt-3">
+        <div className="text-sm font-bold text-ss-teal">{book.title}</div>
+        <div className="text-xs text-ss-muted">by {book.author}</div>
+      </div>
+      <span className="mt-2 inline-flex w-fit rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ss-teal">
+        {book.pillar}
+      </span>
+      <button
+        onClick={() => onSearch(book.searchQuery, book.pillar)}
+        className="mt-4 inline-flex items-center justify-center gap-1 rounded-full bg-ss-orange px-4 py-2 text-xs font-semibold text-white transition hover:bg-ss-orange-dark"
+      >
+        Find the Research <ArrowRight size={12} />
+      </button>
+    </article>
+  )
+}
+
+/* ------------------- DNA → research flow illustration ---------------------- */
+
+function GenomeFlowIllustration() {
+  return (
+    <svg viewBox="0 0 320 240" className="h-full w-full" aria-hidden="true">
+      {/* DNA helix */}
+      <g stroke="#1B474D" strokeWidth="2" fill="none">
+        {Array.from({ length: 6 }).map((_, i) => {
+          const y = 30 + i * 32
+          return (
+            <g key={i}>
+              <path
+                d={`M40 ${y} Q60 ${y - 12}, 80 ${y} T120 ${y}`}
+                stroke="#1B474D"
+                strokeWidth="2.5"
+              />
+              <line x1="50" y1={y - 6} x2="50" y2={y + 6} stroke="#C45820" strokeWidth="2" />
+              <line x1="90" y1={y - 6} x2="90" y2={y + 6} stroke="#C45820" strokeWidth="2" />
+              <line x1="110" y1={y - 6} x2="110" y2={y + 6} stroke="#C45820" strokeWidth="2" />
+            </g>
+          )
+        })}
+      </g>
+      {/* Arrow */}
+      <g stroke="#7A7974" strokeWidth="1.5" fill="none">
+        <line x1="140" y1="120" x2="185" y2="120" strokeDasharray="3 3" />
+        <path d="M180 114 L190 120 L180 126" />
+      </g>
+      {/* Research list */}
+      <g fill="#1B474D">
+        <rect x="205" y="60" width="90" height="120" rx="6" fill="#F9F8F5" stroke="#D4D1CA" />
+        <rect x="215" y="75" width="70" height="6" rx="3" fill="#1B474D" />
+        <rect x="215" y="90" width="55" height="4" rx="2" fill="#7A7974" />
+        <rect x="215" y="100" width="65" height="4" rx="2" fill="#7A7974" />
+        <line x1="215" y1="115" x2="285" y2="115" stroke="#D4D1CA" />
+        <rect x="215" y="125" width="70" height="6" rx="3" fill="#1B474D" />
+        <rect x="215" y="140" width="55" height="4" rx="2" fill="#7A7974" />
+        <rect x="215" y="150" width="65" height="4" rx="2" fill="#7A7974" />
+      </g>
+      {/* Labels */}
+      <text x="80" y="220" fill="#7A7974" fontSize="10" textAnchor="middle" fontFamily="Inter">
+        Your DNA
+      </text>
+      <text x="250" y="200" fill="#7A7974" fontSize="10" textAnchor="middle" fontFamily="Inter">
+        Research Roadmap
+      </text>
+    </svg>
   )
 }
 
