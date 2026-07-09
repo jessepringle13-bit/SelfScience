@@ -19,13 +19,69 @@ const DATE_OPTIONS = [
   { key: '10', label: 'Past 10 years' },
 ]
 
+/**
+ * Analyze a list of items via /api/analyze, capped at `concurrency` in-flight requests.
+ * onResult is called each time one item completes with (id, analysis).
+ * onCount is called with the number of currently in-flight requests (for the UI badge).
+ */
+async function analyzeInPool(items, concurrency, onResult, onCount) {
+  const queue = [...items]
+  let inFlight = 0
+  const kick = () => onCount && onCount(inFlight)
+
+  return new Promise((resolve) => {
+    const next = () => {
+      if (queue.length === 0 && inFlight === 0) {
+        kick()
+        resolve()
+        return
+      }
+      while (inFlight < concurrency && queue.length > 0) {
+        const item = queue.shift()
+        inFlight++
+        kick()
+        fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: item.id,
+            doi: item.doi,
+            pmid: item.pmid,
+            title: item.title,
+            journal: item.journal,
+            year: item.year,
+            source: item.source,
+            authorsShort: item.authorsShort,
+            abstract: item.abstract,
+          }),
+        })
+          .then(async (res) => {
+            if (!res.ok) throw new Error(String(res.status))
+            return res.json()
+          })
+          .then((json) => onResult(item.id, json))
+          .catch(() => {
+            onResult(item.id, {
+              _analysisError: true,
+            })
+          })
+          .finally(() => {
+            inFlight--
+            kick()
+            next()
+          })
+      }
+    }
+    next()
+  })
+}
+
 export default function SearchClient() {
   const router = useRouter()
   const params = useSearchParams()
   const initialQ = params.get('q') || ''
   const initialPillar = params.get('pillar') || ''
   const initialSource = params.get('source') || 'all'
-
   const [query, setQuery] = useState(initialQ)
   const [submittedQ, setSubmittedQ] = useState(initialQ)
   const [pillar, setPillar] = useState(initialPillar)
@@ -35,6 +91,8 @@ export default function SearchClient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
+  const [analyses, setAnalyses] = useState({}) // id -> {reliability, reliabilityLabel, ...}
+  const [analyzing, setAnalyzing] = useState(0) // count in flight
 
   const runSearch = useCallback(async (q, s, pill) => {
     if (!q.trim()) {
@@ -43,6 +101,7 @@ export default function SearchClient() {
     }
     setLoading(true)
     setError(null)
+    setAnalyses({})
     try {
       const url = new URL('/api/search', window.location.origin)
       url.searchParams.set('q', q)
@@ -52,6 +111,12 @@ export default function SearchClient() {
       if (!res.ok) throw new Error(`Search failed (${res.status})`)
       const json = await res.json()
       setData(json)
+      // Kick off AI analysis for top results only; rate-friendly for free tier.
+      // Concurrency 2 keeps latency reasonable while respecting Gemini free RPM.
+      const initial = (json.results || []).slice(0, 6)
+      analyzeInPool(initial, 2, (id, analysis) => {
+        setAnalyses((prev) => ({ ...prev, [id]: analysis }))
+      }, setAnalyzing)
     } catch (e) {
       setError(e.message || 'Something went wrong')
       setData(null)
@@ -80,10 +145,11 @@ export default function SearchClient() {
   // Client-side date filtering (raw display, no reranking yet)
   const filtered = useMemo(() => {
     if (!data?.results) return []
-    if (dateRange === 'any') return data.results
+    const merged = data.results.map((r) => ({ ...r, ...(analyses[r.id] || {}) }))
+    if (dateRange === 'any') return merged
     const cutoff = new Date().getFullYear() - parseInt(dateRange, 10)
-    return data.results.filter((r) => (r.year || 0) >= cutoff)
-  }, [data, dateRange])
+    return merged.filter((r) => (r.year || 0) >= cutoff)
+  }, [data, dateRange, analyses])
 
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
@@ -191,8 +257,16 @@ export default function SearchClient() {
                 )}
               </h1>
               {data && (
-                <span className="text-xs text-ss-muted">
-                  Showing {filtered.length} of {data.total} · PubMed: {data.sources?.pubmed ?? 0} · Semantic Scholar: {data.sources?.semanticScholar ?? 0}
+                <span className="inline-flex items-center gap-3 text-xs text-ss-muted">
+                  <span>
+                    Showing {filtered.length} of {data.total} · PubMed: {data.sources?.pubmed ?? 0} · Semantic Scholar: {data.sources?.semanticScholar ?? 0}
+                  </span>
+                  {analyzing > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-ss-privacy-tint px-2.5 py-1 font-semibold text-ss-teal">
+                      <Loader2 size={12} className="animate-spin" />
+                      Scoring {analyzing} in progress…
+                    </span>
+                  )}
                 </span>
               )}
             </div>

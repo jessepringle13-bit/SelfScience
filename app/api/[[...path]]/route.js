@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { callGemini, extractJson } from '@/lib/gemini'
+import { buildAnalysisPrompt } from '@/lib/prompts'
 
 const NCBI_KEY = process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -286,11 +288,104 @@ export async function GET(request, { params }) {
   return NextResponse.json({
     status: 'ok',
     service: 'selfscience',
-    version: '0.2.0',
-    endpoints: ['/api/search?q=<query>&source=all|pubmed|s2&limit=20&pillar=<name>'],
+    version: '0.3.0',
+    endpoints: [
+      '/api/search?q=<query>&source=all|pubmed|s2&limit=20&pillar=<name>',
+      'POST /api/analyze  { title, journal, year, authorsShort, abstract, source }',
+    ],
   })
 }
 
-export async function POST() {
+/* ----------------------------- /api/analyze ------------------------------- */
+/* Simple in-memory cache keyed by id / doi / title to avoid burning Gemini quota
+ * on repeat searches during a session. */
+const analysisCache = new Map()
+
+const VALID_LABELS = ['Preliminary', 'Limited', 'Moderate', 'Strong', 'Excellent']
+
+function normalizeAnalysis(parsed, item) {
+  const scoreRaw = parseInt(parsed?.score, 10)
+  const score = Math.min(5, Math.max(1, isFinite(scoreRaw) ? scoreRaw : 3))
+  const label = VALID_LABELS.includes(parsed?.label)
+    ? parsed.label
+    : VALID_LABELS[score - 1]
+  const note = (parsed?.note || '').toString().slice(0, 160)
+  const plain = (parsed?.plainLanguage || parsed?.plain || '').toString().trim()
+
+  let flags = []
+  if (Array.isArray(parsed?.flags)) {
+    flags = parsed.flags
+      .filter((f) => f && typeof f.label === 'string')
+      .map((f) => ({
+        label: f.label.slice(0, 40),
+        tone: f.tone === 'critical' ? 'critical' : 'amber',
+      }))
+      .slice(0, 4)
+  }
+  // Guarantee preprint flag rule
+  if (item?.source === 'preprint' && !flags.find((f) => /peer.review/i.test(f.label))) {
+    flags.push({ label: 'Not Yet Peer Reviewed', tone: 'amber' })
+  }
+
+  return {
+    reliability: score,
+    reliabilityLabel: label,
+    reliabilityNote: note,
+    plain,
+    flags,
+  }
+}
+
+async function handleAnalyze(request) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const item = body || {}
+  const cacheKey = item.id || item.doi || item.pmid || (item.title || '').slice(0, 120)
+
+  if (cacheKey && analysisCache.has(cacheKey)) {
+    return NextResponse.json({ ...analysisCache.get(cacheKey), cached: true })
+  }
+
+  try {
+    const prompt = buildAnalysisPrompt(item)
+    const { text } = await callGemini(prompt, {
+      temperature: 0.1,
+      maxOutputTokens: 1200,
+      responseMimeType: 'application/json',
+      thinkingBudget: 0, // disable reasoning overhead on gemini-2.5-flash
+    })
+    const parsed = extractJson(text)
+    if (!parsed) {
+      return NextResponse.json(
+        {
+          error: 'Model returned non-JSON output',
+          raw: text?.slice(0, 400),
+        },
+        { status: 502 }
+      )
+    }
+    const normalized = normalizeAnalysis(parsed, item)
+    if (cacheKey) analysisCache.set(cacheKey, normalized)
+    return NextResponse.json(normalized)
+  } catch (err) {
+    console.error('Gemini analyze error:', err?.message)
+    return NextResponse.json(
+      {
+        error: err?.code === 'NO_KEY' ? 'GEMINI_API_KEY not configured' : err?.message || 'Analysis failed',
+      },
+      { status: err?.status || 500 }
+    )
+  }
+}
+
+export async function POST(request, { params }) {
+  const p = (await params)?.path || []
+  const route = Array.isArray(p) ? p[0] : p
+  if (route === 'analyze') return handleAnalyze(request)
   return NextResponse.json({ status: 'ok' })
 }
