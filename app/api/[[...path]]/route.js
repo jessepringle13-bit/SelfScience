@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { callGemini, extractJson } from '@/lib/gemini'
+import { callAI, extractJson } from '@/lib/ai'
 import { buildAnalysisPrompt, buildGenomePrompt } from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
 
@@ -449,16 +449,47 @@ export async function GET(request, { params }) {
   const route = Array.isArray(p) ? p[0] : p
 
   if (route === 'search') return handleSearch(request)
+  if (route === 'autocomplete') return handleAutocomplete(request)
 
   return NextResponse.json({
     status: 'ok',
     service: 'selfscience',
-    version: '0.3.0',
+    version: '0.5.0',
     endpoints: [
-      '/api/search?q=<query>&source=all|pubmed|s2&limit=20&pillar=<name>',
+      '/api/search?q=<query>&source=all|pubmed|s2|openalex|crossref&limit=40&pillar=<name>',
+      '/api/autocomplete?q=<partial>',
       'POST /api/analyze  { title, journal, year, authorsShort, abstract, source }',
+      'POST /api/genome  { variants: { rsid: genotype } }',
     ],
   })
+}
+
+/* --------------------------- /api/autocomplete --------------------------- */
+async function handleAutocomplete(request) {
+  const { searchParams } = new URL(request.url)
+  const q = (searchParams.get('q') || '').trim()
+  if (q.length < 2) return NextResponse.json({ suggestions: [] })
+
+  try {
+    const url = `https://api.semanticscholar.org/graph/v1/paper/autocomplete?query=${encodeURIComponent(q)}`
+    const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } })
+    if (!res.ok) return NextResponse.json({ suggestions: [] })
+    const data = await safeJson(res)
+    const matches = data?.matches || []
+    const suggestions = matches
+      .slice(0, 5)
+      .map((m) => ({
+        id: m.id,
+        title: m.title || '',
+        year: m.year || null,
+        authorsShort: (m.authorsYear || '').replace(/^\(|\)$/g, ''),
+      }))
+      .filter((s) => s.title)
+    return NextResponse.json({ suggestions })
+  } catch (err) {
+    console.error('autocomplete error:', err)
+    return NextResponse.json({ suggestions: [] })
+  }
 }
 
 /* ----------------------------- /api/analyze ------------------------------- */
@@ -518,11 +549,11 @@ async function handleAnalyze(request) {
 
   try {
     const prompt = buildAnalysisPrompt(item)
-    const { text } = await callGemini(prompt, {
+    const { text, provider } = await callAI(prompt, {
       temperature: 0.1,
       maxOutputTokens: 1200,
       responseMimeType: 'application/json',
-      thinkingBudget: 0, // disable reasoning overhead on gemini-2.5-flash
+      thinkingBudget: 0,
     })
     const parsed = extractJson(text)
     if (!parsed) {
@@ -530,11 +561,13 @@ async function handleAnalyze(request) {
         {
           error: 'Model returned non-JSON output',
           raw: text?.slice(0, 400),
+          provider,
         },
         { status: 502 }
       )
     }
     const normalized = normalizeAnalysis(parsed, item)
+    normalized.aiProvider = provider
     if (cacheKey) analysisCache.set(cacheKey, normalized)
     return NextResponse.json(normalized)
   } catch (err) {
@@ -583,7 +616,7 @@ async function handleGenome(request) {
 
   try {
     const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
-    const { text } = await callGemini(prompt, {
+    const { text, provider } = await callAI(prompt, {
       temperature: 0.15,
       maxOutputTokens: 12000,
       responseMimeType: 'application/json',
@@ -592,16 +625,16 @@ async function handleGenome(request) {
     const parsed = extractJson(text)
     if (!parsed) {
       return NextResponse.json(
-        { error: 'Model returned non-JSON output', raw: (text || '').slice(0, 500) },
+        { error: 'Model returned non-JSON output', raw: (text || '').slice(0, 500), provider },
         { status: 502 }
       )
     }
-    return NextResponse.json(parsed)
+    return NextResponse.json({ ...parsed, aiProvider: provider })
   } catch (err) {
     console.error('Genome analyze error:', err?.message)
     return NextResponse.json(
       {
-        error: err?.code === 'NO_KEY' ? 'GEMINI_API_KEY not configured' : err?.message || 'Analysis failed',
+        error: err?.code === 'NO_KEY' ? 'No AI provider configured' : err?.message || 'Analysis failed',
       },
       { status: err?.status || 500 }
     )
