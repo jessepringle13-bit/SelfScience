@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { callGemini, extractJson } from '@/lib/gemini'
-import { buildAnalysisPrompt } from '@/lib/prompts'
+import { buildAnalysisPrompt, buildGenomePrompt } from '@/lib/prompts'
+import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
 
 const NCBI_KEY = process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -387,5 +388,58 @@ export async function POST(request, { params }) {
   const p = (await params)?.path || []
   const route = Array.isArray(p) ? p[0] : p
   if (route === 'analyze') return handleAnalyze(request)
+  if (route === 'genome') return handleGenome(request)
   return NextResponse.json({ status: 'ok' })
+}
+
+/* ------------------------------ /api/genome ------------------------------- */
+
+async function handleGenome(request) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const rawVariants = body?.variants || {}
+  // Server-side whitelist enforcement + no PII: only keep approved rsIDs.
+  const variants = {}
+  for (const [k, v] of Object.entries(rawVariants)) {
+    if (APPROVED_RSIDS.has(k) && typeof v === 'string' && v.length <= 4) {
+      variants[k] = v.toUpperCase()
+    }
+  }
+  if (Object.keys(variants).length === 0) {
+    return NextResponse.json(
+      { error: 'No recognized variants in the submitted set.' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
+    const { text } = await callGemini(prompt, {
+      temperature: 0.15,
+      maxOutputTokens: 12000,
+      responseMimeType: 'application/json',
+      thinkingBudget: 0,
+    })
+    const parsed = extractJson(text)
+    if (!parsed) {
+      return NextResponse.json(
+        { error: 'Model returned non-JSON output', raw: (text || '').slice(0, 500) },
+        { status: 502 }
+      )
+    }
+    return NextResponse.json(parsed)
+  } catch (err) {
+    console.error('Genome analyze error:', err?.message)
+    return NextResponse.json(
+      {
+        error: err?.code === 'NO_KEY' ? 'GEMINI_API_KEY not configured' : err?.message || 'Analysis failed',
+      },
+      { status: err?.status || 500 }
+    )
+  }
 }

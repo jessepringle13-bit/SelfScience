@@ -8,33 +8,18 @@ import {
   Bookmark,
   ChevronDown,
   ChevronUp,
-  Sparkles,
 } from 'lucide-react'
+import {
+  ReliabilityBadge,
+  ReliabilityPending,
+  ReliabilityError,
+} from './reliability-badge'
 
 const SOURCE_META = {
   'peer-reviewed': { label: 'Peer-Reviewed', color: '#1B474D', bg: 'bg-ss-teal' },
   preprint: { label: 'Preprint', color: '#B07D00', bg: 'bg-[#B07D00]' },
   editorial: { label: 'Editorial', color: '#006494', bg: 'bg-[#006494]' },
   blog: { label: 'Blog', color: '#7A7974', bg: 'bg-ss-muted' },
-}
-
-const reliabilityLabel = (n) =>
-  ['', 'Preliminary', 'Limited', 'Moderate', 'Strong', 'Excellent'][n] || null
-
-export function SignalBars({ filled = 0, size = 'md', dim = false }) {
-  const heights = size === 'sm' ? [6, 9, 12, 15, 18] : [8, 12, 16, 20, 24]
-  const filledClass = dim ? 'bg-ss-border-warm' : 'bg-ss-teal'
-  return (
-    <div className="flex items-end gap-1">
-      {heights.map((h, i) => (
-        <span
-          key={i}
-          style={{ height: h, width: size === 'sm' ? 4 : 5 }}
-          className={`rounded-sm ${i < filled ? filledClass : 'bg-ss-border-warm'}`}
-        />
-      ))}
-    </div>
-  )
 }
 
 export function SourceBadge({ type }) {
@@ -51,21 +36,19 @@ export function SourceBadge({ type }) {
 export function FlagPill({ label, tone = 'amber' }) {
   const bg = tone === 'critical' ? 'bg-ss-critical' : 'bg-ss-amber'
   return (
-    <span className={`inline-flex items-center rounded-full ${bg} px-2.5 py-0.5 text-[11px] font-semibold text-white`}>
+    <span
+      className={`inline-flex items-center rounded-full ${bg} px-2.5 py-0.5 text-[11px] font-semibold text-white`}
+    >
       {label}
     </span>
   )
 }
 
-/**
- * Result card. Layout matches Section E spec.
- * - When item.reliability is null, shows a "Pending analysis" placeholder
- *   so the AI-powered fields plug in cleanly once Gemini scoring is wired.
- */
 export function ResultCard({ item, variant = 'stacked' }) {
   const [expanded, setExpanded] = useState(false)
   const meta = SOURCE_META[item.source] || SOURCE_META['peer-reviewed']
   const hasReliability = typeof item.reliability === 'number' && item.reliability > 0
+  const analysisError = item._analysisError === true
 
   const widthClass =
     variant === 'carousel' ? 'w-[340px] shrink-0 md:w-[380px]' : 'w-full'
@@ -75,7 +58,6 @@ export function ResultCard({ item, variant = 'stacked' }) {
       className={`group flex ${widthClass} flex-col rounded-lg bg-white p-5 shadow-sm ring-1 ring-black/5 transition hover:shadow-md`}
       style={{ borderLeft: `4px solid ${meta.color}` }}
     >
-      {/* Top row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <SourceBadge type={item.source} />
@@ -88,7 +70,6 @@ export function ResultCard({ item, variant = 'stacked' }) {
         <span className="text-xs text-ss-muted">{item.year || '—'}</span>
       </div>
 
-      {/* Title */}
       <a
         href={item.url || '#'}
         target={item.url ? '_blank' : undefined}
@@ -102,24 +83,21 @@ export function ResultCard({ item, variant = 'stacked' }) {
         {item.authorsShort ? <span className="ml-2">· {item.authorsShort}</span> : null}
       </p>
 
-      {/* Reliability row */}
-      <div className="mt-4 flex items-center gap-3">
-        <SignalBars filled={hasReliability ? item.reliability : 0} size="sm" dim={!hasReliability} />
+      {/* Reliability visualization */}
+      <div className="mt-4">
         {hasReliability ? (
-          <span className="text-sm font-bold text-ss-teal">
-            {item.reliabilityLabel || reliabilityLabel(item.reliability)}
-          </span>
+          <ReliabilityBadge
+            score={item.reliability}
+            label={item.reliabilityLabel}
+            note={item.reliabilityNote}
+          />
+        ) : analysisError ? (
+          <ReliabilityError />
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-full bg-ss-privacy-tint px-2 py-0.5 text-[11px] font-semibold text-ss-teal">
-            <Sparkles size={11} /> Pending AI analysis
-          </span>
+          <ReliabilityPending />
         )}
       </div>
-      {item.reliabilityNote ? (
-        <p className="mt-1 text-xs italic text-ss-muted">{item.reliabilityNote}</p>
-      ) : null}
 
-      {/* Bias flags */}
       {item.flags?.length ? (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {item.flags.map((f) => (
@@ -128,7 +106,6 @@ export function ResultCard({ item, variant = 'stacked' }) {
         </div>
       ) : null}
 
-      {/* Plain language */}
       {item.plain ? (
         <div className="mt-4">
           <div className="text-[11px] font-bold uppercase tracking-wider text-ss-teal">
@@ -149,7 +126,6 @@ export function ResultCard({ item, variant = 'stacked' }) {
         </div>
       )}
 
-      {/* Expand */}
       {item.abstract ? (
         <>
           <button
@@ -170,7 +146,6 @@ export function ResultCard({ item, variant = 'stacked' }) {
         </>
       ) : null}
 
-      {/* Actions */}
       <div className="mt-auto flex items-center gap-4 pt-4 text-xs text-ss-muted">
         <a
           href={item.url || '#'}
