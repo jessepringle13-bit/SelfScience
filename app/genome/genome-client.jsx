@@ -15,11 +15,13 @@ import {
   ArrowRight,
   RotateCcw,
   Loader2,
+  BookOpen,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { parseGenomeFile } from '@/lib/genome-parser'
 import { VARIANT_CATALOG, SAMPLE_VARIANTS } from '@/lib/variant-catalog'
 import { trackEvent, EVENTS } from '@/lib/analytics'
+import { getBooksForVariants, PILLAR_LABELS } from '@/lib/books'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -101,7 +103,9 @@ export default function GenomeClient() {
       })
       if (!res.ok) throw new Error(`Analysis failed (${res.status})`)
       const json = await res.json()
-      setReport(json)
+      // Attach the raw variant genotypes so downstream UI (like Recommended
+      // Reading) can match against variantTriggers without another request.
+      setReport({ ...json, _variants: parsed.variants || {} })
       setProgress(100)
       await sleep(300)
       setStage('results')
@@ -468,9 +472,73 @@ function OverviewTab({ report, onSearch }) {
           “{sys}”
         </div>
       )}
+
+      {/* Recommended Reading based on the user's actual variant genotypes */}
+      <RecommendedBooks variants={report?._variants || {}} onSearch={onSearch} />
     </div>
   )
 }
+
+/** Renders books whose variantTriggers match the user's genotype (max 8). */
+function RecommendedBooks({ variants, onSearch }) {
+  const books = getBooksForVariants(variants)
+  const empty = !variants || Object.keys(variants).length === 0
+  return (
+    <div>
+      <SectionHeader
+        icon={<BookOpen size={16} className="text-ss-teal" />}
+        title="Based on Your Profile — Recommended Reading"
+        hint="Books that connect directly to the research areas most relevant to your genetic variants."
+      />
+      {empty && (
+        <div className="mt-4 rounded-xl bg-white p-6 ring-1 ring-black/5 text-sm text-ss-muted">
+          Upload your genome file to get personalized book recommendations based on your specific genetic profile.
+        </div>
+      )}
+      {!empty && (
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+          {books.map((b) => (
+            <div key={b.slug} className="flex flex-col rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+              <div className="mb-2 flex flex-wrap gap-1">
+                {b.pillar.slice(0, 2).map((p) => (
+                  <span key={p} className="rounded-full bg-[#1B474D] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">
+                    {PILLAR_LABELS[p]}
+                  </span>
+                ))}
+                {b.universalRecommendation && (
+                  <span className="rounded-full bg-[#C45820] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">Essential</span>
+                )}
+              </div>
+              <div className="text-sm font-bold leading-snug text-[#28251D] line-clamp-2">{b.title}</div>
+              <div className="mt-0.5 text-xs text-[#7A7974]">{b.author}</div>
+              <p className="mt-2 line-clamp-2 flex-1 text-xs leading-relaxed text-[#28251D]">{b.plainReason}</p>
+              <div className="mt-3 flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onSearch?.(b.searchQueries[0], b.pillar[0])}
+                  className="flex-1 rounded-full border border-[#1B474D] px-2 py-1.5 text-[10px] font-semibold text-[#1B474D] transition hover:bg-[#1B474D] hover:text-white"
+                >
+                  Find Research
+                </button>
+                <a
+                  href={`/reading-list/${b.slug}`}
+                  className="flex-1 rounded-full bg-[#C45820] px-2 py-1.5 text-center text-[10px] font-semibold text-white transition hover:bg-[#A5471A]"
+                >
+                  Learn More
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function _FinishSpacer() {
+  return null
+}
+
 
 function FullReportTab({ report, onSearch }) {
   const groups = report?.fullReport || []

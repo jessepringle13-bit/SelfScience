@@ -163,6 +163,62 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Complete reading list feature — /lib/books.js + list page + book detail + genome recommendations"
+    implemented: true
+    working: true
+    file: "/app/lib/books.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Built the full reading list feature per Session 6 spec (converted TS -> JS).
+
+            Files created / rewritten:
+              - /app/lib/books.js  -> 37 books (9 pillars) + PILLAR_LABELS +
+                getBooksForVariants() with 27 rsID->trigger mappings + Open Library
+                cover fetch with sessionStorage cache.
+              - /app/app/reading-list/page.js  -> server page + metadata,
+                delegates to client.
+              - /app/app/reading-list/reading-list-client.jsx  -> teal hero + sticky
+                filter row (All + 9 pillars) + 3-col grid at desktop / 2 at tablet /
+                1 at mobile / 24px gap. Card design per spec: 160px cover area
+                (Open Library or pillar-color fallback), pillar chip(s), title,
+                author, year, 3-line plainReason, amber honesty note when present,
+                outlined "Find the Research" + orange "Learn More" buttons.
+              - /app/app/reading-list/[slug]/page.js  -> server + dynamic metadata.
+              - /app/app/reading-list/[slug]/book-client.jsx  -> book hero
+                (300px cover + author/year/plainReason/honestyNote), outlined
+                "Find the Research" + orange "Buy This Book" (Amazon search in new
+                tab), auto-searched "Research Behind This Book" (4 result cards
+                from /api/search), "Explore Further" topic-query pills, "More
+                Books in This Area" (3 same-pillar books).
+              - /app/app/reading-list/layout.js DELETED (page.js has metadata now).
+
+            Genome page recommendations:
+              - /app/app/genome/genome-client.jsx overview tab now renders
+                <RecommendedBooks> using getBooksForVariants(report._variants).
+                Empty state prompts user to upload a file.
+              - handleFile now stashes parsed.variants onto report._variants so
+                the recommendations use the user's actual genotypes.
+
+            Verified end-to-end at 1400px:
+              - /reading-list shows 37 books, sticky filter pills, real Open
+                Library covers for popular titles (A Crack in Creation, Dirty
+                Genes, Circadian Code, Genius Foods), teal fallback covers
+                for older titles.
+              - Nutrition filter shows 5 books with correct pillar chips and
+                Dirty Genes shows the amber honesty note per spec.
+              - /reading-list/outlive shows the book hero + auto-searched
+                FOXO3 longevity related-research grid + topic pills + more
+                books in the same area.
+              - All 3 routes return 200. Lint clean.
+              - Analytics fires reading_list_viewed on mount and
+                book_research_clicked with source tag on every research pill /
+                CTA (nav_header, book_detail_primary, book_detail_topic_pill,
+                book_detail_more_research, reading_list).
   - task: "Color-coded flag pills with click-to-explain tooltips + glossary modal"
     implemented: true
     working: true
