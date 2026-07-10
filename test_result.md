@@ -163,6 +163,34 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Final polish: static pages, metadata, error/loading states, analytics scaffold"
+    implemented: true
+    working: "NA"
+    file: "/app/app/layout.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+          agent: "main"
+          comment: |
+            Session 6 polish complete:
+            - Root layout metadata expanded: title template, description, keywords, robots,
+              openGraph, twitter card, canonical, viewport theme-color.
+            - Conditional Analytics component (GA4 + Microsoft Clarity) via next/script,
+              driven by NEXT_PUBLIC_GA_ID and NEXT_PUBLIC_CLARITY_ID env vars (empty = no-op).
+            - New static pages with unique metadata each:
+                /about, /how-it-works, /privacy, /terms
+              Shared <StaticPageShell/> + <SiteFooter/> for consistency.
+            - Global error.js (client) with digest ref + retry/home CTAs.
+            - Custom not-found.js with 404 branded UI + search CTA.
+            - Global loading.js fallback for suspense.
+            - Per-page metadata added: /search, /genome, /study/[id] (generateMetadata),
+              /reading-list (via layout.js), /reading-list/[slug] (generateMetadata pulling
+              book title from READING_LIST).
+            - Mobile responsiveness spot-checked at 390px (Terms page verified: hamburger nav,
+              stacked layout, readable typography).
+            - Env additions: NEXT_PUBLIC_GA_ID, NEXT_PUBLIC_CLARITY_ID, NEXT_PUBLIC_SITE_URL.
   - task: "Homepage hero search wiring and pillar navigation"
     implemented: true
     working: "NA"
