@@ -1197,5 +1197,37 @@ agent_communication:
         
         Verified via curl-equivalent:
         - Fallback (37 recognized): overview.areasToExplore=37, fullReport total=37
+
+    -agent: "main"
+      message: |
+        FEATURE: Per-genotype classification (Positive / Be Aware / Typical).
+        
+        Previously every variant was labelled "Neutral" — the frontend expected
+        Strength / Awareness / Neutral but the backend was hardcoding 'Neutral'
+        (fallback path) or 'Awareness' (dropped-variant fill) regardless of the
+        actual called genotype. Now we classify per genotype using an authoritative
+        catalog.
+        
+        Changes:
+        1) /app/lib/variant-catalog.js — Added `positive` / `awareness` genotype
+           arrays to every VARIANT_CATALOG entry, plus exported classifyVariant(rsid,
+           genotype) which normalises casing, matches unordered pairs (AG == GA),
+           and returns 'Strength' | 'Awareness' | 'Neutral'.
+        2) /app/app/api/[[...path]]/route.js — buildMinimalGenomeReport and the
+           AI-path normalisation both call classifyVariant() for every recognised
+           variant. Overview cards bucket by classification (Positive → Strengths,
+           Be Aware & Typical → Areas to Explore). The AI's strengths/awareness
+           bucketing is overridden by our catalog rules (AI is inconsistent about
+           this and often labels everything Awareness).
+        3) /app/app/genome/genome-client.jsx — Renamed display labels: Strength →
+           "Positive", Awareness → "Be Aware", Neutral → "Typical". Colors
+           unchanged (green / orange / gray).
+        
+        Verified with SAMPLE_VARIANTS (25 variants):
+        - overview.strengths=6 (LCT TT, CYP1A2 AA, ALDH2 GG, APOE-noE4 TT, SLCO1B1
+          TT, ABCG2 GG)
+        - overview.areasToExplore=19 (incl. MTHFR CT/AC → Be Aware, others → Typical)
+        - fullReport totals=25, every card carries a per-genotype classification.
+
         - AI path  (15 recognized): overview total=15 (3 strengths + 12 areas),
           fullReport total=15 (AI covered 2, catalog filled 13)

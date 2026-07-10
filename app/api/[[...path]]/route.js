@@ -10,7 +10,7 @@ import {
   buildPlainLanguagePrompt,
   buildGenomePrompt,
 } from '@/lib/prompts'
-import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
+import { VARIANT_CATALOG, APPROVED_RSIDS, classifyVariant } from '@/lib/variant-catalog'
 import { getPillarQuery } from '@/lib/pillars'
 import { searchCache, makeCacheKey } from '@/lib/cache'
 import { getUsageSnapshot, fetchOpenRouterCredit } from '@/lib/ai-usage'
@@ -835,24 +835,35 @@ function buildMinimalGenomeReport(variants, catalog) {
   const byPillar = {}
   const recognized = []
   const enriched = []
+  const strengthEnriched = []
+  const awarenessEnriched = []
   for (const [rsid, gt] of Object.entries(variants || {})) {
     const meta = catalog[rsid]
+    const cls = classifyVariant(rsid, gt) // 'Strength' | 'Awareness' | 'Neutral'
     recognized.push({
       rsid, gene: meta?.gene || '', variant_name: meta?.description || '',
       genotype_called: gt, pillar: meta?.pillar || 'General',
-      classification: 'Neutral',
+      classification: cls,
     })
     if (meta?.pillar) {
       const p = meta.pillar
       byPillar[p] = byPillar[p] || []
+      const clsCopy = cls === 'Strength'
+        ? `Your ${gt} genotype at ${meta.gene} is associated with typical or favorable function in the literature. Explore the studies to learn more.`
+        : cls === 'Awareness'
+        ? `Your ${gt} genotype at ${meta.gene} is associated with reduced function or elevated attention in the literature — worth understanding better, not a diagnosis.`
+        : `Research area: ${meta.description}. The SelfScience search engine can surface studies on this variant directly.`
       byPillar[p].push({
         gene: meta.gene, rsid, genotype: gt,
-        classification: 'Neutral',
-        explanation: `Research area: ${meta.description}. Full AI interpretation was not available for this session — the SelfScience search engine can surface studies on this variant directly.`,
+        classification: cls,
+        explanation: clsCopy,
         landmarkStudy: '',
         searches: [`${meta.gene} ${meta.description.split('—')[0].trim()}`, `${meta.gene} health research`],
       })
-      enriched.push({ label: meta.description, one_line: `Research literature is available for ${meta.gene}. Explore on SelfScience.`, pillar: p, rsid, gene: meta.gene, genotype: gt })
+      const enrichedItem = { label: meta.description, one_line: clsCopy, pillar: p, rsid, gene: meta.gene, genotype: gt }
+      enriched.push(enrichedItem)
+      if (cls === 'Strength') strengthEnriched.push(enrichedItem)
+      else if (cls === 'Awareness') awarenessEnriched.push(enrichedItem)
     }
   }
   const pillars = Object.keys(byPillar).sort()
@@ -861,14 +872,18 @@ function buildMinimalGenomeReport(variants, catalog) {
   // not just a truncated preview. The FullReport / Roadmap tabs already show
   // the full grouped view, but the Overview tab is where users first look for
   // "what did SelfScience find in me?" — so we no longer slice this list.
-  const allEnriched = enriched.map((a) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype }))
+  const toCard = (a) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype })
   return {
     session_id: Math.random().toString(36).slice(2, 10),
     variants_recognized: recognized,
-    pillar_reports: pillars.map((p) => ({ pillar: p, strengths: [], awareness_areas: byPillar[p] })),
+    pillar_reports: pillars.map((p) => ({
+      pillar: p,
+      strengths: byPillar[p].filter((v) => v.classification === 'Strength'),
+      awareness_areas: byPillar[p].filter((v) => v.classification !== 'Strength'),
+    })),
     overall_summary: {
-      top_strengths: [],
-      top_awareness_areas: enriched,
+      top_strengths: strengthEnriched,
+      top_awareness_areas: awarenessEnriched,
       system_view: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
     },
     research_roadmap: {
@@ -883,8 +898,8 @@ function buildMinimalGenomeReport(variants, catalog) {
     disclaimer: { user_facing: 'This report is for educational purposes only. Not a medical diagnosis.', display: 'always_visible' },
     // UI-compat aliases (same shape the AI-driven path produces):
     overview: {
-      strengths: [],
-      areasToExplore: allEnriched,
+      strengths: strengthEnriched.map(toCard),
+      areasToExplore: [...awarenessEnriched, ...enriched.filter((e) => !strengthEnriched.includes(e) && !awarenessEnriched.includes(e))].map(toCard),
       systemView: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
     },
     fullReport: pillars.map((p) => ({ pillar: p, variants: byPillar[p] })),
@@ -977,55 +992,70 @@ async function handleInterpretGenome(request) {
     // rich narratives with catalog-based fallback entries for anything the
     // AI dropped. AI-covered variants keep their rich `user_explanation` and
     // `landmark_study`; dropped variants get a solid catalog-driven card.
+    //
+    // NOTE 3: The classification (Positive / Be Aware / Typical) is decided
+    // by classifyVariant() using the user's genotype, NOT by the AI's
+    // strengths/awareness bucketing. The AI is inconsistent about this; our
+    // catalog rules are authoritative.
     const overall = parsed.overall_summary || {}
     const pillarReports = parsed.pillar_reports || []
     const covered = new Set()
-    // Flatten every strength across every pillar for Overview.
-    const allStrengths = pillarReports.flatMap((p) =>
-      (p.strengths || []).map((v) => {
+    // Collect every variant the AI wrote about, preserving its rich narrative
+    // but re-classifying via catalog rules.
+    const aiCards = []
+    for (const p of pillarReports) {
+      for (const v of [...(p.strengths || []), ...(p.awareness_areas || [])]) {
         if (v.rsid) covered.add(v.rsid)
-        return {
-          name: `${v.gene || ''} ${v.strength_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
-          plain: v.user_explanation || v.one_line || '',
+        const cls = classifyVariant(v.rsid, v.genotype || variants[v.rsid])
+        aiCards.push({
+          rsid: v.rsid || '', gene: v.gene || '', genotype: v.genotype || variants[v.rsid] || '',
           pillar: p.pillar || v.pillar || '',
-          rsid: v.rsid || '', gene: v.gene || '', genotype: v.genotype || '',
-        }
-      })
-    )
-    // Flatten every awareness area across every pillar for Overview.
-    const allAwareness = pillarReports.flatMap((p) =>
-      (p.awareness_areas || []).map((v) => {
-        if (v.rsid) covered.add(v.rsid)
-        return {
-          name: `${v.gene || ''} ${v.awareness_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
+          name: `${v.gene || ''} ${v.strength_name || v.awareness_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
           plain: v.user_explanation || v.research_direction || v.one_line || '',
-          pillar: p.pillar || v.pillar || '',
-          rsid: v.rsid || '', gene: v.gene || '', genotype: v.genotype || '',
-        }
-      })
-    )
+          classification: cls,
+          landmark_study: v.landmark_study || null,
+          search_queries: v.search_queries || [],
+        })
+      }
+    }
     // Add catalog-based cards for any recognized variant the AI dropped.
-    const droppedCards = []
-    const droppedByPillar = {}
     for (const [rsid, gt] of Object.entries(variants)) {
       if (covered.has(rsid)) continue
       const meta = VARIANT_CATALOG[rsid]
       if (!meta) continue
-      const card = {
-        name: `${meta.gene} ${meta.description}`,
-        plain: `Research literature is available for ${meta.gene}. Explore on SelfScience for the latest studies.`,
-        pillar: meta.pillar || 'General',
+      const cls = classifyVariant(rsid, gt)
+      const plain = cls === 'Strength'
+        ? `Your ${gt} genotype at ${meta.gene} is associated with typical or favorable function in the literature.`
+        : cls === 'Awareness'
+        ? `Your ${gt} genotype at ${meta.gene} is worth understanding better — not a diagnosis. Explore the studies below.`
+        : `Research area: ${meta.description}. The SelfScience search engine can surface studies on this variant.`
+      aiCards.push({
         rsid, gene: meta.gene, genotype: gt,
-      }
-      droppedCards.push(card)
-      const p = meta.pillar || 'General'
-      droppedByPillar[p] = droppedByPillar[p] || []
-      droppedByPillar[p].push({
-        gene: meta.gene, rsid, genotype: gt,
-        classification: 'Awareness',
-        explanation: `Research area: ${meta.description}. Search below for the latest peer-reviewed studies.`,
-        landmarkStudy: '',
-        searches: [`${meta.gene} ${meta.description.split('—')[0].trim()}`, `${meta.gene} health research`],
+        pillar: meta.pillar || 'General',
+        name: `${meta.gene} ${meta.description}`,
+        plain,
+        classification: cls,
+        landmark_study: null,
+        search_queries: [`${meta.gene} ${meta.description.split('—')[0].trim()}`, `${meta.gene} health research`],
+      })
+    }
+    // Bucket by catalog classification for Overview
+    const strengthCards = aiCards.filter((c) => c.classification === 'Strength')
+    const otherCards = aiCards.filter((c) => c.classification !== 'Strength')
+    const toOverview = (c) => ({ name: c.name, plain: c.plain, pillar: c.pillar, rsid: c.rsid, gene: c.gene, genotype: c.genotype })
+    // Group by pillar for FullReport
+    const byPillar = new Map()
+    for (const c of aiCards) {
+      const key = c.pillar || 'General'
+      if (!byPillar.has(key)) byPillar.set(key, [])
+      byPillar.get(key).push({
+        gene: c.gene, rsid: c.rsid, genotype: c.genotype,
+        classification: c.classification,
+        explanation: c.plain,
+        landmarkStudy: c.landmark_study?.title
+          ? `${c.landmark_study.title} — ${c.landmark_study.authors || ''} (${c.landmark_study.year || ''})`
+          : '',
+        searches: c.search_queries || [],
       })
     }
     const normalized = {
@@ -1033,56 +1063,11 @@ async function handleInterpretGenome(request) {
       ...parsed,
       // Compat aliases for existing UI:
       overview: {
-        strengths: allStrengths.length ? allStrengths : (overall.top_strengths || []).map((s) => ({
-          name: s.label || s.strength_name || '',
-          plain: s.one_line || '',
-          pillar: s.pillar || '',
-          rsid: s.rsid || '',
-          gene: s.gene || '',
-          genotype: s.genotype || '',
-        })),
-        areasToExplore: [...allAwareness, ...droppedCards],
+        strengths: strengthCards.map(toOverview),
+        areasToExplore: otherCards.map(toOverview),
         systemView: overall.system_view || '',
       },
-      fullReport: (() => {
-        // Merge AI's rich pillar_reports with catalog-based entries for any
-        // recognized variant the AI dropped. That way FullReport tab is a
-        // complete grouped view of every recognized variant.
-        const aiPillars = (parsed.pillar_reports || []).map((p) => ({
-          pillar: p.pillar,
-          variants: [
-            ...(p.strengths || []).map((v) => ({
-              gene: v.gene, rsid: v.rsid, genotype: v.genotype,
-              classification: 'Strength',
-              explanation: v.user_explanation || '',
-              landmarkStudy: v.landmark_study?.title
-                ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
-                : '',
-              searches: v.search_queries || [],
-            })),
-            ...(p.awareness_areas || []).map((v) => ({
-              gene: v.gene, rsid: v.rsid, genotype: v.genotype,
-              classification: 'Awareness',
-              explanation: v.user_explanation || v.research_direction || '',
-              landmarkStudy: v.landmark_study?.title
-                ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
-                : '',
-              searches: v.search_queries || [],
-            })),
-          ],
-        }))
-        // Now merge in dropped-variant catalog entries, either into existing
-        // pillar buckets or as new pillar groups.
-        const pillarMap = new Map(aiPillars.map((p) => [p.pillar, p]))
-        for (const [pName, catalogVariants] of Object.entries(droppedByPillar)) {
-          if (pillarMap.has(pName)) {
-            pillarMap.get(pName).variants.push(...catalogVariants)
-          } else {
-            pillarMap.set(pName, { pillar: pName, variants: catalogVariants })
-          }
-        }
-        return Array.from(pillarMap.values())
-      })(),
+      fullReport: Array.from(byPillar.entries()).map(([pillar, vs]) => ({ pillar, variants: vs })),
       researchRoadmap: (parsed.research_roadmap?.pillars || []).map((r) => ({
         priority: r.priority, pillar: r.pillar, why: r.reason, searches: r.top_searches || [],
       })),

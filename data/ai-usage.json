@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-10T22:23:57.969Z",
+  "lastUpdated": "2026-07-10T22:31:44.095Z",
   "totals": {
-    "calls": 23,
-    "inTokens": 17610,
-    "outTokens": 31623,
-    "usd": 0.014597299999999999
+    "calls": 26,
+    "inTokens": 19074,
+    "outTokens": 35719,
+    "usd": 0.015097699999999999
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -36,30 +36,30 @@
       "last": "2026-07-10T21:19:51.894Z"
     },
     "together|meta-llama/Llama-3.3-70B-Instruct-Turbo|genome": {
-      "calls": 11,
+      "calls": 12,
       "inTokens": 5526,
       "outTokens": 7337,
       "usd": 0.01131944,
       "unknownPrice": false,
       "first": "2026-07-10T21:31:44.172Z",
-      "last": "2026-07-10T22:23:27.969Z"
+      "last": "2026-07-10T22:31:14.095Z"
     },
     "openrouter|meta-llama/llama-3.1-70b-instruct|genome": {
-      "calls": 9,
-      "inTokens": 9980,
-      "outTokens": 23965,
-      "usd": 0.00305505,
+      "calls": 11,
+      "inTokens": 11444,
+      "outTokens": 28061,
+      "usd": 0.00355545,
       "unknownPrice": false,
       "first": "2026-07-10T21:35:54.562Z",
-      "last": "2026-07-10T22:22:28.456Z"
+      "last": "2026-07-10T22:31:14.339Z"
     }
   },
   "byDay": {
     "2026-07-10": {
-      "calls": 23,
-      "inTokens": 17610,
-      "outTokens": 31623,
-      "usd": 0.014597299999999999
+      "calls": 26,
+      "inTokens": 19074,
+      "outTokens": 35719,
+      "usd": 0.015097699999999999
     }
   },
   "ring": [
@@ -338,6 +338,42 @@
       "outTokens": 0,
       "usd": 0,
       "latencyMs": 20001
+    },
+    {
+      "ts": "2026-07-10T22:25:41.696Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-70b-instruct",
+      "task": "genome",
+      "status": "fail",
+      "httpStatus": 200,
+      "inTokens": 1464,
+      "outTokens": 4096,
+      "usd": 0.0005004,
+      "latencyMs": 133728
+    },
+    {
+      "ts": "2026-07-10T22:31:14.095Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "fail",
+      "httpStatus": 504,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 20003
+    },
+    {
+      "ts": "2026-07-10T22:31:14.339Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-70b-instruct",
+      "task": "genome",
+      "status": "fail",
+      "httpStatus": 429,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 246
     }
   ]
 }

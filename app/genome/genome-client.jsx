@@ -36,9 +36,9 @@ const PILLAR_COLOR = {
 }
 
 const CLASSIFICATION_STYLE = {
-  Strength:  { color: '#2E7D32', bg: '#E4F1E5', label: 'Strength' },
-  Awareness: { color: '#964219', bg: '#FBEEE4', label: 'Awareness' },
-  Neutral:   { color: '#7A7974', bg: '#EFEEE9', label: 'Neutral' },
+  Strength:  { color: '#2E7D32', bg: '#E4F1E5', label: 'Positive' },
+  Awareness: { color: '#964219', bg: '#FBEEE4', label: 'Be Aware' },
+  Neutral:   { color: '#7A7974', bg: '#EFEEE9', label: 'Typical' },
 }
 
 export default function GenomeClient() {
