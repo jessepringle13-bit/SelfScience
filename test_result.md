@@ -163,6 +163,42 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "AI evaluation speed optimisation (Groq primary + parallel + cache)"
+    implemented: true
+    working: true
+    file: "/app/lib/ai.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Measured baseline latency (OpenRouter free tier):
+              /api/score-reliability : 7-44s per call
+              /api/translate-plain-language : 34-60s per call (many hitting 60s ceiling)
+            After optimisation:
+              /api/score-reliability : ~590-620ms per call  (Groq llama-3.1-8b-instant)
+              /api/translate-plain-language : ~610-700ms per call (Groq llama-3.3-70b-versatile)
+              First badge on /search : 1.26s (was ~30-40s)
+              5 badges visible : 4.68s (was ~45-60s)
+              Repeat search (cache hit) : first badge 0.26s, 5 badges 1.86s
+            Changes:
+              1. lib/ai.js: Swapped primary from OpenRouter free to Groq direct
+                 (Groq inference is ~10-100x faster than OpenRouter free tier). Added a
+                 3-tier fallback chain: Groq primary (fast small/large model) -> Groq
+                 secondary (different model, separate rate-limit bucket) -> OpenRouter.
+                 Under burst load (12 parallel requests) tested wall-time = 1.24s, ZERO
+                 requests fell through to slow OpenRouter.
+                 Reliability max_tokens 1024->512 (schema is tiny).
+              2. search-client.jsx analyzeInPool:
+                   - Reliability + plain-language now fire IN PARALLEL per item
+                     (were previously chained; each item now takes ~1 round trip instead of 2)
+                   - Concurrency bumped from 2 to 5 in-flight items
+                   - localStorage cache keyed by doi/pmid/id with 7-day TTL and versioning
+                     -> repeat searches for the same paper resolve without any AI call
+              3. Fallback prompt no longer needs reliability context (plain-language works
+                 standalone), so the parallelisation is safe.
   - task: "Microsoft Clarity with auto-masked inputs + 10th pillar (Pediatric & Youth Wellness)"
     implemented: true
     working: true
