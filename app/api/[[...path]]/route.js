@@ -568,9 +568,18 @@ async function handleSearch(request) {
   // OR-ish topic search and return the best material from the last few years.
   const isMultiWord = parsed.tokens.length >= 2
   const quotedQ = isMultiWord && !isPillarBrowse ? `"${effectiveInputQ.replace(/"/g, '')}"` : effectiveInputQ
-  // For explicit user searches we still append the pillar as a topic hint.
-  // For pillar-browse we already ARE the pillar — don't duplicate.
-  const effectiveQuery = (pillar && !isPillarBrowse) ? `${quotedQ} ${pillar}` : quotedQ
+  // Text + pillar mode ("filter by pillar"):
+  //   The user typed something AND selected a pillar. The user query is
+  //   authoritative — every result must match it — and the pillar acts as a
+  //   topical boost. We fold in the CURATED pillar tokens (not just the
+  //   pillar's display name, which is a weak signal on its own) and apply the
+  //   same last-5-years recency bias that pillar-browse uses. This is what
+  //   makes "inflammation + Longevity" surface healthspan/aging inflammation
+  //   research instead of arbitrary inflammation papers.
+  const isTextPillar = !isPillarBrowse && !!pillar && !!pillarQuery
+  const effectiveQuery = isTextPillar
+    ? `${quotedQ} ${pillarQuery}`                  // user text + curated pillar tokens
+    : (pillar && !isPillarBrowse ? `${quotedQ} ${pillar}` : quotedQ)
 
   // Pillar browse: pull deeper from each source so we can filter to recent 5y and still return ~20.
   const perSource = isPillarBrowse ? 20 : { pubmed: 12, s2: 10, oa: 10, crossref: 10 }
@@ -595,11 +604,16 @@ async function handleSearch(request) {
     isPillarBrowse ? null : parsed
   )
 
-  if (isPillarBrowse) {
-    // Bias to the last 5 years, then rank by recency + citations.
+  if (isPillarBrowse || isTextPillar) {
+    // Pillar contexts (both pure-browse and text+pillar) bias to the last 5
+    // years. For pillar-browse this is the whole pool; for text+pillar we
+    // still respect the user's query (relevance filter already applied above)
+    // but sort recent-first so "inflammation + Longevity" surfaces 2024 work,
+    // not a 2011 paper.
     const cutoff = new Date().getFullYear() - 5
     const recent = merged.filter((r) => (r.year || 0) >= cutoff)
-    // Fall back to full set if we filtered too aggressively (e.g. sparse topic).
+    // Fall back to full set if recency-filter cuts too aggressively (e.g. a
+    // niche gene where recent literature is sparse).
     const pool = recent.length >= 8 ? recent : merged
     pool.sort((a, b) => {
       const yr = (b.year || 0) - (a.year || 0)
@@ -615,6 +629,7 @@ async function handleSearch(request) {
     query: effectiveInputQ,
     pillar,
     isPillarBrowse,
+    isTextPillar,
     total: merged.length,
     sources: {
       pubmed: pubmedResults.length,

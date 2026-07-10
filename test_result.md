@@ -765,8 +765,42 @@ agent_communication:
 
     -agent: "main"
       message: |
-        PERF ADD 2: AI cascade upgraded — 3-tier for reliability, tighter retry policy,
-        JSON mode, smart Retry-After handling, and model-specific error routing.
+        BUGFIX + FEATURE: text+pillar filtering + heading + last-5-yrs bias.
+        
+        User report: "when I select a pillar to research in, it only relates to
+        what I typed in the search bar" — the text+pillar path was just tacking
+        on the pillar's display name as a weak keyword, so "inflammation + Longevity"
+        returned generic inflammation retractions instead of longevity research.
+        
+        /app/app/api/[[...path]]/route.js:
+          - New `isTextPillar` mode: user query + pillar both present.
+          - Effective search query now folds in the CURATED pillar tokens
+            (e.g. "inflammation" + "healthspan longevity aging") for real
+            topical steering, not just the pillar's display name.
+          - Same last-5-years recency bias + recent-first sort that
+            pillar-browse uses. If recency filter cuts pool < 8, falls back
+            to full merged set.
+          - Response includes `isTextPillar` flag.
+        
+        /app/app/search/search-client.jsx:
+          - Heading now displays: `"inflammation" in Longevity · last 5 years`
+          - Date filter auto-defaults to "Last 5 Years" for text+pillar too
+            (previously only for pure pillar-browse).
+        
+        Verified live via curl + screenshot: `q=inflammation&pillar=Longevity`
+        now returns senescence, healthspan, IL-11 signalling, senolytics
+        research from 2021-2025 — actual longevity+inflammation, not noise.
+        
+        PRODUCTION 502 ON /api/interpret-genome (separate issue):
+          The user reported 502s uploading genome files on prod
+          (https://health-research-hub-3.emergent.host). Root cause: production
+          is running the OLD ai.js which fell back to OpenRouter's free
+          `openai/gpt-oss-20b:free` model — that model's daily-cap is exhausted,
+          returning 429s that surfaced as 502 to the client.
+          
+          The Groq-only cascade in preview fixes this. User needs to REDEPLOY
+          to push the fix to production. No code change needed.
+
         
         /app/lib/ai.js changes:
         

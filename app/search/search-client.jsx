@@ -171,13 +171,17 @@ export default function SearchClient() {
   const initialQ = params.get('q') || ''
   const initialPillar = params.get('pillar') || ''
   const isInitialPillarBrowse = !initialQ && !!getPillarQuery(initialPillar)
+  const isInitialTextPillar = !!initialQ && !!getPillarQuery(initialPillar)
 
   const [query, setQuery] = useState(initialQ)
   const [submittedQ, setSubmittedQ] = useState(initialQ)
   const [sourceType, setSourceType] = useState('all')
   const [pillar, setPillar] = useState(initialPillar)
-  // Default to "Last 5 Years" when arriving via a pillar click; else All Time.
-  const [dateRange, setDateRange] = useState(isInitialPillarBrowse ? '5' : 'any')
+  // Default to "Last 5 Years" whenever a pillar is in the URL (either pure
+  // browse or text+pillar filtered). Else All Time.
+  const [dateRange, setDateRange] = useState(
+    (isInitialPillarBrowse || isInitialTextPillar) ? '5' : 'any'
+  )
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
 
   const [loading, setLoading] = useState(false)
@@ -471,9 +475,11 @@ export default function SearchClient() {
           <h1 className="text-2xl font-extrabold text-ss-teal">
             {data?.isPillarBrowse && pillar
               ? <>Latest research on <span className="text-ss-orange">{pillar}</span></>
-              : submittedQ
-                ? <>Results for “{submittedQ}”</>
-                : <>Search health &amp; genomics research</>}
+              : data?.isTextPillar && pillar && submittedQ
+                ? <>&ldquo;{submittedQ}&rdquo; in <span className="text-ss-orange">{pillar}</span> <span className="text-sm font-medium text-ss-muted">· last 5 years</span></>
+                : submittedQ
+                  ? <>Results for &ldquo;{submittedQ}&rdquo;</>
+                  : <>Search health &amp; genomics research</>}
           </h1>
           {data && (
             <span className="inline-flex flex-wrap items-center gap-2 text-xs text-ss-muted">
