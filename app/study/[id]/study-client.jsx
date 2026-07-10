@@ -20,7 +20,7 @@ import {
   ReliabilityPending,
   ReliabilityError,
 } from '@/components/reliability-badge'
-import { SourceBadge, FlagPill, FundingTrailPanel } from '@/components/result-card'
+import { SourceBadge, FlagPill, FlagRow, FundingTrailPanel } from '@/components/result-card'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 
 export default function StudyClient({ id }) {
@@ -226,13 +226,7 @@ export default function StudyClient({ id }) {
               )}
             </div>
 
-            {merged.flags?.length ? (
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {merged.flags.map((f) => (
-                  <FlagPill key={f.label} label={f.label} tone={f.tone} />
-                ))}
-              </div>
-            ) : null}
+            <FlagRow flags={merged.flags} />
           </div>
 
           {/* Funding trail (opened by default on detail page when applicable) */}

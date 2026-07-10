@@ -45,7 +45,7 @@ const PAGE_SIZE = 20
  */
 const CACHE_KEY_PREFIX = 'ss:analysis:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
-const CACHE_VERSION = 2 // bump to invalidate all cached entries after schema change
+const CACHE_VERSION = 3 // bump to invalidate all cached entries after schema change
 
 function cacheKeyFor(item) {
   const raw = item.doi || item.pmid || item.id || (item.title || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 120)

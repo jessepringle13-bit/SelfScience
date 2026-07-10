@@ -163,6 +163,75 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Color-coded flag pills with click-to-explain tooltips + glossary modal"
+    implemented: true
+    working: true
+    file: "/app/lib/flags.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User goal: "cut through the fog of influencers and misinformation" by making
+            every study tag visually + semantically show whether it's a good signal
+            or a red flag, with clarifying language.
+
+            Built end-to-end:
+              1. /app/lib/flags.js -- canonical catalog of 26 flags with tone (good /
+                 amber / critical), plain-English explanation, and regex matchers so
+                 slight AI label variations still map correctly. Includes:
+                   GOOD (green): RCT, Double-Blind Placebo Controlled, Meta-Analysis,
+                                 Systematic Review, Pre-Registered, Large Sample,
+                                 Long Follow-up, Human Study, Peer Reviewed,
+                                 Conflicts Fully Disclosed, Publicly Funded
+                   AMBER: Not Yet Peer Reviewed, Small Study, Observational Only,
+                                 Cross-Sectional, Animal Study Only, Cell / In-Vitro Only,
+                                 Short Follow-up, Industry Funded, No Control Group,
+                                 Self-Reported Outcomes
+                   CRITICAL (red): RETRACTED, Conflict Not Disclosed, Predatory Journal,
+                                 Ghost Authorship
+
+              2. TONE_STYLES map with hex colors:
+                   good     -> #2E7D32 (green)
+                   amber    -> #B45309 (amber/orange)
+                   critical -> #B91C1C (red)
+
+              3. /app/components/result-card.jsx <FlagPill> rewritten:
+                   - Looks up canonical meta from flags.js (falls back to AI tone)
+                   - Renders with the correct tone color + icon (Check / AlertTriangle / ShieldAlert)
+                   - Click reveals an inline explainer tooltip with the plain-English text
+                   - Native title attr for accessibility hover on desktop
+
+              4. New <FlagRow> wraps every card's flag list + adds a small
+                 "? What do these mean?" button that opens <FlagGlossary> -- a modal
+                 with EVERY flag grouped by tone with its explanation.
+
+              5. /app/lib/prompts.js reliability prompt expanded to instruct the AI to
+                 emit good-tone flags for genuine quality signals (RCT, double-blind,
+                 meta-analysis etc). Added rules: aim for 2-5 flags, never fabricate,
+                 always include Not Yet Peer Reviewed for preprints.
+
+              6. /app/app/study/[id]/study-client.jsx also uses <FlagRow> for consistency.
+
+              7. Tailwind config: added ./lib/**/*.{js,jsx} to content scan paths so
+                 the arbitrary color classes stored in flags.js get JIT-compiled.
+
+              8. Bumped localStorage CACHE_VERSION 2 -> 3 so users with cached results
+                 from the previous flag schema (amber/critical only) refresh to the
+                 new schema on next search.
+
+            Verified via Playwright on real metformin search:
+              - Cell 2024 aging study surfaced 4 green good-tone flags: Randomized
+                Controlled Trial, Large Sample, Long Follow-up, Human Study.
+              - Viruses 2024 observational study surfaced amber Observational Only
+                + green Peer Reviewed -- exactly the mixed-quality nuance we want.
+              - Clicking a pill opened the inline explainer tooltip with the correct
+                verdict header + canonical name + explanation.
+              - "What do these mean?" opened the full glossary modal with all 26
+                flags grouped into green / amber / red sections.
+              - Colors verified in DOM: green=rgb(46,125,50) / amber=rgb(180,83,9).
   - task: "Header nav cleanup (logo-as-home, About dropdown, orange Support pill)"
     implemented: true
     working: true

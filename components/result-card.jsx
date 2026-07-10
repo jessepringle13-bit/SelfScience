@@ -10,12 +10,17 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
+  Info,
+  Check,
+  ShieldAlert,
+  X,
 } from 'lucide-react'
 import {
   ReliabilityBadge,
   ReliabilityPending,
   ReliabilityError,
 } from './reliability-badge'
+import { getFlagMeta, TONE_STYLES, allFlags } from '@/lib/flags'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 
 const SOURCE_META = {
@@ -38,14 +43,150 @@ export function SourceBadge({ type }) {
   )
 }
 
-export function FlagPill({ label, tone = 'amber' }) {
-  const bg = tone === 'critical' ? 'bg-ss-critical' : 'bg-ss-amber'
+export function FlagPill({ label, tone: aiTone = 'amber', size = 'md' }) {
+  const [open, setOpen] = useState(false)
+  const meta = getFlagMeta(label, aiTone) || { canonical: label, tone: aiTone, explain: '' }
+  const styles = TONE_STYLES[meta.tone] || TONE_STYLES.amber
+  const dot = meta.tone === 'good' ? <Check size={10} strokeWidth={3} /> :
+               meta.tone === 'critical' ? <ShieldAlert size={10} strokeWidth={2.5} /> :
+               <AlertTriangle size={10} strokeWidth={2.5} />
+
+  const padding = size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-0.5 text-[11px]'
+
   return (
-    <span
-      className={`inline-flex items-center rounded-full ${bg} px-2.5 py-0.5 text-[11px] font-semibold text-white`}
-    >
-      {label}
+    <span className="relative inline-flex flex-col">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v) }}
+        className={`inline-flex items-center gap-1 rounded-full ${styles.bg} ${padding} font-semibold text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-1 ${styles.ring}`}
+        aria-expanded={open}
+        title={meta.explain}
+      >
+        <span className="inline-flex items-center">{dot}</span>
+        {meta.canonical}
+        <Info size={10} className="opacity-70" />
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full z-30 mt-1.5 w-72 rounded-lg bg-white p-3 text-left text-[12px] leading-relaxed text-ss-text shadow-xl ring-1 ring-black/10"
+        >
+          <span className="mb-1 flex items-center justify-between gap-2">
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider ${styles.accent}`}>
+              <span className={`inline-block h-2 w-2 rounded-full ${styles.dot}`} />
+              {styles.verdictLabel} — {styles.verdict}
+            </span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setOpen(false) }}
+              className="rounded-full p-0.5 text-ss-muted hover:bg-ss-bg hover:text-ss-teal"
+              aria-label="Close explanation"
+            >
+              <X size={12} />
+            </button>
+          </span>
+          <span className="mt-1 block font-semibold text-ss-teal">{meta.canonical}</span>
+          <span className="mt-1 block text-ss-text/90">{meta.explain}</span>
+        </span>
+      )}
     </span>
+  )
+}
+
+/**
+ * Wraps a row of FlagPills with a small "What do these mean?" button that
+ * opens a full glossary modal. Use this everywhere flags are rendered so the
+ * disclosure UX is consistent across the site.
+ */
+export function FlagRow({ flags = [], size = 'md' }) {
+  const [glossaryOpen, setGlossaryOpen] = useState(false)
+  if (!flags?.length) return null
+  return (
+    <>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {flags.map((f) => (
+          <FlagPill key={`${f.label}-${f.tone || ''}`} label={f.label} tone={f.tone} size={size} />
+        ))}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setGlossaryOpen(true) }}
+          className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm bg-white px-2 py-0.5 text-[10px] font-semibold text-ss-muted transition hover:border-ss-teal hover:text-ss-teal"
+          title="What do these tags mean?"
+        >
+          <Info size={11} /> What do these mean?
+        </button>
+      </div>
+      {glossaryOpen && <FlagGlossary onClose={() => setGlossaryOpen(false)} />}
+    </>
+  )
+}
+
+/** Full glossary modal — lists every flag grouped by tone with its explanation. */
+export function FlagGlossary({ onClose }) {
+  const list = allFlags()
+  const groups = { good: [], amber: [], critical: [] }
+  for (const f of list) groups[f.tone]?.push(f)
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl md:p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-ss-orange">
+              Reading study tags
+            </div>
+            <h2 className="mt-1 text-2xl font-extrabold text-ss-teal">
+              What the tags mean
+            </h2>
+            <p className="mt-2 text-sm text-ss-muted">
+              Every study on SelfScience gets tagged with quality signals so you can tell at a glance whether it&rsquo;s a strong piece of evidence, a preliminary finding, or something to read with real skepticism.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-ss-muted hover:bg-ss-bg hover:text-ss-teal"
+            aria-label="Close glossary"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {(['good', 'amber', 'critical']).map((tone) => {
+          const t = TONE_STYLES[tone]
+          const items = groups[tone] || []
+          if (!items.length) return null
+          return (
+            <section key={tone} className="mt-6">
+              <div className={`mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white ${t.bg}`}>
+                {tone === 'good' ? <Check size={12} strokeWidth={3} /> :
+                 tone === 'critical' ? <ShieldAlert size={12} strokeWidth={2.5} /> :
+                 <AlertTriangle size={12} strokeWidth={2.5} />}
+                {t.verdictLabel} — {t.verdict}
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {items.map((f) => (
+                  <div key={f.canonical} className="rounded-lg bg-ss-surface p-3 ring-1 ring-ss-border-warm/60">
+                    <div className={`text-[13px] font-bold ${t.accent}`}>{f.canonical}</div>
+                    <div className="mt-1 text-[12px] leading-relaxed text-ss-text">{f.explain}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )
+        })}
+
+        <div className="mt-6 rounded-lg bg-ss-privacy-tint p-4 text-[12px] italic text-ss-teal">
+          Tags come from an AI that reads the abstract, journal, and metadata. They are quality signals, not verdicts. Read the study itself before drawing conclusions.
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -185,13 +326,7 @@ export function ResultCard({ item, variant = 'stacked' }) {
         )}
       </div>
 
-      {item.flags?.length ? (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {item.flags.map((f) => (
-            <FlagPill key={f.label} label={f.label} tone={f.tone} />
-          ))}
-        </div>
-      ) : null}
+      <FlagRow flags={item.flags} />
 
       {/* Funding trail (only when score ≤ 2) */}
       <FundingTrailPanel funding={item.funding} />
