@@ -14,6 +14,7 @@ import {
   Brain,
   Leaf,
   Droplet,
+  Baby,
 } from 'lucide-react'
 
 export const PILLARS = [
@@ -26,6 +27,7 @@ export const PILLARS = [
   { key: 'mental-health',      name: 'Mental Health & Neurochemistry',  short: 'Mental Health',     Icon: Brain,     description: 'The genetics of mood, stress response, dopamine, serotonin, and brain chemistry.' },
   { key: 'environment',        name: 'Environmental Sensitivity',       short: 'Environment',       Icon: Leaf,      description: 'How your genes influence your response to environmental exposures, toxins, and chemical sensitivity.' },
   { key: 'hormones',           name: 'Hormones & Endocrine Health',     short: 'Hormones',          Icon: Droplet,   description: 'Testosterone, estrogen, thyroid, cortisol, leptin, and the genetics of hormonal health.' },
+  { key: 'pediatric',          name: 'Pediatric & Youth Wellness',      short: 'Youth Wellness',    Icon: Baby,      description: 'Growth, development, nutrition, sleep, ADHD, allergies, and the research shaping children\u2019s health from infancy through adolescence.' },
 ]
 
 export function SiteNav({ variant = 'light' }) {

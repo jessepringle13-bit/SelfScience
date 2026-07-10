@@ -163,6 +163,35 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Microsoft Clarity with auto-masked inputs + 10th pillar (Pediatric & Youth Wellness)"
+    implemented: true
+    working: true
+    file: "/app/components/analytics.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Clarity:
+            - Loads via next/script when NEXT_PUBLIC_CLARITY_ID is set. Full no-op when empty.
+            - Added dedicated clarity-mask script that runs a MutationObserver on
+              document.documentElement, tagging every input/textarea/select/[contenteditable]
+              with data-clarity-mask="True". Covers static + dynamic + attribute-changed cases.
+            - Verified end-to-end: on /genome the file input is masked, on / the search bar
+              is masked, dynamically injected inputs are masked within ~500ms of insertion.
+            - Also fires clarity('set','maskAllInputs','true') and clarity('consent') as
+              belt-and-braces if the Clarity project accepts those flags.
+
+            Pillars:
+            - Added 10th pillar "Pediatric & Youth Wellness" (short label: "Youth Wellness")
+              in /app/components/site-nav.jsx PILLARS array with Baby icon.
+            - Updated /app/app/page.js CATEGORY_PILLS + PILL_TO_PILLAR mapping so the
+              hero category pill row + pillar grid + pillar dropdown all include it.
+            - Homepage copy updated: "nine health pillars" -> "ten health pillars",
+              "The Nine Pillars" -> "The Ten Pillars", grid heading now reads "from infancy
+              through longevity".
   - task: "GA4 analytics with privacy-safe custom event tracking"
     implemented: true
     working: true

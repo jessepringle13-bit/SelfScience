@@ -45,15 +45,79 @@ export default function Analytics() {
         </>
       )}
       {clarityId && (
-        <Script id="clarity-init" strategy="afterInteractive">
-          {`
-            (function(c,l,a,r,i,t,y){
-              c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-              t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-              y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-            })(window, document, "clarity", "script", "${clarityId}");
-          `}
-        </Script>
+        <>
+          <Script id="clarity-init" strategy="afterInteractive">
+            {`
+              (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+              })(window, document, "clarity", "script", "${clarityId}");
+            `}
+          </Script>
+          <Script id="clarity-mask" strategy="afterInteractive">
+            {`
+              (function(){
+                // Selector for anything a user might type/select/pick — all masked in recordings.
+                var SEL = 'input, textarea, select, [contenteditable="true"], [contenteditable=""]';
+
+                function maskEl(el) {
+                  if (!el || el.nodeType !== 1) return;
+                  // Never override an explicit unmask.
+                  if (el.getAttribute('data-clarity-unmask') === 'True') return;
+                  el.setAttribute('data-clarity-mask', 'True');
+                }
+
+                function maskAll(root) {
+                  var scope = root || document;
+                  if (scope.querySelectorAll) {
+                    scope.querySelectorAll(SEL).forEach(maskEl);
+                  }
+                }
+
+                // Initial sweep as soon as DOM is available.
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', function(){ maskAll(document); });
+                } else {
+                  maskAll(document);
+                }
+
+                // Also mask inputs that get added later (SPA navigation, dialogs, dynamic UI).
+                try {
+                  var mo = new MutationObserver(function(mutations){
+                    for (var i = 0; i < mutations.length; i++) {
+                      var m = mutations[i];
+                      for (var j = 0; j < m.addedNodes.length; j++) {
+                        var n = m.addedNodes[j];
+                        if (n.nodeType !== 1) continue;
+                        if (n.matches && n.matches(SEL)) maskEl(n);
+                        maskAll(n);
+                      }
+                      // Also handle new contenteditable / type=file attrs on existing elements.
+                      if (m.type === 'attributes' && m.target && m.target.matches && m.target.matches(SEL)) {
+                        maskEl(m.target);
+                      }
+                    }
+                  });
+                  mo.observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['contenteditable', 'type']
+                  });
+                } catch (e) { /* older browsers: initial sweep still applied */ }
+
+                // Belt-and-braces: tell Clarity to respect strict content masking mode.
+                // Works only if the Clarity project has been configured to accept the flag;
+                // safe no-op otherwise.
+                if (typeof window.clarity === 'function') {
+                  try { window.clarity('set', 'maskAllInputs', 'true'); } catch (e) {}
+                  try { window.clarity('consent'); } catch (e) {}
+                }
+              })();
+            `}
+          </Script>
+        </>
       )}
     </>
   )

@@ -163,6 +163,7 @@ const CATEGORY_PILLS = [
   'Mental Health',
   'Environment',
   'Hormones',
+  'Youth Wellness',
 ]
 
 // Map pill short-label to full pillar name (for URL param)
@@ -176,6 +177,7 @@ const PILL_TO_PILLAR = {
   'Mental Health': 'Mental Health & Neurochemistry',
   'Environment': 'Environmental Sensitivity',
   'Hormones': 'Hormones & Endocrine Health',
+  'Youth Wellness': 'Pediatric & Youth Wellness',
 }
 
 /* --------------------------------- Page ------------------------------------ */
@@ -260,7 +262,7 @@ function App() {
             Search the science.<br className="hidden sm:block" /> Understand your biology.
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-white/80">
-            AI-scored research across nine health pillars. Personalized by your own genome, if you choose.
+            AI-scored research across ten health pillars. Personalized by your own genome, if you choose.
           </p>
 
           {/* Search bar */}
@@ -373,7 +375,7 @@ function App() {
                 Start Exploring
               </h2>
               <p className="mt-2 max-w-xl text-ss-muted">
-                Editor-curated studies across the nine pillars, each with an AI reliability score and plain-language summary.
+                Editor-curated studies across the ten pillars, each with an AI reliability score and plain-language summary.
               </p>
             </div>
             <a
@@ -394,18 +396,18 @@ function App() {
         </div>
       </section>
 
-      {/* ============================ 9 PILLARS ========================== */}
+      {/* ============================ 10 PILLARS ========================== */}
       <section id="pillars" className="bg-white py-20">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
-              The Nine Pillars
+              The Ten Pillars
             </div>
             <h2 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
               Explore by Topic
             </h2>
             <p className="mt-3 text-ss-muted">
-              Research grouped into the nine domains that shape human health and performance.
+              Research grouped into the ten domains that shape human health and performance — from infancy through longevity.
             </p>
           </div>
 
