@@ -163,6 +163,35 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "GA4 analytics with privacy-safe custom event tracking"
+    implemented: true
+    working: true
+    file: "/app/lib/analytics.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Wired GA4 via next/script (no extra package required, but @next/third-parties compatible).
+            Env var: NEXT_PUBLIC_GA_MEASUREMENT_ID (safe no-op when empty). IP anonymised,
+            ad_storage/ad_personalization consent denied by default, allow_google_signals=false.
+            Custom events fired via lib/analytics.js -> trackEvent(name, params).
+            Params are sanitised through an ALLOWED_KEYS whitelist so PII/health data
+            (search query text, genome contents, variant lists) can never leak — only
+            event names, page paths, and generic metadata (source, tab, book_slug, pillar,
+            file_format, variant_count) are ever sent.
+            Events wired:
+              search_performed          -> homepage submit, /search submit, autocomplete selection
+              genome_upload_started     -> file drop/select (file_format only, never contents)
+              genome_results_viewed     -> once when stage becomes 'results' + on Full/Roadmap tab switch
+              reading_list_viewed       -> useEffect on /reading-list mount
+              book_research_clicked     -> Find the Research button (both list + detail)
+              plain_language_expanded   -> result-card Full Abstract toggle + study-page tab switch
+            Verified end-to-end via Playwright: injected a test measurement ID, confirmed
+            gtag script loaded, confirmed events landed in dataLayer with correct params,
+            confirmed NO search query text or file contents appear in any payload.
   - task: "Final polish: static pages, metadata, error/loading states, analytics scaffold"
     implemented: true
     working: "NA"

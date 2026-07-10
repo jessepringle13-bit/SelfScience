@@ -21,6 +21,7 @@ import {
   ReliabilityError,
 } from '@/components/reliability-badge'
 import { SourceBadge, FlagPill, FundingTrailPanel } from '@/components/result-card'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 export default function StudyClient({ id }) {
   const router = useRouter()
@@ -271,7 +272,13 @@ export default function StudyClient({ id }) {
             <div className="mb-4 flex items-center gap-1 rounded-full bg-ss-surface p-1 ring-1 ring-ss-border-warm/70 w-fit">
               <button
                 type="button"
-                onClick={() => setAbsOpen(false)}
+                onClick={() => {
+                  setAbsOpen(false)
+                  trackEvent(EVENTS.PLAIN_LANGUAGE_EXPANDED, {
+                    source: 'study_page',
+                    tab: 'plain_language',
+                  })
+                }}
                 className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                   !absOpen ? 'bg-ss-teal text-white shadow-sm' : 'text-ss-muted hover:text-ss-teal'
                 }`}
@@ -280,7 +287,13 @@ export default function StudyClient({ id }) {
               </button>
               <button
                 type="button"
-                onClick={() => setAbsOpen(true)}
+                onClick={() => {
+                  setAbsOpen(true)
+                  trackEvent(EVENTS.PLAIN_LANGUAGE_EXPANDED, {
+                    source: 'study_page',
+                    tab: 'full_abstract',
+                  })
+                }}
                 className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
                   absOpen ? 'bg-ss-teal text-white shadow-sm' : 'text-ss-muted hover:text-ss-teal'
                 }`}

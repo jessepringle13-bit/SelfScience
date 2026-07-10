@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dna,
@@ -19,6 +19,7 @@ import {
 import SiteNav from '@/components/site-nav'
 import { parseGenomeFile } from '@/lib/genome-parser'
 import { VARIANT_CATALOG, SAMPLE_VARIANTS } from '@/lib/variant-catalog'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -46,6 +47,32 @@ export default function GenomeClient() {
   const [stats, setStats] = useState(null)       // { recognized, format }
   const [report, setReport] = useState(null)     // Gemini JSON
   const [activeTab, setActiveTab] = useState('overview')
+
+  // Fire GA event exactly once when the results view first renders.
+  const resultsTrackedRef = useRef(false)
+  useEffect(() => {
+    if (stage === 'results' && !resultsTrackedRef.current) {
+      resultsTrackedRef.current = true
+      trackEvent(EVENTS.GENOME_RESULTS_VIEWED, {
+        variant_count: stats?.recognized ?? 0,
+        file_format: (stats?.format || 'unknown').toString().slice(0, 32),
+      })
+    }
+    if (stage === 'upload') {
+      // Reset when the user starts over so a repeat run tracks again.
+      resultsTrackedRef.current = false
+    }
+  }, [stage, stats])
+
+  // Also track when the user switches to the Full Report / Roadmap tabs.
+  useEffect(() => {
+    if (stage !== 'results') return
+    if (activeTab === 'overview') return
+    trackEvent(EVENTS.GENOME_RESULTS_VIEWED, {
+      tab: activeTab, // 'full' or 'roadmap'
+      triggered_by: 'tab_switch',
+    })
+  }, [activeTab, stage])
 
   const stepThroughProgress = async () => {
     setProgressLabel('Reading your file…')
@@ -86,6 +113,12 @@ export default function GenomeClient() {
 
   const handleFile = useCallback(async (file) => {
     if (!file) return
+    // Track only the fact that upload started + generic file format, NEVER the contents.
+    const ext = (file.name || '').toLowerCase().split('.').pop()
+    trackEvent(EVENTS.GENOME_UPLOAD_STARTED, {
+      file_format: ['txt', 'vcf', 'zip', 'csv'].includes(ext) ? ext : 'other',
+      source: 'file_picker',
+    })
     setErrorMsg(null)
     setStage('processing')
     setProgress(5)

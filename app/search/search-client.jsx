@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 const SOURCE_TYPE_OPTIONS = [
   { key: 'all',       label: 'All' },
@@ -162,6 +163,10 @@ export default function SearchClient() {
     const q = query.trim()
     if (!q) return
     setSubmittedQ(q)
+    trackEvent(EVENTS.SEARCH_PERFORMED, {
+      source: 'search_bar',
+      has_pillar: !!pillar,
+    })
     const usp = new URLSearchParams()
     usp.set('q', q)
     if (pillar) usp.set('pillar', pillar)
@@ -201,6 +206,10 @@ export default function SearchClient() {
     setSubmittedQ(s.title)
     setShowSuggestions(false)
     setSuggestions([])
+    trackEvent(EVENTS.SEARCH_PERFORMED, {
+      source: 'autocomplete',
+      has_pillar: !!pillar,
+    })
     const usp = new URLSearchParams()
     usp.set('q', s.title)
     if (pillar) usp.set('pillar', pillar)

@@ -6,6 +6,7 @@ import { ArrowLeft, Search, BookOpen, ArrowRight, ShieldCheck } from 'lucide-rea
 import SiteNav from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
 import { READING_LIST, PlaceholderCover } from '../page'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 export default function BookClient({ slug }) {
   const router = useRouter()
@@ -40,6 +41,11 @@ export default function BookClient({ slug }) {
   }, [slug, book])
 
   const goSearch = (q, pillar) => {
+    trackEvent(EVENTS.BOOK_RESEARCH_CLICKED, {
+      book_slug: slug,
+      pillar: pillar || 'unknown',
+      source: 'book_detail',
+    })
     const usp = new URLSearchParams()
     usp.set('q', q)
     if (pillar) usp.set('pillar', pillar)

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BookOpen, ArrowRight, Search } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { PILLARS } from '@/components/site-nav'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +37,7 @@ export default function ReadingListPage() {
 
   // Fetch cover images from Google Books once (parallel)
   useEffect(() => {
+    trackEvent(EVENTS.READING_LIST_VIEWED)
     let alive = true
     Promise.all(
       READING_LIST.map(async (book) => {
@@ -63,7 +65,11 @@ export default function ReadingListPage() {
     return READING_LIST.filter((b) => b.pillar === fullPillar)
   }, [filter])
 
-  const goSearch = (q, pillar) => {
+  const goSearch = (q, pillar, bookSlug) => {
+    trackEvent(EVENTS.BOOK_RESEARCH_CLICKED, {
+      book_slug: bookSlug,
+      pillar: pillar || 'unknown',
+    })
     const usp = new URLSearchParams()
     usp.set('q', q)
     if (pillar) usp.set('pillar', pillar)
@@ -130,7 +136,7 @@ export default function ReadingListPage() {
               <p className="mt-4 text-sm text-ss-text/90 leading-relaxed">{book.reason}</p>
               <div className="mt-auto flex flex-wrap gap-2 pt-5">
                 <button
-                  onClick={() => goSearch(book.searchQuery, book.pillar)}
+                  onClick={() => goSearch(book.searchQuery, book.pillar, book.slug)}
                   className="inline-flex flex-1 items-center justify-center gap-1 rounded-full bg-ss-orange px-3 py-2 text-xs font-semibold text-white transition hover:bg-ss-orange-dark"
                 >
                   <Search size={12} /> Find the Research

@@ -16,6 +16,7 @@ import {
   ReliabilityPending,
   ReliabilityError,
 } from './reliability-badge'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 const SOURCE_META = {
   'peer-reviewed': { label: 'Peer-Reviewed', color: '#1B474D', bg: 'bg-ss-teal' },
@@ -110,7 +111,9 @@ export function ResultCard({ item, variant = 'stacked' }) {
     e?.preventDefault?.()
     try {
       sessionStorage.setItem(`ss:study:${item.id}`, JSON.stringify(item))
-    } catch {}
+    } catch {
+      /* sessionStorage may be blocked */
+    }
     router.push(`/study/${encodeURIComponent(item.id)}`)
   }
 
@@ -217,7 +220,17 @@ export function ResultCard({ item, variant = 'stacked' }) {
         <>
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => {
+              setExpanded((v) => {
+                const next = !v
+                if (next) {
+                  trackEvent(EVENTS.PLAIN_LANGUAGE_EXPANDED, {
+                    source: 'result_card',
+                  })
+                }
+                return next
+              })
+            }}
             className="mt-3 inline-flex w-fit items-center gap-1 text-xs font-semibold text-ss-muted hover:text-ss-teal"
           >
             Full Abstract {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}

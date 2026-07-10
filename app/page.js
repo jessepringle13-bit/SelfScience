@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 /* -------------------------------- Sample data ------------------------------ */
 
@@ -187,6 +188,10 @@ function App() {
   const goSearch = (q, pillar) => {
     const term = (q ?? query).trim()
     if (!term) return
+    trackEvent(EVENTS.SEARCH_PERFORMED, {
+      source: 'homepage',
+      has_pillar: !!pillar,
+    })
     const usp = new URLSearchParams()
     usp.set('q', term)
     if (pillar) usp.set('pillar', pillar)
