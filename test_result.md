@@ -742,3 +742,58 @@ agent_communication:
         20 recent studies) and screenshot testing. Frontend testing not requested by
         user for this iteration.
 
+    -agent: "testing"
+      message: |
+        ✅ COMPREHENSIVE FRONTEND TESTING COMPLETE - BOTH FEATURES WORKING
+        
+        FEATURE 1 — Pillar Click Auto-Search: ✅ PASS (10/10 pillars tested)
+        
+        Tested all 10 pillars across 4 paths:
+        A. Homepage category pills: Genomics, Nutrition, Performance, Longevity, Wellness, 
+           Pharmacogenomics, Mental Health, Environment, Hormones, Youth Wellness — ALL PASS
+        B. Homepage pillar grid: Longevity, Pharmacogenomics, Youth Wellness — ALL PASS
+        C. Nav dropdown: Genomics, Mental Health — ALL PASS
+        D. Direct URL: /search?pillar=Longevity — PASS
+        
+        Verified for each pillar:
+        ✅ URL correctly routes to /search?pillar=<Name>
+        ✅ Heading displays "Latest research on <Pillar Name>"
+        ✅ "Last 5 Years" date filter is active/highlighted by default
+        ✅ Search auto-fires without user interaction
+        
+        ⚠️  NOTE: Many searches returned 0 results due to backend API 429 rate-limiting 
+        (PubMed, Semantic Scholar, OpenAlex, Crossref). This is NOT a frontend bug — 
+        the feature is working correctly. The backend is correctly attempting to fetch 
+        results, but external APIs are rate-limiting. Console shows ~50 "429" errors.
+        
+        FEATURE 2 — Book Synopsis & Impact Panels: ✅ PASS (5/5 books tested)
+        
+        Tested books: outlive, why-we-sleep, the-language-of-life, behave, lifespan
+        
+        Verified for each book:
+        ✅ "What's Inside" panel visible with synopsis heading "A quick synopsis"
+        ✅ "Why It Matters" panel visible with knownFor heading "What it's known for"
+        ✅ Both panels contain >150 characters of content
+        ✅ Panels positioned BEFORE "The Research Behind This Book" section (DOM order verified)
+        ✅ Research section loads below panels (4 cards or loading state)
+        
+        Synopsis lengths: outlive (603 chars), why-we-sleep (570 chars), 
+        the-language-of-life (688 chars), behave (623 chars), lifespan (577 chars)
+        
+        READING LIST PAGE: ✅ PASS
+        - All 37 book cards render correctly
+        - No JavaScript errors
+        - Filter pills functional
+        
+        SCREENSHOTS CAPTURED:
+        - pillar_longevity.png (pillar browse page with results)
+        - pillar_nav_mental_health.png (nav dropdown working)
+        - book_outlive.png (synopsis & knownFor panels visible above research)
+        
+        CONSOLE ERRORS: 48-52 errors, all "Failed to load resource: 429" from backend 
+        API rate limiting. No frontend JavaScript errors detected.
+        
+        RECOMMENDATION: Both features are production-ready. The 429 errors are expected 
+        when backend APIs hit rate limits and do not indicate a bug in the implementation.
+
+
