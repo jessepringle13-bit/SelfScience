@@ -372,7 +372,107 @@ const normalizeTitle = (t) =>
 // Later sources fill in missing fields (e.g., abstract, oaUrl, citationCount).
 const PROVIDER_RANK = { PubMed: 0, 'Semantic Scholar': 1, OpenAlex: 2, Crossref: 3 }
 
-function mergeResults(...arrays) {
+/* -------------------------- Relevance filtering --------------------------- */
+
+// Common English stopwords + a few generic academic filler words we don't want
+// to inflate token overlap scores.
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or', 'but',
+  'is', 'are', 'was', 'were', 'be', 'as', 'by', 'with', 'from', 'that', 'this',
+  'these', 'those', 'it', 'its', 'we', 'our', 'their', 'not', 'no', 'do', 'does',
+  'has', 'have', 'had', 'can', 'may', 'might', 'will', 'shall', 'study',
+  'research', 'paper', 'article',
+])
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Turn a raw user query into { tokens, phrases, fullPhrase } where:
+ *  - tokens = significant lowercase words (stopwords removed, min 2 chars OR digit)
+ *  - phrases = the full query (if 2+ tokens) plus every adjacent bigram
+ *  - fullPhrase = the full lowercased query string for exact-phrase matching
+ */
+function parseQuery(q) {
+  const clean = (q || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!clean) return { tokens: [], phrases: [], fullPhrase: '' }
+  const raw = clean.split(' ')
+  const tokens = raw.filter((w) => w && !STOPWORDS.has(w) && (w.length >= 2 || /^\d+$/.test(w)))
+  const phrases = new Set()
+  if (tokens.length >= 2) {
+    phrases.add(clean)
+    for (let i = 0; i < raw.length - 1; i++) {
+      if (STOPWORDS.has(raw[i]) || STOPWORDS.has(raw[i + 1])) continue
+      const bigram = `${raw[i]} ${raw[i + 1]}`
+      if (bigram.trim().length >= 3) phrases.add(bigram)
+    }
+  }
+  return { tokens, phrases: [...phrases], fullPhrase: clean }
+}
+
+/**
+ * Score a result against a parsed query. Higher score = more relevant.
+ * Also returns a `keep` flag that decides whether to include the result at all.
+ */
+function scoreRelevance(item, parsed) {
+  const { tokens, phrases, fullPhrase } = parsed
+  const title = (item.title || '').toLowerCase()
+  const abstract = (item.abstract || '').toLowerCase()
+  const journal = (item.journal || '').toLowerCase()
+
+  let score = 0
+
+  // Full-query phrase — strongest signal
+  if (fullPhrase && title.includes(fullPhrase)) score += 20
+  else if (fullPhrase && abstract.includes(fullPhrase)) score += 12
+
+  // Bigram / phrase matches
+  let phraseHitsTitle = 0
+  let phraseHitsAbstract = 0
+  for (const p of phrases) {
+    if (p === fullPhrase) continue // already counted
+    if (title.includes(p)) { score += 6; phraseHitsTitle++ }
+    else if (abstract.includes(p)) { score += 3; phraseHitsAbstract++ }
+  }
+
+  // Individual token (whole-word) matches
+  let titleTokenHits = 0
+  let absTokenHits = 0
+  for (const t of tokens) {
+    const re = new RegExp(`\\b${escapeRegex(t)}\\b`, 'i')
+    if (re.test(title)) { score += 2; titleTokenHits++ }
+    else if (re.test(abstract)) { score += 1; absTokenHits++ }
+    else if (re.test(journal)) score += 0.5
+  }
+
+  // ---- Keep / drop decision ----
+  // Filter out results that lack meaningful match to the query.
+  // For "zone 2 training", this must drop "Work Zone Safety Gamification" (only
+  // 2 of 3 tokens, no phrase) while keeping "Zone 2 aerobic exercise" (phrase match).
+  let keep
+  if (tokens.length === 0) {
+    keep = true
+  } else if (tokens.length === 1) {
+    // Single-token query — trust source API but require ≥1 hit somewhere.
+    keep = titleTokenHits + absTokenHits > 0
+  } else {
+    const hasFullPhrase =
+      fullPhrase && (title.includes(fullPhrase) || abstract.includes(fullPhrase))
+    const hasStrongBigram = phraseHitsTitle > 0
+    const allTokensInTitle = titleTokenHits === tokens.length
+    // Every query token appears SOMEWHERE (title+abstract) AND at least 2 of them
+    // are in the title. This lets legitimate variations through (e.g. "rapamycin
+    // and mTOR pathway in cancer" for query "rapamycin mTOR inhibition") but
+    // drops results where the query looks like an accidental keyword overlap.
+    const goodCoverage =
+      (titleTokenHits + absTokenHits) === tokens.length &&
+      titleTokenHits >= Math.min(2, tokens.length - 1)
+    keep = hasFullPhrase || hasStrongBigram || allTokensInTitle || goodCoverage
+  }
+
+  return { score, keep }
+}
+
+function mergeResults(arrays, parsedQuery) {
   const seen = new Map()
   const all = []
   for (const arr of arrays) for (const it of arr) all.push(it)
@@ -402,8 +502,24 @@ function mergeResults(...arrays) {
     }
   }
 
-  const list = [...seen.values()]
-  list.sort((a, b) => (b.year || 0) - (a.year || 0))
+  let list = [...seen.values()]
+
+  // Score + filter for relevance if the caller passed a parsed query.
+  if (parsedQuery && parsedQuery.tokens.length > 0) {
+    list = list
+      .map((it) => {
+        const r = scoreRelevance(it, parsedQuery)
+        return { ...it, _relevance: r.score, _keep: r.keep }
+      })
+      .filter((it) => it._keep)
+      // Primary sort: relevance desc; tiebreak: newer year first
+      .sort((a, b) => (b._relevance - a._relevance) || ((b.year || 0) - (a.year || 0)))
+      // Strip internal helper fields before returning to the client
+      .map(({ _keep, ...rest }) => rest)
+  } else {
+    list.sort((a, b) => (b.year || 0) - (a.year || 0))
+  }
+
   return list
 }
 
@@ -420,21 +536,25 @@ async function handleSearch(request) {
     return NextResponse.json({ query: '', results: [], total: 0, sources: {} })
   }
 
-  const effectiveQuery = pillar ? `${q} ${pillar}` : q
-  const wants = (name) => sourceFilter === 'all' || sourceFilter === name
+  const parsed = parseQuery(q)
+  // For multi-word queries, wrap in quotes so PubMed/OpenAlex/Crossref/S2 do
+  // exact-phrase matching. This alone eliminates most of the "loose keyword"
+  // noise (e.g. War Zone Training, Work Zone Safety) for a query like "zone 2 training".
+  const isMultiWord = parsed.tokens.length >= 2
+  const quotedQ = isMultiWord ? `"${q.replace(/"/g, '')}"` : q
+  const effectiveQuery = pillar ? `${quotedQ} ${pillar}` : quotedQ
 
   const [pubmedResults, s2Results, openAlexResults, crossrefResults] = await Promise.all([
-    wants('pubmed') ? searchPubmed(effectiveQuery, 12) : Promise.resolve([]),
-    wants('s2') ? searchSemanticScholar(effectiveQuery, 10) : Promise.resolve([]),
-    wants('openalex') ? searchOpenAlex(effectiveQuery, 10) : Promise.resolve([]),
-    wants('crossref') ? searchCrossref(effectiveQuery, 10) : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'pubmed') ? searchPubmed(effectiveQuery, 12) : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 's2') ? searchSemanticScholar(effectiveQuery, 10) : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, 10) : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'crossref') ? searchCrossref(effectiveQuery, 10) : Promise.resolve([]),
   ])
 
+  // Merge + relevance filter + sort in one pass.
   const merged = mergeResults(
-    pubmedResults,
-    s2Results,
-    openAlexResults,
-    crossrefResults
+    [pubmedResults, s2Results, openAlexResults, crossrefResults],
+    parsed
   ).slice(0, limit)
 
   return NextResponse.json({

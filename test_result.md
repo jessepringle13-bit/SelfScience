@@ -163,6 +163,44 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Search relevance filtering (drop off-topic keyword-overlap noise)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Reported bug: query "zone 2 training" returned unrelated results like
+            "War Zones", "Work Zone Safety Gamification", "AI-Guided Lung Ultrasound",
+            "Reporter-Interpreter-Manager-Educator Framework", "TZHE Training Zone
+            Hypermodel", "Data-Efficient Deep Learning Tissue Characterization".
+            All were loose keyword overlaps (any of "zone", "training", "2").
+
+            Two-part fix, all server-side:
+              1. Query construction: multi-word queries are now sent to PubMed / OpenAlex
+                 / Crossref / S2 wrapped in QUOTES (e.g. `"zone 2 training"`). Each source
+                 API therefore does an exact-phrase match first before falling back.
+              2. Post-fetch relevance scoring in mergeResults():
+                  * Full-query phrase in title -> +20   in abstract -> +12
+                  * Bigram phrases (each) in title -> +6   in abstract -> +3
+                  * Whole-word token match  in title -> +2   in abstract -> +1
+                  * Journal match           -> +0.5
+                 Then a KEEP decision that drops results that fail ALL of:
+                  * full-query phrase anywhere
+                  * any strong bigram in title
+                  * all tokens in title
+                  * every token appears somewhere AND >=2 in title
+                 Results sorted by relevance DESC then year DESC.
+
+            Verified with real queries:
+              "zone 2 training"       : 30 noisy -> 9 all-relevant
+              "MTHFR C677T"           : 10 all on the C677T variant
+              "creatine supplementation": 10 all on creatine supplementation
+              "rapamycin"             : 8 all on rapamycin (single-token path)
   - task: "AI evaluation speed optimisation (Groq primary + parallel + cache)"
     implemented: true
     working: true
