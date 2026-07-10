@@ -16,7 +16,11 @@ export const metadata = {
 
 export default function HowItWorksPage() {
   return (
-    <ContentPage title="How SelfScience Works">
+    <ContentPage
+      eyebrow="Product"
+      title="How SelfScience Works"
+      lede="SelfScience combines a research search engine, an AI reliability scoring system, and a genome analysis tool into one platform. Here is exactly how each piece works."
+    >
       <Section>
         <p>
           SelfScience combines a research search engine, an AI reliability scoring system, and a genome analysis tool into one platform. Here is exactly how each piece works.

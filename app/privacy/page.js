@@ -31,7 +31,12 @@ const SECTIONS = [
 
 export default function PrivacyPage() {
   return (
-    <ContentPage title="Privacy Policy" disclaimerBanner={<DisclaimerBanner storageKey="ss:privacy-disclaimer" />}>
+    <ContentPage
+      eyebrow="Legal"
+      title="Privacy Policy"
+      lede="How we handle your data — including the strict rule that your genome file is parsed only in your browser and never uploaded to our servers."
+      disclaimerBanner={<DisclaimerBanner storageKey="ss:privacy-disclaimer" />}
+    >
       <Section>
         <p><strong>Effective Date:</strong> July 2026</p>
         <p><strong>Platform:</strong> SelfScience (selfscience.io)</p>

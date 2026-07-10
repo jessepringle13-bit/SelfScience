@@ -17,7 +17,11 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <ContentPage title="About SelfScience">
+    <ContentPage
+      eyebrow="About"
+      title="About SelfScience"
+      lede="I built SelfScience because I lived in the gap between genetic data and meaningful understanding — and because crossing it changed everything about how I understand my own health."
+    >
       <Section heading="Why This Exists">
         <p>
           Most people who buy a genetic testing kit from 23andMe or AncestryDNA download their results, feel overwhelmed, and do nothing with them. The reports are written for population averages. The research behind them is buried in academic journals most people cannot read. And the gap between &ldquo;here is your data&rdquo; and &ldquo;here is what to do with it&rdquo; is enormous.

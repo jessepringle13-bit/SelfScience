@@ -30,7 +30,12 @@ const SECTIONS = [
 
 export default function TermsPage() {
   return (
-    <ContentPage title="Terms of Use" disclaimerBanner={<DisclaimerBanner />}>
+    <ContentPage
+      eyebrow="Legal"
+      title="Terms of Use"
+      lede="Please read these terms carefully before using SelfScience. By accessing or using this platform you agree to be bound by them."
+      disclaimerBanner={<DisclaimerBanner />}
+    >
       <Section>
         <p><strong>Effective Date:</strong> July 2026</p>
         <p><strong>Platform:</strong> SelfScience (selfscience.io)</p>

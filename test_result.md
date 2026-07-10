@@ -163,6 +163,55 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Content pages visual overhaul (teal hero + orange accents + dark nav)"
+    implemented: true
+    working: true
+    file: "/app/components/content-page.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User feedback: static pages were too white/whitespaced, header inconsistent
+            with rest of site. Rebuilt ContentPage to match the site's teal-hero pattern
+            (same visual language as reading-list, search hero, study hero).
+
+            Changes to /app/components/content-page.jsx:
+              - Dark teal (#1B474D) hero band spans nav + title area, with the SiteNav
+                rendered in "dark" variant so the header is teal, not white.
+              - Hero includes: small teal-tinted eyebrow pill + big white H1 + optional
+                white lede. Warm orange radial glow in top-right corner + subtle
+                #EEF7F7 glow bottom-left for depth.
+              - White "paper" content card floats -mt-10 over the hero band and holds
+                the 800px content column (still enforced).
+              - Section headings gained an orange (#C45820) left-border accent.
+              - LegalSection numbers are now large orange (#C45820) numerals over the
+                teal H2 heading -- gives the legal cards personality without breaking
+                readability.
+              - TableOfContents card uses a soft teal-to-white gradient with orange
+                numeral bullets and orange hover state.
+
+            Each page now supplies its own eyebrow + lede (H1 text remains EXACTLY the
+            user's provided copy):
+              /about        eyebrow "About"    H1 "About SelfScience"
+              /how-it-works eyebrow "Product"  H1 "How SelfScience Works"
+              /mission      eyebrow "Mission"  H1 "Our Mission"
+              /terms        eyebrow "Legal"    H1 "Terms of Use"
+              /privacy      eyebrow "Legal"    H1 "Privacy Policy"
+
+            Also updated /app/.env: NEXT_PUBLIC_SITE_URL -> https://selfscience.io
+            (canonical URLs and OpenGraph now point to the real domain).
+
+            Verified via Playwright at 1400px and 390px:
+              - Header is dark teal on every content page (consistent)
+              - Active nav link visible on each page
+              - Mobile hero adapts, hamburger + wordmark visible
+              - Section headings show orange left accent
+              - Legal cards show large orange section numbers + white/cream alternation
+              - Ready-to-start CTA card renders correctly on About + Mission
+              - Sticky disclaimer banner still works on Terms + Privacy
   - task: "Full rewrite of 5 static content pages with exact copy + design system"
     implemented: true
     working: true

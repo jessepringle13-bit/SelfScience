@@ -17,7 +17,11 @@ export const metadata = {
 
 export default function MissionPage() {
   return (
-    <ContentPage title="Our Mission">
+    <ContentPage
+      eyebrow="Mission"
+      title="Our Mission"
+      lede="Why SelfScience exists, what it is built on, and the standard it holds itself to."
+    >
       <Section heading="The Problem">
         <p>
           Fourteen million people have downloaded their raw genetic data from consumer testing services. Most of it is sitting unused &mdash; not because people do not care, but because the gap between raw data and meaningful understanding is enormous.
