@@ -763,6 +763,38 @@ agent_communication:
           - Different pillars keyed separately, no collisions
           - Empty results stay MISS on retry (no negative-cache trap)
 
+    -agent: "main"
+      message: |
+        AI STACK REFACTOR: Groq-only with proper retries. Dropped OpenRouter.
+        
+        Motivation: OpenRouter's free tier daily cap was being exhausted almost
+        immediately in production, causing cascading 429s in the AI reliability
+        and plain-language endpoints.
+        
+        /app/lib/ai.js rewritten:
+          - Removed callOpenRouter, OPENROUTER_KEY, orFallback model refs.
+          - callGroqOnce → single HTTP call, extracts status + Retry-After +
+            classifies retryability (408/425/429/5xx retryable; NO_KEY /
+            EMPTY_RESPONSE / 4xx-other non-retryable).
+          - callGroqWithRetry → up to 3 attempts per model with exponential
+            backoff (400ms → 800ms → 1600ms, capped at 5s) + jitter, honoring
+            server Retry-After header (capped at 8s).
+          - runWithModelCascade → tries primary model with retries, then
+            secondary Groq model (separate rate-limit bucket) with retries.
+            Worst case = 2 models × 3 attempts = 6 network calls.
+          - Non-retryable errors short-circuit (no point rolling to secondary
+            if prompt is malformed or key is missing).
+        
+        OPENROUTER_API_KEY left in .env (harmless, in case we want to re-enable
+        the fallback later; no code path reads it anymore).
+        
+        Verified live:
+          - 5 concurrent /api/score-reliability requests: all 200 OK
+          - Log shows successful primary → secondary Groq cascade when 8b
+            gets rate-limited (rolls to 70b, returns 200)
+          - Zero OpenRouter references in new log entries
+
+
         
         1) /api/search now accepts a pillar-only request (no `q`). When `pillar` matches
            one of the 10 SelfScience pillars, backend swaps in a curated 2–4 token
