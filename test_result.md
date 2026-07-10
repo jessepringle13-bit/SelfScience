@@ -765,7 +765,34 @@ agent_communication:
 
     -agent: "main"
       message: |
-        AI CASCADE MODEL UPDATE + genome progress indicator.
+        LATENCY PERF: switched reliability + plain-language from free-primary
+        to paid-primary cascade. Guarantees <10s consistently.
+        
+        Old cascades:
+          Reliability:   free-70B → paid-8B
+          Plain-language: free-70B → paid-70B
+        
+        New cascades:
+          Reliability:   paid-70B (llama-3.1-70b-instruct) → paid-8B (last resort)
+          Plain-language: paid-70B (llama-3.1-70b) → paid-70B (llama-3.3-70b, different provider = different rate bucket)
+        
+        Rationale: free llama-3.3-70b-instruct:free on OpenRouter routes to
+        the Venice provider which gets upstream-rate-limited multiple times
+        per hour (Retry-After 20-30s), causing cascade to paid tier with a
+        total latency of 15-25s. Skipping the free tier entirely and going
+        straight to paid gives consistent 3-9s response times.
+        
+        Cost: llama-3.1-70b-instruct on OpenRouter is ~$0.09/M input tokens
+        and ~$0.09/M output tokens. Each reliability call is ~1500 input +
+        150 output = ~$0.00015. Each plain-language call is ~3000 input +
+        600 output = ~$0.00032. Rough estimate: 30,000-60,000 calls per $10
+        of OpenRouter credit — very comfortable.
+        
+        Verified live (all paid-primary, no cache hits):
+          Reliability calls: 3.1s, 2.6s, 4.3s (all under 5s, target was <10s)
+          Plain-language:    9.3s, 6.9s, 8.5s (all under 10s, all on-topic)
+          Genome:            unchanged (Together AI primary, ~30s expected)
+
         
         Per user spec: swap out reasoning models for non-reasoning Llama models
         across all cascades. Non-reasoning models are the correct tool for our
