@@ -37,11 +37,17 @@ export function SiteNav({ variant = 'light' }) {
   const isDark = variant === 'dark'
   const pathname = usePathname() || ''
   const [pillarsOpen, setPillarsOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Close dropdown on Escape
+  // Close dropdowns on Escape
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && setPillarsOpen(false)
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setPillarsOpen(false)
+        setAboutOpen(false)
+      }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
@@ -53,6 +59,12 @@ export function SiteNav({ variant = 'light' }) {
   const linkActive = isDark ? 'text-white font-semibold' : 'text-ss-teal font-semibold'
   const wordmarkClass = isDark ? 'text-white' : 'text-ss-teal'
   const linkClass = (href) => (pathname === href ? linkActive : linkBase)
+  const ABOUT_ITEMS = [
+    { href: '/about',         label: 'About',         blurb: 'The story behind the platform.' },
+    { href: '/mission',       label: 'Mission',       blurb: 'Why SelfScience exists.' },
+    { href: '/how-it-works',  label: 'How It Works',  blurb: 'A tour under the hood.' },
+  ]
+  const aboutActive = ABOUT_ITEMS.some((i) => i.href === pathname)
 
   return (
     <header className={`absolute inset-x-0 top-0 z-40 border-b ${base}`}>
@@ -64,9 +76,7 @@ export function SiteNav({ variant = 'light' }) {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-          <a href="/" className={linkClass('/')}>Home</a>
           <a href="/search" className={linkClass('/search')}>Search</a>
-          <a href="/genome" className={linkClass('/genome')}>Upload Genome</a>
 
           {/* Pillars dropdown */}
           <div
@@ -106,10 +116,40 @@ export function SiteNav({ variant = 'light' }) {
           </div>
 
           <a href="/reading-list" className={linkClass('/reading-list')}>Reading List</a>
-          <a href="/about" className={linkClass('/about')}>About</a>
-          <a href="/mission" className={linkClass('/mission')}>Mission</a>
-          <a href="/how-it-works" className={linkClass('/how-it-works')}>How It Works</a>
-          <SupportLink isDark={isDark} pathname={pathname} />
+
+          {/* About dropdown: About / Mission / How It Works */}
+          <div
+            className="relative"
+            onMouseEnter={() => setAboutOpen(true)}
+            onMouseLeave={() => setAboutOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setAboutOpen((v) => !v)}
+              className={`inline-flex items-center gap-1 ${aboutActive ? linkActive : linkBase}`}
+              aria-expanded={aboutOpen}
+            >
+              About <ChevronDown size={14} className={`transition ${aboutOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {aboutOpen && (
+              <div className="absolute left-1/2 top-full z-50 mt-2 w-[300px] -translate-x-1/2 rounded-xl bg-white p-2 shadow-2xl ring-1 ring-black/10">
+                {ABOUT_ITEMS.map((it) => (
+                  <a
+                    key={it.href}
+                    href={it.href}
+                    className={`block rounded-lg p-3 transition hover:bg-ss-bg ${
+                      pathname === it.href ? 'bg-ss-bg' : ''
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-ss-teal">{it.label}</span>
+                    <span className="mt-0.5 block text-[12px] text-ss-muted">{it.blurb}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <SupportLink pathname={pathname} />
         </nav>
 
         <a
@@ -134,7 +174,6 @@ export function SiteNav({ variant = 'light' }) {
       {mobileOpen && (
         <div className="border-t border-white/10 bg-ss-teal text-white md:hidden">
           <nav className="container flex flex-col gap-3 py-4 text-sm">
-            <a href="/" className="hover:opacity-80">Home</a>
             <a href="/search" className="hover:opacity-80">Search</a>
             <a href="/genome" className="hover:opacity-80">Upload Genome</a>
             <details className="group">
@@ -151,9 +190,17 @@ export function SiteNav({ variant = 'light' }) {
               </div>
             </details>
             <a href="/reading-list" className="hover:opacity-80">Reading List</a>
-            <a href="/about" className="hover:opacity-80">About</a>
-            <a href="/mission" className="hover:opacity-80">Mission</a>
-            <a href="/how-it-works" className="hover:opacity-80">How It Works</a>
+            <details className="group">
+              <summary className="flex cursor-pointer items-center justify-between hover:opacity-80">
+                <span>About</span>
+                <ChevronDown size={14} className="transition group-open:rotate-180" />
+              </summary>
+              <div className="mt-2 flex flex-col gap-1 pl-3 text-[13px]">
+                <a href="/about" className="py-1 hover:opacity-80">About</a>
+                <a href="/mission" className="py-1 hover:opacity-80">Mission</a>
+                <a href="/how-it-works" className="py-1 hover:opacity-80">How It Works</a>
+              </div>
+            </details>
             <a href="/support" className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-[#C45820] px-4 py-2 text-sm font-semibold text-white">☕ Support SelfScience</a>
           </nav>
         </div>
@@ -165,22 +212,18 @@ export function SiteNav({ variant = 'light' }) {
 export default SiteNav
 
 /**
- * Subtle "Support" pill for the desktop nav. Sends the user to /support
- * (which then explains the mission + links to Buy Me a Coffee), so we can
- * migrate to Stripe or another provider later without touching the nav.
+ * "Support" pill for the desktop nav — filled orange to match the site brand.
+ * Sends the user to /support (which then links out to Buy Me a Coffee), so we
+ * can migrate to Stripe or another provider later without touching the nav.
  */
-function SupportLink({ isDark, pathname }) {
+function SupportLink({ pathname }) {
   const active = pathname === '/support'
-  const base = isDark
-    ? 'border-white/30 text-white hover:bg-white/10'
-    : 'border-[#C45820]/40 text-[#C45820] hover:bg-[#C45820] hover:text-white'
-  const activeCls = isDark ? 'bg-white/10 text-white' : 'bg-[#C45820] text-white'
   return (
     <a
       href="/support"
       onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_header' })}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-        active ? activeCls : base
+      className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold shadow-sm transition ${
+        active ? 'bg-[#A5471A] text-white' : 'bg-[#C45820] text-white hover:bg-[#A5471A]'
       }`}
     >
       <Coffee size={13} />

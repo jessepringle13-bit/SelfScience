@@ -163,6 +163,50 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Header nav cleanup (logo-as-home, About dropdown, orange Support pill)"
+    implemented: true
+    working: true
+    file: "/app/components/site-nav.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Simplified the header per user feedback (was too cluttered, had duplicate
+            Upload Genome). Desktop nav went from 9 items -> 5 items + CTA:
+
+              Before: Home / Search / Upload Genome / Pillars / Reading List / About /
+                      Mission / How It Works / Support + [Upload Genome CTA]
+              After:  Search / Pillars / Reading List / About v / Support + [Upload Genome CTA]
+
+            Changes:
+              - Removed "Home" nav link -- SelfScience wordmark is the home trigger.
+              - Removed duplicate "Upload Genome" nav link -- kept only the orange
+                CTA button on the right so it's unambiguous.
+              - New "About" hover dropdown groups About / Mission / How It Works with
+                short blurbs. Uses same pattern as the Pillars dropdown so it looks
+                native. Active-state highlighting still works via aboutActive check.
+              - Support pill is now a FILLED orange (#C45820) pill (matches the
+                Upload Genome CTA styling but at nav-pill scale). Was previously an
+                outlined ghost link that was easy to miss.
+
+            Mobile drawer mirrors the same structure:
+              Search / Upload Genome / Pillars > / Reading List / About > / Support
+              About is a native <details> collapsible showing About / Mission /
+              How It Works.
+
+            BMC URL: /app/.env NEXT_PUBLIC_BMC_URL already correct at
+            https://buymeacoffee.com/selfscience (user typo in message was "buymeacoffe"
+            with one 'e' -- clarified the placeholder is correct).
+
+            Verified via Playwright at 1400px and 390px:
+              - Desktop nav shows exactly: Search / Pillars / Reading List / About / Support
+              - About dropdown opens on hover and lists the 3 nested pages with blurbs
+              - Orange Support pill visible on the dark hero
+              - Upload Genome CTA present on right, only once
+              - Mobile drawer collapses About into a nested details block
   - task: "Donation flow (Buy Me a Coffee + dedicated /support page)"
     implemented: true
     working: true
