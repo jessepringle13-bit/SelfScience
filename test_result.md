@@ -765,8 +765,43 @@ agent_communication:
 
     -agent: "main"
       message: |
-        LATENCY PERF: switched reliability + plain-language from free-primary
-        to paid-primary cascade. Guarantees <10s consistently.
+        FEATURE: AI usage tracker + admin dashboard.
+        
+        Goal: monitor OpenRouter credit burn rate for the first week (and
+        beyond) to confirm the $0.0002 - $0.0003 per-call cost estimate
+        matches production reality.
+        
+        Files created:
+          - /app/lib/ai-usage.js — in-memory + JSON-persisted usage tracker.
+            Records every AI call with: provider, model, task, tokens (in/out),
+            latency, HTTP status, USD estimate (from local PRICES table).
+            Also aggregates per-model, per-day, and keeps a 200-item ring
+            buffer of recent calls. Persists to /app/data/ai-usage.json every
+            30s (debounced) so counters survive supervisor restarts.
+          - /app/app/admin/ai-usage/page.js — simple dashboard page at
+            /admin/ai-usage?token=<ADMIN_TOKEN>. Shows total calls, tokens,
+            USD, per-model breakdown, per-day rollup, and last 200 calls.
+            Also displays LIVE OpenRouter credit balance from their /credits
+            endpoint so we can compare our estimate vs. reality directly.
+        
+        Files modified:
+          - /app/lib/ai.js — callOpenAICompatible now returns usage from the
+            provider response; runCascade calls recordAiCall() for every
+            attempt (success, validation-failed, or thrown).
+          - /app/app/api/[[...path]]/route.js — new GET /api/admin/ai-usage
+            route protected by ADMIN_TOKEN env variable (401 otherwise).
+          - /app/.env — added ADMIN_TOKEN (auto-generated).
+        
+        Access:
+          Preview: http://localhost:3000/admin/ai-usage?token=<ADMIN_TOKEN>
+          Prod:    https://selfscience.io/admin/ai-usage?token=<ADMIN_TOKEN>
+        (Not linked from site nav — admin-only.)
+        
+        Verified live: 3 test AI calls (1 reliability + 1 failed validation
+        + 1 successful plain-language cascade) were recorded correctly with
+        accurate token counts and USD estimates. OpenRouter live credit
+        endpoint returned $10.00 total / $0.008 used (matches expectations).
+
         
         Old cascades:
           Reliability:   free-70B → paid-8B

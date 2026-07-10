@@ -13,6 +13,7 @@ import {
 import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
 import { getPillarQuery } from '@/lib/pillars'
 import { searchCache, makeCacheKey } from '@/lib/cache'
+import { getUsageSnapshot, fetchOpenRouterCredit } from '@/lib/ai-usage'
 
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -657,9 +658,11 @@ async function handleSearch(request) {
 export async function GET(request, { params }) {
   const p = (await params)?.path || []
   const route = Array.isArray(p) ? p[0] : p
+  const subRoute = Array.isArray(p) ? p[1] : null
 
   if (route === 'search') return handleSearch(request)
   if (route === 'autocomplete') return handleAutocomplete(request)
+  if (route === 'admin' && subRoute === 'ai-usage') return handleAdminAiUsage(request)
 
   return NextResponse.json({
     status: 'ok',
@@ -1023,4 +1026,38 @@ export async function POST(request, { params }) {
   if (route === 'genome') return handleInterpretGenome(request)
 
   return NextResponse.json({ status: 'ok' })
+}
+
+/**
+ * Admin — AI usage / cost snapshot.
+ *   GET /api/admin/ai-usage?token=<ADMIN_TOKEN>
+ *
+ * Returns:
+ *   - In-app usage snapshot (calls, tokens, USD, per-model + per-day)
+ *   - Live OpenRouter remaining credit balance
+ * Auth: shared secret via ?token query param compared to ADMIN_TOKEN env.
+ */
+async function handleAdminAiUsage(request) {
+  const url = new URL(request.url)
+  const token = url.searchParams.get('token') || ''
+  const expected = process.env.ADMIN_TOKEN || ''
+  if (!expected) {
+    return NextResponse.json({ error: 'ADMIN_TOKEN not configured on server' }, { status: 500 })
+  }
+  if (token !== expected) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
+  const [snapshot, openRouterCredit] = await Promise.all([
+    getUsageSnapshot(),
+    fetchOpenRouterCredit(),
+  ])
+  return NextResponse.json({
+    snapshot,
+    liveCredits: {
+      openrouter: openRouterCredit,
+      together:  { note: 'Together AI has no public credit-balance API. Check https://api.together.ai/user/billing' },
+    },
+    priceTableNote: 'Prices in /app/lib/ai-usage.js. Update as providers publish new pricing.',
+  })
 }
