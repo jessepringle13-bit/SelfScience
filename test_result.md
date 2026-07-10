@@ -163,6 +163,57 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Donation flow (Buy Me a Coffee + dedicated /support page)"
+    implemented: true
+    working: true
+    file: "/app/components/support-button.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Wired a full support / donation flow driven by NEXT_PUBLIC_BMC_URL:
+              - Placeholder in /app/.env: https://buymeacoffee.com/selfscience  (user
+                will swap in the real BMC profile URL once the account is created).
+              - New components/support-button.jsx with 4 variants (nav / footer / hero /
+                ghost). Opens BMC in a new tab (rel="noopener noreferrer"). If the env
+                var is missing or non-URL, it safely falls back to the internal /support
+                page so the flow never breaks.
+              - Site nav: added a small "Support" pill (orange outline on light, white
+                outline on dark) at the end of the desktop nav with a coffee icon.
+                Mobile drawer gets a full orange "Support SelfScience" CTA at the bottom.
+              - Site footer: added a top "Support our work" callout row above the
+                existing links row. Heart icon + one-line pitch + orange pill button.
+                Also added /support to the FOOTER_LINKS list.
+              - New /support page:
+                  * Hero: teal band + orange eyebrow + big H1 "Keep SelfScience honest
+                    and free." + lede.
+                  * Primary CTA card (soft teal-to-white gradient): coffee icon, Buy me
+                    a coffee button, "See what your donation funds" jump link.
+                  * 2x2 funding-card grid: AI processing costs / Keeping SelfScience
+                    free / Editorial research time / Zero ads-affiliate-upsells.
+                  * Muted transparency section explaining current bootstrapped status
+                    and a promise to publish an expense breakdown when donations
+                    exceed running costs.
+                  * "Other ways to help" bulleted list (tell a friend, feedback,
+                    corrections, citations).
+                  * Bottom teal CTA card mirroring the top primary CTA.
+              - Analytics: added EVENTS.SUPPORT_CLICKED and fires on every entry point
+                (nav pill, mobile drawer, footer button, hero CTA, bottom CTA) with a
+                distinct 'source' param so we can compare conversion by placement.
+                All source values remain in the ALLOWED_KEYS whitelist -> no PII leaks.
+              - Domain: /app/.env NEXT_PUBLIC_SITE_URL already points to
+                https://selfscience.io from the previous session.
+
+            Verified via Playwright:
+              - /support returns 200
+              - BMC link href = https://buymeacoffee.com/selfscience  (placeholder)
+              - BMC link target = "_blank" (new tab)
+              - Nav "Support" pill visible in dark hero
+              - Footer callout row + "Support" bold when on /support
+              - No lint errors on any new file
   - task: "Content pages visual overhaul (teal hero + orange accents + dark nav)"
     implemented: true
     working: true

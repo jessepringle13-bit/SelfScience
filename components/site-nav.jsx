@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { Coffee } from 'lucide-react'
 import {
   Menu,
   X,
@@ -17,6 +18,7 @@ import {
   Droplet,
   Baby,
 } from 'lucide-react'
+import { trackEvent, EVENTS } from '@/lib/analytics'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -107,6 +109,7 @@ export function SiteNav({ variant = 'light' }) {
           <a href="/about" className={linkClass('/about')}>About</a>
           <a href="/mission" className={linkClass('/mission')}>Mission</a>
           <a href="/how-it-works" className={linkClass('/how-it-works')}>How It Works</a>
+          <SupportLink isDark={isDark} pathname={pathname} />
         </nav>
 
         <a
@@ -151,6 +154,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/about" className="hover:opacity-80">About</a>
             <a href="/mission" className="hover:opacity-80">Mission</a>
             <a href="/how-it-works" className="hover:opacity-80">How It Works</a>
+            <a href="/support" className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-[#C45820] px-4 py-2 text-sm font-semibold text-white">☕ Support SelfScience</a>
           </nav>
         </div>
       )}
@@ -159,3 +163,28 @@ export function SiteNav({ variant = 'light' }) {
 }
 
 export default SiteNav
+
+/**
+ * Subtle "Support" pill for the desktop nav. Sends the user to /support
+ * (which then explains the mission + links to Buy Me a Coffee), so we can
+ * migrate to Stripe or another provider later without touching the nav.
+ */
+function SupportLink({ isDark, pathname }) {
+  const active = pathname === '/support'
+  const base = isDark
+    ? 'border-white/30 text-white hover:bg-white/10'
+    : 'border-[#C45820]/40 text-[#C45820] hover:bg-[#C45820] hover:text-white'
+  const activeCls = isDark ? 'bg-white/10 text-white' : 'bg-[#C45820] text-white'
+  return (
+    <a
+      href="/support"
+      onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_header' })}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+        active ? activeCls : base
+      }`}
+    >
+      <Coffee size={13} />
+      Support
+    </a>
+  )
+}
