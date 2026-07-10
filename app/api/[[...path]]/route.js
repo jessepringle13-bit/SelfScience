@@ -12,6 +12,7 @@ import {
 } from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
 import { getPillarQuery } from '@/lib/pillars'
+import { searchCache, makeCacheKey } from '@/lib/cache'
 
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -542,6 +543,21 @@ async function handleSearch(request) {
     return NextResponse.json({ query: '', results: [], total: 0, sources: {} })
   }
 
+  // ---- Cache lookup ----------------------------------------------------
+  // Same params → same upstream calls → same response. Pillar-browse gets
+  // a longer TTL (10 min) because curated queries don't drift and we want
+  // to shield the biomedical APIs from repeat pillar clicks by anonymous
+  // browsers. Regular searches get a shorter TTL (5 min) — long enough to
+  // absorb F5 / back-forward / dedupe from AI reprocessing, short enough
+  // to keep fresh content flowing in for active researchers.
+  const cacheKey = makeCacheKey('search', {
+    q: effectiveInputQ, pillar, source: sourceFilter, limit, mode: isPillarBrowse ? 'browse' : 'q',
+  })
+  const cached = searchCache.get(cacheKey)
+  if (cached) {
+    return NextResponse.json({ ...cached, _cache: 'hit' })
+  }
+
   const parsed = parseQuery(effectiveInputQ)
   // For multi-word queries, wrap in quotes so PubMed/OpenAlex/Crossref/S2 do
   // exact-phrase matching. This alone eliminates most of the "loose keyword"
@@ -595,7 +611,7 @@ async function handleSearch(request) {
 
   merged = merged.slice(0, limit)
 
-  return NextResponse.json({
+  const payload = {
     query: effectiveInputQ,
     pillar,
     isPillarBrowse,
@@ -607,7 +623,18 @@ async function handleSearch(request) {
       crossref: crossrefResults.length,
     },
     results: merged,
-  })
+  }
+
+  // Only cache non-empty responses. If ALL four upstream APIs failed / 429'd
+  // and we got zero results, we do NOT want to freeze that empty result for
+  // 5–10 minutes — the user should be able to retry immediately and hit the
+  // upstreams again.
+  if (merged.length > 0) {
+    const ttlMs = isPillarBrowse ? 10 * 60 * 1000 : 5 * 60 * 1000
+    searchCache.set(cacheKey, payload, ttlMs)
+  }
+
+  return NextResponse.json({ ...payload, _cache: 'miss' })
 }
 
 /* --------------------------------- Router --------------------------------- */

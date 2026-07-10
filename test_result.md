@@ -738,6 +738,49 @@ agent_communication:
            "Why It Matters" section BEFORE the auto-fetched "Research Behind This
            Book" grid — matching the requested reading order.
         
+        Frontend testing: 10/10 pillars PASS, 5/5 book pages PASS, all 37 books
+        render on /reading-list.
+
+    -agent: "main"
+      message: |
+        PERF ADD: Server-side in-memory TTL cache for /api/search.
+        
+        New /app/lib/cache.js — a small LRU-ish TTL Map pinned to globalThis
+        (so it survives Next.js hot-reloads in dev). Bounded at 500 entries.
+        Auto-sweeps expired keys every 5 min.
+        
+        /app/app/api/[[...path]]/route.js — handleSearch now:
+          1. Builds a stable cache key from (q, pillar, source, limit, mode).
+          2. Cache HIT returns instantly with `_cache: "hit"`.
+          3. Cache MISS runs the normal upstream fanout, then stores the payload
+             with TTL = 10 min for pillar-browse / 5 min for regular queries.
+          4. Empty (0-result) responses are NEVER cached — user should be able
+             to retry immediately and hit upstream again.
+        
+        Verified with curl:
+          - Pillar (Nutrition): 2.74s miss → 0.044s hit (62x speedup)
+          - Regular query (MTHFR folate): 490ms miss → 42ms hit
+          - Different pillars keyed separately, no collisions
+          - Empty results stay MISS on retry (no negative-cache trap)
+
+        
+        1) /api/search now accepts a pillar-only request (no `q`). When `pillar` matches
+           one of the 10 SelfScience pillars, backend swaps in a curated 2–4 token
+           query from /app/lib/pillars.js, pulls ~20 per source, skips the strict
+           relevance filter (broad topic browse), biases to last-5-years, and sorts
+           by recency + citations. Response now also includes `isPillarBrowse: true`.
+        
+        2) /app/app/search/search-client.jsx: when URL has ?pillar=<Name> without ?q=,
+           the client auto-fires the search, defaults the Date filter to "Last 5 Years",
+           and renders "Latest research on <Pillar>" as the heading. Homepage category
+           pills and pillar-grid tiles now route to /search?pillar=<Name>.
+        
+        3) /app/lib/books.js: added `synopsis` (what the book contains) and `knownFor`
+           (its cultural / scientific impact) to all 37 books. /app/app/reading-list/
+           [slug]/book-client.jsx renders these in a two-column "What's Inside" +
+           "Why It Matters" section BEFORE the auto-fetched "Research Behind This
+           Book" grid — matching the requested reading order.
+        
         Verified via curl (Longevity, Genomics, Youth-Wellness pillars all return
         20 recent studies) and screenshot testing. Frontend testing not requested by
         user for this iteration.
