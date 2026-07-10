@@ -208,7 +208,15 @@ function App() {
   const handlePill = (pillLabel) => {
     setActivePill(pillLabel)
     const pillar = PILL_TO_PILLAR[pillLabel] || pillLabel
-    goSearch(query.trim() || pillar, pillar)
+    const userQ = query.trim()
+    trackEvent(EVENTS.SEARCH_PERFORMED, {
+      source: userQ ? 'homepage_pill_with_query' : 'homepage_pill_browse',
+      has_pillar: true,
+    })
+    const usp = new URLSearchParams()
+    if (userQ) usp.set('q', userQ)
+    usp.set('pillar', pillar)
+    router.push(`/search?${usp.toString()}`)
   }
 
   return (

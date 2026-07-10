@@ -85,7 +85,10 @@ export default function BookClient({ slug }) {
               <h1 className="text-3xl font-extrabold leading-tight text-[#1B474D] md:text-4xl">{book.title}</h1>
               <div className="mt-2 text-lg text-[#7A7974]">{book.author}</div>
               <div className="text-sm text-[#7A7974]">{book.year}</div>
+
+              {/* Why it's on the SelfScience reading list — the personal, variant-aware hook. */}
               <p className="mt-5 text-base leading-relaxed text-[#28251D]">{book.plainReason}</p>
+
               {book.honestyNote && (
                 <div className="mt-5 rounded-lg border-l-4 border-[#B07D00] bg-[#FFFBEA] p-4">
                   <div className="text-sm font-bold text-[#7A7974]">Honesty Note:</div>
@@ -113,6 +116,34 @@ export default function BookClient({ slug }) {
           </div>
         </div>
       </section>
+
+      {/* About the Book — synopsis + cultural impact, before the research. */}
+      {(book.synopsis || book.knownFor) && (
+        <section className="bg-white py-12">
+          <div className="container">
+            <div className="grid gap-8 md:grid-cols-2">
+              {book.synopsis && (
+                <div className="rounded-2xl bg-[#F9F8F5] p-6 ring-1 ring-black/5">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#C45820]">
+                    <BookInfoDot /> What&rsquo;s Inside
+                  </div>
+                  <h2 className="mt-2 text-xl font-extrabold text-[#1B474D]">A quick synopsis</h2>
+                  <p className="mt-3 text-sm leading-relaxed text-[#28251D]">{book.synopsis}</p>
+                </div>
+              )}
+              {book.knownFor && (
+                <div className="rounded-2xl bg-[#F9F8F5] p-6 ring-1 ring-black/5">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#C45820]">
+                    <BookInfoDot /> Why It Matters
+                  </div>
+                  <h2 className="mt-2 text-xl font-extrabold text-[#1B474D]">What it&rsquo;s known for</h2>
+                  <p className="mt-3 text-sm leading-relaxed text-[#28251D]">{book.knownFor}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* The Research Behind This Book */}
       <section className="container py-12">
@@ -196,4 +227,9 @@ export default function BookClient({ slug }) {
       <SiteFooter />
     </div>
   )
+}
+
+/** Small decorative dot used as an eyebrow marker for the About/Impact panels. */
+function BookInfoDot() {
+  return <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#C45820]" aria-hidden="true" />
 }

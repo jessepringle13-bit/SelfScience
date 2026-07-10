@@ -14,6 +14,7 @@ import {
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
 import { trackEvent, EVENTS } from '@/lib/analytics'
+import { getPillarQuery } from '@/lib/pillars'
 
 const SOURCE_TYPE_OPTIONS = [
   { key: 'all',       label: 'All' },
@@ -169,12 +170,14 @@ export default function SearchClient() {
   const params = useSearchParams()
   const initialQ = params.get('q') || ''
   const initialPillar = params.get('pillar') || ''
+  const isInitialPillarBrowse = !initialQ && !!getPillarQuery(initialPillar)
 
   const [query, setQuery] = useState(initialQ)
   const [submittedQ, setSubmittedQ] = useState(initialQ)
   const [sourceType, setSourceType] = useState('all')
   const [pillar, setPillar] = useState(initialPillar)
-  const [dateRange, setDateRange] = useState('any')
+  // Default to "Last 5 Years" when arriving via a pillar click; else All Time.
+  const [dateRange, setDateRange] = useState(isInitialPillarBrowse ? '5' : 'any')
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
 
   const [loading, setLoading] = useState(false)
@@ -186,7 +189,10 @@ export default function SearchClient() {
   const analyzedRef = useRef(new Set()) // ids we've already sent to /analyze
 
   const runSearch = useCallback(async (q, pill) => {
-    if (!q.trim()) {
+    const trimmed = (q || '').trim()
+    const pillarQuery = getPillarQuery(pill)
+    // Allow pillar-only browse: no user query, but pillar has a curated one.
+    if (!trimmed && !pillarQuery) {
       setData(null)
       return
     }
@@ -197,8 +203,9 @@ export default function SearchClient() {
     analyzedRef.current = new Set()
     try {
       const url = new URL('/api/search', window.location.origin)
-      url.searchParams.set('q', q)
-      url.searchParams.set('limit', '40')
+      if (trimmed) url.searchParams.set('q', trimmed)
+      // In pillar-browse mode fetch fewer (20) since we don't paginate through them.
+      url.searchParams.set('limit', trimmed ? '40' : '20')
       if (pill) url.searchParams.set('pillar', pill)
       const res = await fetch(url.toString())
       if (!res.ok) throw new Error(`Search failed (${res.status})`)
@@ -213,7 +220,8 @@ export default function SearchClient() {
   }, [])
 
   useEffect(() => {
-    if (submittedQ) runSearch(submittedQ, pillar)
+    // Fire search when we have either a submitted query OR a pillar-browse.
+    if (submittedQ || getPillarQuery(pillar)) runSearch(submittedQ, pillar)
   }, [submittedQ, pillar, runSearch])
 
   const submit = (e) => {
@@ -461,7 +469,11 @@ export default function SearchClient() {
       <section className="container py-8">
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-2xl font-extrabold text-ss-teal">
-            {submittedQ ? <>Results for “{submittedQ}”</> : <>Search health &amp; genomics research</>}
+            {data?.isPillarBrowse && pillar
+              ? <>Latest research on <span className="text-ss-orange">{pillar}</span></>
+              : submittedQ
+                ? <>Results for “{submittedQ}”</>
+                : <>Search health &amp; genomics research</>}
           </h1>
           {data && (
             <span className="inline-flex flex-wrap items-center gap-2 text-xs text-ss-muted">
@@ -490,12 +502,12 @@ export default function SearchClient() {
             </div>
           </div>
         )}
-        {!loading && !error && submittedQ && filtered.length === 0 && (
+        {!loading && !error && (submittedQ || data?.isPillarBrowse) && filtered.length === 0 && (
           <div className="rounded-lg border border-ss-border-warm bg-white p-6 text-sm text-ss-muted">
             No results matching your filters. Try loosening them or a different query.
           </div>
         )}
-        {!loading && !error && !submittedQ && (
+        {!loading && !error && !submittedQ && !data?.isPillarBrowse && (
           <div className="rounded-lg border border-dashed border-ss-border-warm bg-white p-8 text-center text-sm text-ss-muted">
             Enter a topic, gene, molecule, or study above to search PubMed, Semantic Scholar, OpenAlex &amp; Crossref.
           </div>

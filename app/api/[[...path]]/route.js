@@ -11,6 +11,7 @@ import {
   buildGenomePrompt,
 } from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS } from '@/lib/variant-catalog'
+import { getPillarQuery } from '@/lib/pillars'
 
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -531,35 +532,73 @@ async function handleSearch(request) {
   const sourceFilter = searchParams.get('source') || 'all'
   const limit = Math.min(parseInt(searchParams.get('limit') || '25', 10), 40)
   const pillar = searchParams.get('pillar') || ''
+  // "pillar browse" mode: user clicked a pillar with no explicit query.
+  // We swap in a curated pillar query and bias toward recent, high-quality work.
+  const pillarQuery = getPillarQuery(pillar)
+  const isPillarBrowse = !q && !!pillarQuery
+  const effectiveInputQ = isPillarBrowse ? pillarQuery : q
 
-  if (!q) {
+  if (!effectiveInputQ) {
     return NextResponse.json({ query: '', results: [], total: 0, sources: {} })
   }
 
-  const parsed = parseQuery(q)
+  const parsed = parseQuery(effectiveInputQ)
   // For multi-word queries, wrap in quotes so PubMed/OpenAlex/Crossref/S2 do
   // exact-phrase matching. This alone eliminates most of the "loose keyword"
   // noise (e.g. War Zone Training, Work Zone Safety) for a query like "zone 2 training".
+  //
+  // Exception: in pillar-browse mode we want HIGH RECALL across a topic, so we
+  // do NOT quote — we want each source to interpret the curated tokens as an
+  // OR-ish topic search and return the best material from the last few years.
   const isMultiWord = parsed.tokens.length >= 2
-  const quotedQ = isMultiWord ? `"${q.replace(/"/g, '')}"` : q
-  const effectiveQuery = pillar ? `${quotedQ} ${pillar}` : quotedQ
+  const quotedQ = isMultiWord && !isPillarBrowse ? `"${effectiveInputQ.replace(/"/g, '')}"` : effectiveInputQ
+  // For explicit user searches we still append the pillar as a topic hint.
+  // For pillar-browse we already ARE the pillar — don't duplicate.
+  const effectiveQuery = (pillar && !isPillarBrowse) ? `${quotedQ} ${pillar}` : quotedQ
+
+  // Pillar browse: pull deeper from each source so we can filter to recent 5y and still return ~20.
+  const perSource = isPillarBrowse ? 20 : { pubmed: 12, s2: 10, oa: 10, crossref: 10 }
+  const pubmedN   = typeof perSource === 'number' ? perSource : perSource.pubmed
+  const s2N       = typeof perSource === 'number' ? perSource : perSource.s2
+  const oaN       = typeof perSource === 'number' ? perSource : perSource.oa
+  const crossrefN = typeof perSource === 'number' ? perSource : perSource.crossref
 
   const [pubmedResults, s2Results, openAlexResults, crossrefResults] = await Promise.all([
-    (sourceFilter === 'all' || sourceFilter === 'pubmed') ? searchPubmed(effectiveQuery, 12) : Promise.resolve([]),
-    (sourceFilter === 'all' || sourceFilter === 's2') ? searchSemanticScholar(effectiveQuery, 10) : Promise.resolve([]),
-    (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, 10) : Promise.resolve([]),
-    (sourceFilter === 'all' || sourceFilter === 'crossref') ? searchCrossref(effectiveQuery, 10) : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'pubmed')   ? searchPubmed(effectiveQuery, pubmedN)          : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 's2')       ? searchSemanticScholar(effectiveQuery, s2N)     : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, oaN)            : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'crossref') ? searchCrossref(effectiveQuery, crossrefN)      : Promise.resolve([]),
   ])
 
   // Merge + relevance filter + sort in one pass.
-  const merged = mergeResults(
+  let merged = mergeResults(
     [pubmedResults, s2Results, openAlexResults, crossrefResults],
-    parsed
-  ).slice(0, limit)
+    // In pillar-browse mode we skip the strict relevance filter — the curated
+    // pillar query is meant to be broad, and we want a representative sweep
+    // of the topic, not a phrase-matched exact hit.
+    isPillarBrowse ? null : parsed
+  )
+
+  if (isPillarBrowse) {
+    // Bias to the last 5 years, then rank by recency + citations.
+    const cutoff = new Date().getFullYear() - 5
+    const recent = merged.filter((r) => (r.year || 0) >= cutoff)
+    // Fall back to full set if we filtered too aggressively (e.g. sparse topic).
+    const pool = recent.length >= 8 ? recent : merged
+    pool.sort((a, b) => {
+      const yr = (b.year || 0) - (a.year || 0)
+      if (yr !== 0) return yr
+      return (b.citationCount || 0) - (a.citationCount || 0)
+    })
+    merged = pool
+  }
+
+  merged = merged.slice(0, limit)
 
   return NextResponse.json({
-    query: q,
+    query: effectiveInputQ,
     pillar,
+    isPillarBrowse,
     total: merged.length,
     sources: {
       pubmed: pubmedResults.length,
