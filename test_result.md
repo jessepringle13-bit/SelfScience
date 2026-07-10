@@ -765,8 +765,72 @@ agent_communication:
 
     -agent: "main"
       message: |
-        AI PROVIDERS REPLATFORMED: Together AI + OpenRouter (paid+free).
-        Dropped Groq (which was daily-capped and unreliable on our tier).
+        AI CASCADE MODEL UPDATE + genome progress indicator.
+        
+        Per user spec: swap out reasoning models for non-reasoning Llama models
+        across all cascades. Non-reasoning models are the correct tool for our
+        structured-output tasks.
+        
+        Model updates in /app/lib/ai.js:
+          Genome:        together/Llama-3.3-70B-Instruct-Turbo (unchanged)
+                      → openrouter/meta-llama/llama-3.1-70b-instruct (was gpt-4o-mini)
+          Reliability:   openrouter/llama-3.3-70b-instruct:free (was gpt-oss-20b:free)
+                      → openrouter/meta-llama/llama-3.1-8b-instruct (was gpt-4o-mini)
+          Plain-language: openrouter/llama-3.3-70b-instruct:free (was gpt-oss-20b:free)
+                      → openrouter/meta-llama/llama-3.1-70b-instruct
+                         (NOT 8b, empirically 8b hallucinates on our 8-section
+                          schema — verified in testing, returned "fruits and
+                          vegetables" content for a berberine study)
+        
+        NOTE: user's spec called for `meta-llama/llama-3.1-70b-instruct:free`
+        as the free primary, but OpenRouter has deprecated that slug in favor
+        of `llama-3.3-70b-instruct:free` (same 70B class, newer version).
+        
+        Fixed a subtle bug in extractTopicTokens(): was reading the first 3000
+        chars of the prompt template (system/schema boilerplate) instead of
+        the study data at the bottom. Now searches for `Study title:`/`STUDY:`
+        markers and pulls tokens from that region — catches hallucinated
+        responses reliably.
+        
+        Added enhanced VALIDATOR for plain-language: response must contain at
+        least one distinctive token from the source study in whatTheyFound or
+        researchQuestion, otherwise cascade to next tier. This is what fixed
+        the 8b hallucination problem — the validator now catches it and
+        automatically upgrades to 70b.
+        
+        /app/app/genome/genome-client.jsx — progress ticker:
+          - Old: 4 static labels advanced over ~1.4s, then bar sat at 85%
+            for the full 30s AI wait ("Building your personalized research
+            roadmap…" for 28 seconds felt broken).
+          - New: startProgressTicker() runs a setInterval that advances
+            through 8 stages over ~44s, refreshing the label every 900ms:
+              0s   → "Reading your variants…"
+              1.5s → "Cross-referencing your recognized variants…"
+              4s   → "Analyzing 9 research pillars…"
+              10s  → "Identifying strengths and awareness areas…"
+              18s  → "Cross-referencing landmark studies…"
+              26s  → "Building your personalized research roadmap…"
+              34s  → "Finalizing your report…"
+              44s  → "Almost there — putting it all together…"
+            Ticker asymptotes at 95% until the API returns, then jumps to
+            100% with "Report ready ✓".
+          - Verified via screenshot: label changed from
+            "Cross-referencing your recognized variants…" (t=2.5s) to
+            "Identifying strengths and awareness areas…" (t=12s).
+        
+        Verified live end-to-end via curl (correct payload shape):
+          - Genome:        Together AI 70B → 200 OK in ~30s
+          - Reliability:   OpenRouter free 70B → 200 OK, score 4/Strong (or
+            falls to 8b if free tier upstream-rate-limited)
+          - Plain-language: 70B free → 70B paid on cascade, on-topic content
+            confirmed (mentions berberine, glucose, HbA1c, prediabetes)
+        
+        Latency note: user's target was <10s for reliability + plain-language.
+        Currently ~7-11s when the free 70B tier is available, but rises to
+        15-25s when free 70B is upstream-rate-limited (Venice-hosted, common)
+        and we fall back to the paid tier. Cannot improve further without
+        moving off the free tier as the primary.
+
         
         New key in .env: TOGETHER_API_KEY
         

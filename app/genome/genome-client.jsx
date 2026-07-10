@@ -80,24 +80,47 @@ export default function GenomeClient() {
     })
   }, [activeTab, stage])
 
-  const stepThroughProgress = async () => {
-    setProgressLabel('Reading your file…')
-    setProgress(15)
-    await sleep(400)
-    setProgress(30)
-    setProgressLabel('Identifying genetic variants across 6 research areas…')
-    await sleep(600)
-    setProgress(60)
-    setProgressLabel('Building your personalized research roadmap…')
-    await sleep(400)
-    setProgress(85)
+  /**
+   * Start a background ticker that steps the progress bar toward 95% over
+   * ~40 seconds and rotates through descriptive status messages so the user
+   * feels progress even though the API call takes 25-35 seconds.
+   *
+   * Returns a stop() function the caller invokes when the API returns.
+   */
+  const startProgressTicker = () => {
+    const stages = [
+      { at: 0,     pct: 8,  label: 'Reading your variants…' },
+      { at: 1500,  pct: 20, label: 'Cross-referencing your recognized variants…' },
+      { at: 4000,  pct: 34, label: 'Analyzing 9 research pillars…' },
+      { at: 10000, pct: 52, label: 'Identifying strengths and awareness areas…' },
+      { at: 18000, pct: 68, label: 'Cross-referencing landmark studies…' },
+      { at: 26000, pct: 82, label: 'Building your personalized research roadmap…' },
+      { at: 34000, pct: 90, label: 'Finalizing your report…' },
+      { at: 44000, pct: 95, label: 'Almost there — putting it all together…' },
+    ]
+    const t0 = Date.now()
+    let stopped = false
+
+    const advance = () => {
+      if (stopped) return
+      const elapsed = Date.now() - t0
+      // Find the last stage whose "at" is ≤ elapsed.
+      let current = stages[0]
+      for (const s of stages) if (s.at <= elapsed) current = s
+      setProgress(current.pct)
+      setProgressLabel(current.label)
+    }
+
+    advance()
+    const iv = setInterval(advance, 900)
+    return () => { stopped = true; clearInterval(iv) }
   }
 
   const runAnalysis = useCallback(async (parsed) => {
     setStage('processing')
     setVariants(parsed.variants)
     setStats(parsed.stats)
-    await stepThroughProgress()
+    const stopTicker = startProgressTicker()
 
     try {
       const res = await fetch('/api/interpret-genome', {
@@ -110,10 +133,13 @@ export default function GenomeClient() {
       // Attach the raw variant genotypes so downstream UI (like Recommended
       // Reading) can match against variantTriggers without another request.
       setReport({ ...json, _variants: parsed.variants || {} })
+      stopTicker()
       setProgress(100)
+      setProgressLabel('Report ready ✓')
       await sleep(300)
       setStage('results')
     } catch (err) {
+      stopTicker()
       setErrorMsg(err.message || 'Analysis failed')
       setStage('error')
     }
