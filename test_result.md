@@ -765,7 +765,49 @@ agent_communication:
 
     -agent: "main"
       message: |
-        FEATURE: AI usage tracker + admin dashboard.
+        BUGFIX 504: fix genome upload timing out on real 23andMe files.
+        
+        Root cause: user's real 23andMe file has 150+ recognized variants.
+        Sending all of them to the AI produced a 10k+ token prompt that
+        Together AI either (a) took 45+ seconds to respond to, or (b)
+        returned schema-invalid JSON. Both failed the internal cascade and
+        also pushed the endpoint past Emergent's ~60s ingress timeout → 504.
+        
+        Multi-layer fix in this session:
+        
+        1) /app/lib/prompts.js — buildGenomePrompt() now CAPS the variant
+           list sent to the AI at 25, spread across pillars (up to 4 per
+           pillar) for diversity. Removed the "note: N additional variants
+           omitted" line — empirically confused the model into returning
+           garbage JSON.
+        
+        2) /app/lib/ai.js — added:
+             • AbortController with per-request timeout (default 40s, override
+               via opts.timeoutMs)
+             • opts.maxAttempts override for callWithRetry (genome uses 1 —
+               timeouts should cascade to next tier, not retry the same slow
+               provider)
+             • opts.totalBudgetMs on runCascade — enforces a hard cascade
+               ceiling. Each tier gets `remaining_budget / tiers_left` as its
+               timeout. Genome: 40s total budget, 22s per-tier ceiling.
+        
+        3) /app/app/api/[[...path]]/route.js — /api/interpret-genome handler:
+             • Removed the outer double-retry (it doubled the effective
+               timeout budget; the cascade already retries internally).
+             • Added SKIP_AI_THRESHOLD = 30. If a user uploads a file with
+               more than 30 recognized variants, we SKIP the AI cascade
+               entirely and serve the variant-only fallback directly.
+               Empirically the AI fails schema validation on large variant
+               lists, so this is BOTH faster (600ms vs 45s+) AND more
+               reliable. Small panels (sample data, targeted uploads) still
+               get AI-driven interpretation.
+        
+        Verified:
+          - User's real 150-variant genome file: 570ms response, 5 pillars,
+            6 awareness areas from variant catalog. Was 60s+ → 504 before.
+          - Sample 10-variant payload: 20s response via AI attempt +
+            fallback. Under 60s ingress timeout guaranteed.
+
         
         Goal: monitor OpenRouter credit burn rate for the first week (and
         beyond) to confirm the $0.0002 - $0.0003 per-call cost estimate

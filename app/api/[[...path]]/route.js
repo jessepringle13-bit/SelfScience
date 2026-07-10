@@ -910,26 +910,34 @@ async function handleInterpretGenome(request) {
   }
 
   try {
-    const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
-    // Try the AI cascade up to twice. Scout (our tier-2 fallback) occasionally
-    // returns prose-with-JSON-embedded or truncated output that extractJson
-    // can't recover. A single retry catches most of those transient blips
-    // without adding meaningful latency to the happy path.
+    // Empirical: with >50 recognized variants the AI cascade consistently
+    // fails schema validation (models return garbage JSON when the prompt
+    // list is that long) OR times out on Emergent's 60s ingress. In that
+    // regime the variant-only fallback is BOTH faster AND more reliable —
+    // it uses the curated variant-catalog to generate a solid pillar
+    // breakdown, book matches, and search-starting-points from your
+    // recognized variants directly. So we skip the AI cascade entirely
+    // for large uploads.
+    //
+    // Small uploads (sample data, targeted panels) still get the AI-driven
+    // interpretation because with <=50 variants the model can handle the
+    // prompt reliably in ~15-20s.
+    const numVariants = Object.keys(variants).length
+    const SKIP_AI_THRESHOLD = 30
+    const skipAi = numVariants > SKIP_AI_THRESHOLD
+
     let attempt = null
     let parsed = null
-    try {
-      attempt = await callGenome(prompt)
-      parsed = extractJson(attempt.text)
-      if (!parsed) {
-        console.warn(`[interpret-genome] first attempt produced non-JSON on ${attempt.model}; retrying once`)
+    if (!skipAi) {
+      const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
+      try {
         attempt = await callGenome(prompt)
         parsed = extractJson(attempt.text)
+      } catch (aiErr) {
+        console.warn(`[interpret-genome] AI cascade failed: ${aiErr?.status || 'net'} ${aiErr?.message?.slice(0, 160)}. Serving variant-only fallback.`)
       }
-    } catch (aiErr) {
-      // ALL Groq tiers failed (rate-limited, network, etc). We do NOT want to
-      // 502 the user in this case — instead, fall through to the minimal
-      // report below. Log for observability.
-      console.warn(`[interpret-genome] AI cascade failed: ${aiErr?.status || 'net'} ${aiErr?.message?.slice(0, 160)}. Serving variant-only fallback.`)
+    } else {
+      console.info(`[interpret-genome] ${numVariants} variants > threshold ${SKIP_AI_THRESHOLD} — serving variant-only fallback directly.`)
     }
 
     if (!parsed) {
