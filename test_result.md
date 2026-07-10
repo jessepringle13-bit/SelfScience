@@ -163,6 +163,47 @@ backend:
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
 
 frontend:
+  - task: "Full rewrite of 5 static content pages with exact copy + design system"
+    implemented: true
+    working: true
+    file: "/app/components/content-page.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Rebuilt /about, /how-it-works, /terms, /privacy from scratch using user's
+            EXACT provided copy (no summarising or rewording). Added new /mission page.
+
+            New shared building blocks:
+              - /app/components/content-page.jsx  — ContentPage shell + Section +
+                LegalSection + TableOfContents. Enforces 800px max width, 24px mobile
+                gutter, 64px section spacing, heading #1B474D, body #28251D, bg #F7F6F2.
+              - /app/components/disclaimer-banner.jsx  — sticky, sessionStorage-dismissible
+                #EEF7F7 banner used on /terms and /privacy.
+              - /app/components/page-cta.jsx  — "Ready to start?" CTA card with two
+                buttons (Search the Research + Upload Your Genome) for /about and /mission.
+
+            Navigation updates:
+              - /app/components/site-nav.jsx: added Mission + How It Works to header,
+                added usePathname() active-state highlighting.
+              - /app/components/site-footer.jsx: rebuilt to show all 5 pages (About,
+                Mission, How It Works, Reading List, Terms, Privacy) with current-page
+                link bold.
+
+            Legal pages (/terms, /privacy):
+              - Table of contents with 11 (Terms) / 10 (Privacy) anchor-linked items
+              - Numbered sections with large bold section numbers
+              - Alternating white / #F9F8F5 backgrounds
+              - scroll-mt-28 offset so sticky banner doesn't cover jump-to sections
+
+            Verified end-to-end:
+              - All 5 URLs return 200
+              - Active nav highlight visible on each page
+              - Banner dismiss confirmed via Playwright (sessionStorage flag persists)
+              - CTA card renders on /about and /mission with correct colors + buttons
   - task: "Search relevance filtering (drop off-topic keyword-overlap noise)"
     implemented: true
     working: true

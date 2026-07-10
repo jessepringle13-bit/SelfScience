@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import {
   Menu,
   X,
@@ -32,6 +33,7 @@ export const PILLARS = [
 
 export function SiteNav({ variant = 'light' }) {
   const isDark = variant === 'dark'
+  const pathname = usePathname() || ''
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -45,8 +47,10 @@ export function SiteNav({ variant = 'light' }) {
   const base = isDark
     ? 'border-white/15 bg-ss-teal/40 backdrop-blur-md text-white'
     : 'border-ss-border-warm bg-white text-ss-text'
-  const linkClass = isDark ? 'text-white/85 hover:text-white' : 'text-ss-text hover:text-ss-teal'
+  const linkBase = isDark ? 'text-white/85 hover:text-white' : 'text-ss-text hover:text-ss-teal'
+  const linkActive = isDark ? 'text-white font-semibold' : 'text-ss-teal font-semibold'
   const wordmarkClass = isDark ? 'text-white' : 'text-ss-teal'
+  const linkClass = (href) => (pathname === href ? linkActive : linkBase)
 
   return (
     <header className={`absolute inset-x-0 top-0 z-40 border-b ${base}`}>
@@ -57,10 +61,10 @@ export function SiteNav({ variant = 'light' }) {
         </a>
 
         {/* Desktop nav */}
-        <nav className="hidden items-center gap-7 text-sm font-medium md:flex">
-          <a href="/" className={linkClass}>Home</a>
-          <a href="/search" className={linkClass}>Search</a>
-          <a href="/genome" className={linkClass}>Upload Genome</a>
+        <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+          <a href="/" className={linkClass('/')}>Home</a>
+          <a href="/search" className={linkClass('/search')}>Search</a>
+          <a href="/genome" className={linkClass('/genome')}>Upload Genome</a>
 
           {/* Pillars dropdown */}
           <div
@@ -71,7 +75,7 @@ export function SiteNav({ variant = 'light' }) {
             <button
               type="button"
               onClick={() => setPillarsOpen((v) => !v)}
-              className={`inline-flex items-center gap-1 ${linkClass}`}
+              className={`inline-flex items-center gap-1 ${linkBase}`}
               aria-expanded={pillarsOpen}
             >
               Pillars <ChevronDown size={14} className={`transition ${pillarsOpen ? 'rotate-180' : ''}`} />
@@ -99,8 +103,10 @@ export function SiteNav({ variant = 'light' }) {
             )}
           </div>
 
-          <a href="/reading-list" className={linkClass}>Reading List</a>
-          <a href="/about" className={linkClass}>About</a>
+          <a href="/reading-list" className={linkClass('/reading-list')}>Reading List</a>
+          <a href="/about" className={linkClass('/about')}>About</a>
+          <a href="/mission" className={linkClass('/mission')}>Mission</a>
+          <a href="/how-it-works" className={linkClass('/how-it-works')}>How It Works</a>
         </nav>
 
         <a
@@ -143,6 +149,8 @@ export function SiteNav({ variant = 'light' }) {
             </details>
             <a href="/reading-list" className="hover:opacity-80">Reading List</a>
             <a href="/about" className="hover:opacity-80">About</a>
+            <a href="/mission" className="hover:opacity-80">Mission</a>
+            <a href="/how-it-works" className="hover:opacity-80">How It Works</a>
           </nav>
         </div>
       )}

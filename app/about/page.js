@@ -1,14 +1,15 @@
-import StaticPageShell from '@/components/static-page-shell'
+import ContentPage, { Section } from '@/components/content-page'
+import PageCTA from '@/components/page-cta'
 
 export const metadata = {
-  title: 'About',
+  title: 'About SelfScience',
   description:
-    'SelfScience helps you search the science and understand your biology. Learn about our mission, editorial standards, and what makes us different.',
+    'SelfScience was built by someone who lived in the gap between genetic data and meaningful understanding. Here is the story and the mission.',
   alternates: { canonical: '/about' },
   openGraph: {
     title: 'About SelfScience',
     description:
-      'A health research search engine with AI reliability scoring and personal genome analysis. Built for people who want the evidence, not the hype.',
+      'SelfScience was built by someone who lived in the gap between genetic data and meaningful understanding. Here is the story and the mission.',
     url: '/about',
     type: 'website',
   },
@@ -16,75 +17,75 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <StaticPageShell
-      eyebrow={<span>About</span>}
-      title="Search the science. Understand your biology."
-      lede="SelfScience is a health-research search engine built for people who want to read the evidence for themselves — not just the headlines."
-    >
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">Why we built it</h2>
+    <ContentPage title="About SelfScience">
+      <Section heading="Why This Exists">
         <p>
-          Health information online is a mess. Marketing copy is dressed up as science, single studies are
-          reported as breakthroughs, and reliable information is buried behind paywalls or academic jargon.
-          SelfScience is our attempt to fix that for the questions that matter most about your own biology.
+          Most people who buy a genetic testing kit from 23andMe or AncestryDNA download their results, feel overwhelmed, and do nothing with them. The reports are written for population averages. The research behind them is buried in academic journals most people cannot read. And the gap between &ldquo;here is your data&rdquo; and &ldquo;here is what to do with it&rdquo; is enormous.
         </p>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">What we do</h2>
-        <ul className="list-disc space-y-2 pl-6">
-          <li>
-            <strong>Aggregate real research.</strong> Every query hits PubMed, Semantic Scholar, OpenAlex, and
-            Crossref in parallel and merges results by DOI.
-          </li>
-          <li>
-            <strong>Score reliability.</strong> AI models flag preprints, small-n studies, industry funding,
-            and methodological concerns — with a plain-English note explaining why.
-          </li>
-          <li>
-            <strong>Translate the jargon.</strong> A one-tap plain-language summary breaks down each study
-            into what was tested, who was studied, what was found, and what it does and doesn’t mean for you.
-          </li>
-          <li>
-            <strong>Personalise the roadmap.</strong> Upload a raw DNA file (23andMe, AncestryDNA, VCF) and
-            SelfScience parses it locally in your browser to build a research roadmap tuned to your variants.
-          </li>
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">Our principles</h2>
-        <ul className="list-disc space-y-2 pl-6">
-          <li>Peer-reviewed evidence first. Preprints are labelled.</li>
-          <li>No affiliate links, no supplement upsells, no sponsored studies.</li>
-          <li>Uncertainty is a feature. If the science is contested, we say so.</li>
-          <li>Your genome never leaves your device.</li>
-          <li>We are not doctors. We help you find better questions to ask them.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">Who it&apos;s for</h2>
         <p>
-          Curious people, motivated patients, coaches, biohackers, students, and anyone who wants to skip the
-          influencer summary and read the source. If you can read a nutrition label, you can read a study
-          with a little help — and we&apos;re that help.
+          I built SelfScience because I lived in that gap &mdash; and because crossing it changed everything about how I understand my own health.
         </p>
-      </section>
+      </Section>
 
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">Get in touch</h2>
+      <Section heading="The Journey That Built This">
         <p>
-          We&apos;re a small team and we read everything. Feedback, corrections, and study suggestions are all
-          welcome. Reach out through the contact form (coming soon) or open an issue in our upcoming public
-          feedback repo.
+          In 2024 I downloaded my raw genome data from 23andMe. What started as curiosity became something I did not expect &mdash; a complete reframe of how I understood my body, my training, my nutrition, my mental health, and my relationship with the medications I had been prescribed.
         </p>
-      </section>
+        <p>
+          I learned that I carry a compound heterozygous MTHFR variant &mdash; meaning my body converts folate to its active form at roughly half the efficiency of someone without it. This directly affects how I produce serotonin and dopamine. I had been on an antidepressant for years. Nobody had ever connected these two facts.
+        </p>
+        <p>
+          I learned that my COMT Val158Met genotype &mdash; the so-called Warrior genotype &mdash; means my prefrontal cortex clears dopamine faster than average. I perform better under pressure and challenge than in routine. That explained more about how I function than any personality assessment I had ever taken.
+        </p>
+        <p>
+          I learned that my ACTN3 XX genotype makes me a pure endurance athlete at the genetic level. My COL5A1 TT variant means my connective tissue is structurally more vulnerable than average and requires permanent management. My MTNR1B GG variant means that eating late at night is not just a bad habit &mdash; it is a direct driver of blood sugar dysregulation for my specific biology.
+        </p>
+        <p>
+          Each discovery led to research. Each piece of research led to more questions. What I found was that the science existed &mdash; thousands of peer-reviewed studies on these exact variants &mdash; but it was inaccessible. Dense. Jargon-heavy. Buried behind paywalls or written for researchers, not people.
+        </p>
+        <p>
+          I also went through something harder during this period. I navigated coming off an antidepressant &mdash; not impulsively, but deliberately, using my genomic data as a guide. Understanding that my MTHFR variant affects neurotransmitter synthesis, that my BDNF Val66Met variant means exercise is literal neurological medicine for me, that my FKBP5 CT variant means cortisol management is non-negotiable &mdash; all of this informed how I approached that transition. It gave me a framework when most people in that situation have none.
+        </p>
+        <p>
+          I started training for Hyrox. I built a 12-month program around my specific genetic profile &mdash; Zone 2 heart rate calibrated to my Whoop data, connective tissue prehab built around my COL5A1 variant, nutrition timing built around my MTNR1B GG genotype. I got my bloodwork done and started tracking the markers most relevant to my specific variants.
+        </p>
+        <p>
+          And throughout all of it, I kept thinking the same thing: other people deserve access to this. Not the version filtered through a 23andMe report. Not the version buried in a PubMed abstract. The real version &mdash; the research, explained honestly, connected to their specific biology, in language they can actually understand.
+        </p>
+        <p>That is SelfScience.</p>
+      </Section>
 
-      <p className="rounded-lg bg-ss-privacy-tint p-4 text-sm italic text-ss-teal">
-        SelfScience is for education, not medical advice. Always talk to a qualified clinician before making
-        decisions about your health, medications, or treatments.
-      </p>
-    </StaticPageShell>
+      <Section heading="What SelfScience Is">
+        <p>
+          SelfScience is a research discovery platform for people who want to understand the science behind their health &mdash; starting with their own biology.
+        </p>
+        <p>
+          It is a search engine for peer-reviewed health and genomics research, with AI-powered reliability scoring that tells you what kind of evidence you are looking at and who funded it. It translates dense academic language into plain English. It surfaces the funding trail behind studies so you can see who paid for the research and what interest they had in the outcome.
+        </p>
+        <p>
+          And it gives you a way to upload your raw genome file &mdash; processed entirely in your browser, never stored &mdash; and receive a personalized research roadmap built around your specific genetic variants. Not a medical report. Not a diagnosis. A starting point for understanding yourself through the lens of what the science actually shows.
+        </p>
+      </Section>
+
+      <Section heading="What SelfScience Is Not">
+        <p>
+          SelfScience is not a medical provider. It does not diagnose conditions. It does not recommend treatments or medications. It does not replace a qualified healthcare provider or genetic counselor.
+        </p>
+        <p>
+          Every piece of content on this platform is for educational purposes only. The research we surface is real. The reliability scores are honest. The genome interpretations reflect what population studies have found &mdash; not what will happen to you personally. Genetics describes tendencies. Your life, your choices, and your environment shape the outcome.
+        </p>
+      </Section>
+
+      <Section heading="The Mission">
+        <p>
+          To make the science of human biology accessible, honest, and personally relevant &mdash; for everyone who has ever looked at their genetic data and wondered what to do with it. For everyone who has ever read a health headline and wondered whether it was real. For everyone who deserves to understand themselves at a deeper level than a population average allows.
+        </p>
+        <p>
+          The research exists. SelfScience helps you find it, understand it, and know what questions to ask next.
+        </p>
+      </Section>
+
+      <PageCTA />
+    </ContentPage>
   )
 }

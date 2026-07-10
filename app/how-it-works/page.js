@@ -1,14 +1,14 @@
-import StaticPageShell from '@/components/static-page-shell'
+import ContentPage, { Section } from '@/components/content-page'
 
 export const metadata = {
-  title: 'How It Works',
+  title: 'How SelfScience Works',
   description:
-    'How SelfScience aggregates PubMed, Semantic Scholar, OpenAlex, and Crossref, scores study reliability with AI, and turns your raw DNA file into a personalised research roadmap.',
+    'SelfScience combines a research search engine, AI reliability scoring, plain language translation, and a genome analysis tool. Here is exactly how each piece works.',
   alternates: { canonical: '/how-it-works' },
   openGraph: {
     title: 'How SelfScience Works',
     description:
-      'From your question to your genome — a look under the hood at how SelfScience finds, scores, and translates research.',
+      'SelfScience combines a research search engine, AI reliability scoring, plain language translation, and a genome analysis tool. Here is exactly how each piece works.',
     url: '/how-it-works',
     type: 'website',
   },
@@ -16,86 +16,116 @@ export const metadata = {
 
 export default function HowItWorksPage() {
   return (
-    <StaticPageShell
-      eyebrow={<span>How It Works</span>}
-      title="From your question to your genome"
-      lede="A quick tour of what happens under the hood when you search a topic, tap 'plain language,' or upload a raw DNA file."
-    >
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">1. Search across the whole scientific literature</h2>
+    <ContentPage title="How SelfScience Works">
+      <Section>
         <p>
-          When you type a query, SelfScience calls <strong>four major research indexes in parallel</strong>:
-          PubMed (NIH), Semantic Scholar (AI2), OpenAlex, and Crossref. We merge the results by DOI and
-          normalized title so you don&apos;t see the same paper five times.
+          SelfScience combines a research search engine, an AI reliability scoring system, and a genome analysis tool into one platform. Here is exactly how each piece works.
         </p>
-        <ul className="mt-3 list-disc space-y-1 pl-6">
-          <li>Peer-reviewed papers, preprints, and editorial explainers all in one feed.</li>
-          <li>Filter by pillar (Genomics, Nutrition, Longevity…), by source, or by year.</li>
-          <li>Every result links back to the original publisher — no paywalled second-hand summaries.</li>
-        </ul>
-      </section>
+      </Section>
 
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">2. Reliability scoring, in plain sight</h2>
+      <Section heading="The Search Engine">
         <p>
-          Each study card carries a reliability label from <em>Limited</em> to <em>Very Strong</em>, plus
-          honest flags for common issues:
+          Type any health or genomics topic into the search bar. SelfScience searches two major scientific databases simultaneously:
         </p>
-        <ul className="mt-3 list-disc space-y-1 pl-6">
-          <li><strong>Not Yet Peer-Reviewed</strong> — for preprints from bioRxiv / medRxiv.</li>
-          <li><strong>Small Study</strong> — flagged when the sample size is too small to generalise.</li>
-          <li><strong>Industry Funded</strong> — when funding trails suggest a conflict of interest.</li>
-          <li><strong>Retracted / Corrected</strong> — pulled from PubMed and Retraction Watch.</li>
-        </ul>
-        <p className="mt-3">
-          Scoring is generated with a large language model constrained to a strict schema; the model never
-          invents metadata that isn&apos;t in the original abstract or metadata payload.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">3. Plain-language translations</h2>
         <p>
-          Every study can be expanded into an eight-section explainer covering:
+          <strong>PubMed</strong> &mdash; the National Library of Medicine&rsquo;s database of over 35 million peer-reviewed biomedical citations. The most comprehensive source of medical research in the world.
         </p>
-        <ol className="mt-3 list-decimal space-y-1 pl-6">
-          <li>What they tested</li>
-          <li>Who was studied</li>
-          <li>What was measured</li>
-          <li>What they found</li>
-          <li>What it means — and what it doesn&apos;t</li>
-          <li>Real-world takeaways</li>
-          <li>Where the evidence is strong vs. weak</li>
-          <li>Related questions worth asking</li>
-        </ol>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">4. Your genome, on your device</h2>
         <p>
-          Upload a raw DNA file from 23andMe, AncestryDNA, or a clinical VCF export. Parsing happens
-          <strong> entirely in your browser</strong> — the raw file never touches our servers.
+          <strong>Semantic Scholar</strong> &mdash; a free academic search engine covering health, genomics, nutrition, and sports science research across millions of papers.
         </p>
-        <ul className="mt-3 list-disc space-y-1 pl-6">
-          <li>We match against ~185 well-studied variants across our nine pillars.</li>
-          <li>Only the anonymous list of matched rsIDs (no personal data) is sent for AI interpretation.</li>
-          <li>You get a three-tab roadmap: what to research first, personalised study queries, and lifestyle levers.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="text-xl font-bold text-ss-teal">5. Reading list &amp; editorial</h2>
         <p>
-          Books can be a shortcut into a field. Our reading list pairs each book with the underlying
-          peer-reviewed studies, and every entry includes an honest note on where the author&apos;s claims are
-          well-supported vs. speculative.
+          Results from both sources are combined, deduplicated, and displayed together. You see peer-reviewed studies, clinical trials, review articles, and editorial content from SelfScience &mdash; all in one place.
         </p>
-      </section>
+      </Section>
 
-      <p className="rounded-lg bg-ss-privacy-tint p-4 text-sm italic text-ss-teal">
-        SelfScience is a tool for research literacy — not a diagnosis, treatment, or medical device. Always
-        discuss health decisions with a qualified clinician.
-      </p>
-    </StaticPageShell>
+      <Section heading="The Reliability Score">
+        <p>
+          Every result gets scored automatically across six dimensions before you click it. The score appears as a signal bar indicator &mdash; like phone signal bars &mdash; so you can assess the quality of evidence at a glance before reading anything.
+        </p>
+        <p>The six dimensions:</p>
+        <p>
+          <strong>Study Design</strong> &mdash; what type of research is this? A randomized controlled trial carries more weight than a single case report. A meta-analysis of many studies carries more weight than a single trial. This is the most important dimension.
+        </p>
+        <p>
+          <strong>Methodology</strong> &mdash; how well was the study conducted? Sample size, whether there was a control group, whether the study was pre-registered before data was collected.
+        </p>
+        <p>
+          <strong>Source Credibility</strong> &mdash; where was it published? A study in the New England Journal of Medicine is different from a study in a pay-to-publish journal.
+        </p>
+        <p>
+          <strong>Bias Risk</strong> &mdash; does the study design have features that make it more or less likely to show a real effect?
+        </p>
+        <p>
+          <strong>Recency</strong> &mdash; when was this published? Science moves fast in some areas. A 2005 study on gut microbiome research is a different kind of evidence than a 2024 study.
+        </p>
+        <p>
+          <strong>Funding Transparency</strong> &mdash; who paid for this research and what financial relationship exists between the funders and the outcome? This is the dimension most health platforms ignore. SelfScience does not.
+        </p>
+      </Section>
+
+      <Section heading="The Funding Trail">
+        <p>
+          When a study scores low on funding transparency &mdash; meaning the funder had a direct financial interest in the outcome, or conflicts of interest were not disclosed &mdash; SelfScience surfaces a Funding and Conflict of Interest Report alongside the result.
+        </p>
+        <p>
+          This report shows you who funded the research, what financial relationships exist between the researchers and the funder, whether the study was pre-registered before data collection began, and links to public databases where you can verify this information yourself &mdash; including the Open Payments database, ProPublica Dollars for Docs, and the UCSF Industry Documents Library.
+        </p>
+        <p>This is not accusation. It is information. You decide what to do with it.</p>
+      </Section>
+
+      <Section heading="Plain Language Translation">
+        <p>Every abstract on SelfScience has two reading modes.</p>
+        <p>
+          <strong>Plain Language</strong> &mdash; an AI-generated translation that explains what was studied, what was found, what the limitations are, and where this finding fits in the broader body of evidence. Written at an eighth grade reading level. No jargon left unexplained.
+        </p>
+        <p>
+          <strong>Full Abstract</strong> &mdash; the original published text, available one click below the plain language version.
+        </p>
+        <p>
+          Both are visible on every result. Plain language is the entry point. The full abstract is always one click away for those who want to go deeper.
+        </p>
+        <p>
+          The translation follows strict rules. It never tells you what to do based on a single study. It never describes a correlation as proof of causation. It always states the limitations honestly. It always makes clear that one study &mdash; even an excellent one &mdash; does not establish truth.
+        </p>
+      </Section>
+
+      <Section heading="The Genome Upload Tool">
+        <p>
+          Upload your raw genome file from 23andMe, AncestryDNA, MyHeritage, or a whole genome sequencing service. SelfScience reads the file, identifies your key genetic variants, and builds a personalized research roadmap showing which areas of the scientific literature are most relevant to your specific biology.
+        </p>
+        <p><strong>What happens when you upload:</strong></p>
+        <p>
+          Your file is read entirely in your browser. Nothing is transmitted to a server. Nothing is stored. The raw file data is cleared from memory immediately after your variant calls are extracted. Your session ends when you close the page.
+        </p>
+        <p>
+          SelfScience checks for approximately 200 genetic variants across nine research pillars &mdash; Genomics, Nutrition, Sports Performance, Longevity, General Wellness, Pharmacogenomics, Mental Health and Neurochemistry, Environmental Sensitivity, and Hormones and Endocrine Health.
+        </p>
+        <p>
+          Each recognized variant is classified as a Strength, an Area to Explore, or Neutral based on what population studies have found for that genotype.
+        </p>
+        <p><strong>What the results are:</strong></p>
+        <p>A research starting point. Not a diagnosis. Not a prediction. Not medical advice.</p>
+        <p>
+          Genetics describes tendencies found in population studies. Many variants have modest effects. Most health outcomes are shaped by dozens or hundreds of genes interacting with your environment, your lifestyle, and your choices. Your genome is one input into a complex system &mdash; a genuinely useful input, but not the whole story.
+        </p>
+        <p>
+          The genome tool gives you a map of where to start reading. SelfScience gives you the research to read.
+        </p>
+        <p>
+          <strong>Accepted file formats:</strong> .txt&nbsp;&nbsp;.zip&nbsp;&nbsp;.vcf
+          <br />
+          <strong>Supported sources:</strong> 23andMe, AncestryDNA, MyHeritage, standard whole genome sequencing VCF files
+        </p>
+      </Section>
+
+      <Section heading="The Reading List">
+        <p>
+          Every book on the SelfScience reading list is annotated with the peer-reviewed research behind its core ideas &mdash; and an honest note on where the evidence is strong and where it is still emerging. Some popular health books overstate the research. SelfScience tells you which claims are well-supported and which to read with appropriate skepticism.
+        </p>
+        <p>
+          Book recommendations are also personalized. After uploading your genome file, SelfScience matches your variant profile to specific books most relevant to your findings &mdash; connecting your biology to the literature most worth reading.
+        </p>
+      </Section>
+    </ContentPage>
   )
 }
