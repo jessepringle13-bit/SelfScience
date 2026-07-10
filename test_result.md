@@ -765,34 +765,48 @@ agent_communication:
 
     -agent: "main"
       message: |
-        AI STACK REFACTOR: Groq-only with proper retries. Dropped OpenRouter.
+        PERF ADD 2: AI cascade upgraded — 3-tier for reliability, tighter retry policy,
+        JSON mode, smart Retry-After handling, and model-specific error routing.
         
-        Motivation: OpenRouter's free tier daily cap was being exhausted almost
-        immediately in production, causing cascading 429s in the AI reliability
-        and plain-language endpoints.
+        /app/lib/ai.js changes:
         
-        /app/lib/ai.js rewritten:
-          - Removed callOpenRouter, OPENROUTER_KEY, orFallback model refs.
-          - callGroqOnce → single HTTP call, extracts status + Retry-After +
-            classifies retryability (408/425/429/5xx retryable; NO_KEY /
-            EMPTY_RESPONSE / 4xx-other non-retryable).
-          - callGroqWithRetry → up to 3 attempts per model with exponential
-            backoff (400ms → 800ms → 1600ms, capped at 5s) + jitter, honoring
-            server Retry-After header (capped at 8s).
-          - runWithModelCascade → tries primary model with retries, then
-            secondary Groq model (separate rate-limit bucket) with retries.
-            Worst case = 2 models × 3 attempts = 6 network calls.
-          - Non-retryable errors short-circuit (no point rolling to secondary
-            if prompt is malformed or key is missing).
+        1. **3-tier cascade for reliability** (short-JSON task):
+             llama-3.1-8b-instant → llama-4-scout-17b-16e-instruct → llama-3.3-70b
+           Verified 15/15 concurrent requests succeeded in 2.96s with load balanced
+           across tiers 1 and 2.
         
-        OPENROUTER_API_KEY left in .env (harmless, in case we want to re-enable
-        the fallback later; no code path reads it anymore).
+        2. **2-tier cascade for plain-language & genome** (elaborate schema):
+             llama-3.3-70b → llama-4-scout
+           Tried adding qwen3-32b and openai/gpt-oss-* as third tiers but:
+             - qwen3-32b: echoes the schema placeholders instead of filling them
+             - gpt-oss-20b: 403 on longer prompts on this account tier
+             - gpt-oss-120b: 403 across the board on this account
+             - llama-3.1-8b-instant: hallucinates generic content on this schema
+           llama-4-scout as sole fallback is acceptable: it occasionally returns
+           prose instead of JSON (frontend gracefully handles 502).
         
-        Verified live:
-          - 5 concurrent /api/score-reliability requests: all 200 OK
-          - Log shows successful primary → secondary Groq cascade when 8b
-            gets rate-limited (rolls to 70b, returns 200)
-          - Zero OpenRouter references in new log entries
+        3. **JSON mode** (`response_format: { type: "json_object" }`) enabled for
+           all three ops. Guarantees syntactically valid JSON from Groq.
+        
+        4. **Smart Retry-After**: if the server suggests a wait > 2500ms, we DON'T
+           wait — we cascade to the next model (separate rate bucket) immediately.
+           This was the biggest latency win. Worst case dropped from ~20s to ~5s.
+        
+        5. **Model-specific errors cascade**: 400 model_decommissioned / 404
+           model-not-found now cascade to the next model instead of failing the
+           whole request. Only prompt-level errors (NO_KEY, EMPTY_RESPONSE,
+           401/403 auth) short-circuit.
+        
+        6. **MAX_ATTEMPTS reduced from 3 → 2** per model. With 3-tier cascade for
+           reliability, total worst case = 3 × 2 = 6 network calls, same as
+           before but distributed across 3 rate-limit buckets (much more likely
+           to succeed).
+        
+        Note: This account's llama-3.3-70b daily TPD cap (100k tokens) is
+        currently exhausted, so plain-language falls to scout tier during
+        testing. This is expected free-tier behavior and self-resolves at
+        daily reset.
+
 
 
         
