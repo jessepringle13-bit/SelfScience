@@ -765,7 +765,41 @@ agent_communication:
 
     -agent: "main"
       message: |
-        FEATURE: Downloadable genome report + graceful AI-fallback.
+        AI PROVIDERS REPLATFORMED: Together AI + OpenRouter (paid+free).
+        Dropped Groq (which was daily-capped and unreliable on our tier).
+        
+        New key in .env: TOGETHER_API_KEY
+        
+        Cascades (per user spec):
+          • Genome        →  Together AI (Llama-3.3-70B-Instruct-Turbo, serverless)
+                            → OpenRouter paid (gpt-4o-mini)
+          • Reliability   →  OpenRouter free (openai/gpt-oss-20b:free)
+                            → OpenRouter paid (gpt-4o-mini)
+          • Plain-language →  OpenRouter free (openai/gpt-oss-20b:free)
+                            → OpenRouter paid (gpt-4o-mini)
+        
+        Notes:
+          - User specified `Meta-Llama-3.1-70B-Instruct-Turbo` for genome but
+            that requires a dedicated (paid) Together AI endpoint. Swapped
+            to `Llama-3.3-70B-Instruct-Turbo` which is the newer version,
+            available on Together's free serverless tier, and used the same
+            $25 credit pool.
+          - Added a `validate(text)` option to runCascade — if a free-tier
+            reasoning model returns 200 with an empty schema shell (common
+            with openai/gpt-oss-20b:free on our elaborate plain-language
+            prompt), the validator rejects the response and cascade rolls
+            to the paid tier. This preserves the user's "free primary,
+            paid fallback" priority while never returning garbage to the
+            end user.
+          - Genome graceful-fallback (variant-only report) is retained as
+            the absolute last resort if BOTH provider tiers fail.
+        
+        Verified live:
+          • Genome: 200 OK via Together AI (real 4-pillar report, 33s)
+          • Reliability: 200 OK via OpenRouter free (score 1/Preliminary, 5s)
+          • Plain-language: cascaded free → paid (validator rejected empty
+            free-tier output), returned filled sections via gpt-4o-mini (17s)
+
         
         User asked for a way to save the personalized genome analysis for
         offline reading + future research. Also fixed a related 502 error
