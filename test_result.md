@@ -765,7 +765,61 @@ agent_communication:
 
     -agent: "main"
       message: |
-        BUGFIX + FEATURE: text+pillar filtering + heading + last-5-yrs bias.
+        FEATURE: Downloadable genome report + graceful AI-fallback.
+        
+        User asked for a way to save the personalized genome analysis for
+        offline reading + future research. Also fixed a related 502 error
+        that was surfacing under sustained load.
+        
+        1) /app/lib/genome-report.js (NEW)
+           - buildGenomeMarkdown() — pure function that renders a rich Markdown
+             report from the same data the results UI uses. Includes header,
+             disclaimer, Overview (strengths + awareness areas), Full Report
+             (per-pillar variant details + landmark studies + search links),
+             Research Roadmap, Recommended Reading (all 37 books with synopsis
+             + knownFor), a technical rsID table, and About footer.
+           - Every search suggestion becomes a clickable https://selfscience.io/search
+             link so the file stays useful after the tab closes.
+           - buildVariantsCsv() — compact CSV for spreadsheet users.
+           - reportFilename() — `selfscience-genome-YYYY-MM-DD.md`
+           - downloadTextFile() — Blob + <a download> browser flow.
+        
+        2) /app/app/genome/genome-client.jsx
+           - New SaveReportCard component with 3 buttons:
+               • Download report (.md)   — primary teal
+               • Print / Save as PDF     — opens browser print dialog
+               • Variants (.csv)         — for downstream tools
+           - Print button pre-expands all 3 tabs (Overview / Full Report /
+             Roadmap) so a printed / saved-as-PDF copy contains everything.
+           - Tabs are now always MOUNTED (with `ss-tab-hidden` on inactive
+             ones) so print mode can reveal them without a re-render race.
+        
+        3) /app/app/globals.css
+           - Added .ss-tab-hidden and `@media print` block that:
+               • Hides nav, footer, sticky disclaimer, buttons, tab switcher
+               • Forces open all <details> and expands hidden tabs
+               • Applies proper page-break rules
+        
+        4) /app/app/api/[[...path]]/route.js — 502 → graceful fallback
+           - Root cause: llama-4-scout tier-2 sometimes returns non-JSON on
+             the elaborate genome prompt. Under concurrent load, all Groq
+             tiers can 429 on TPM. Both scenarios were surfacing as 502.
+           - Fix A: retry the AI call ONCE if the first response isn't
+             parseable JSON.
+           - Fix B: NEW buildMinimalGenomeReport() — if both AI attempts
+             fail OR the whole Groq cascade throws (all tiers rate-limited),
+             we build a variant-only report from VARIANT_CATALOG. User gets
+             their pillar breakdown, book matches, and search-starting-points
+             even without AI. Response includes `_aiFallback: true`.
+           - UI shows a subtle "AI was busy" notice under the header when
+             _aiFallback is true, inviting the user to retry in a minute
+             for the full AI interpretation.
+        
+        Verified: 8 concurrent requests all returned 200 (1 real AI + 7
+        variant-only fallbacks) — previously would have been mostly 429/502.
+        Download tested end-to-end via playwright: 13,313-char .md with
+        38 clickable selfscience.io links.
+
         
         User report: "when I select a pillar to research in, it only relates to
         what I typed in the search bar" — the text+pillar path was just tacking

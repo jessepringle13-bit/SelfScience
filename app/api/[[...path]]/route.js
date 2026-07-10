@@ -820,6 +820,73 @@ function normalizeReliability(parsed, item) {
 }
 /* ------------------- /api/interpret-genome ------------------- */
 
+/**
+ * Build a MINIMAL genome-analysis payload from the raw variant list alone —
+ * no AI required. Used as a graceful fallback when the AI cascade returns
+ * non-JSON output (very rare, but happens under load with our tier-2
+ * fallback model). The report is less rich than an AI-driven one but still
+ * gives the user their variant list grouped by pillar, book matches (via
+ * the client), and search-starting-points to explore further.
+ */
+function buildMinimalGenomeReport(variants, catalog) {
+  const byPillar = {}
+  const recognized = []
+  const enriched = []
+  for (const [rsid, gt] of Object.entries(variants || {})) {
+    const meta = catalog[rsid]
+    recognized.push({
+      rsid, gene: meta?.gene || '', variant_name: meta?.description || '',
+      genotype_called: gt, pillar: meta?.pillar || 'General',
+      classification: 'Neutral',
+    })
+    if (meta?.pillar) {
+      const p = meta.pillar
+      byPillar[p] = byPillar[p] || []
+      byPillar[p].push({
+        gene: meta.gene, rsid, genotype: gt,
+        classification: 'Neutral',
+        explanation: `Research area: ${meta.description}. Full AI interpretation was not available for this session — the SelfScience search engine can surface studies on this variant directly.`,
+        landmarkStudy: '',
+        searches: [`${meta.gene} ${meta.description.split('—')[0].trim()}`, `${meta.gene} health research`],
+      })
+      enriched.push({ label: meta.description, one_line: `Research literature is available for ${meta.gene}. Explore on SelfScience.`, pillar: p, rsid, gene: meta.gene, genotype: gt })
+    }
+  }
+  const pillars = Object.keys(byPillar).sort()
+  return {
+    session_id: Math.random().toString(36).slice(2, 10),
+    variants_recognized: recognized,
+    pillar_reports: pillars.map((p) => ({ pillar: p, strengths: [], awareness_areas: byPillar[p] })),
+    overall_summary: {
+      top_strengths: [],
+      top_awareness_areas: enriched.slice(0, 6),
+      system_view: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
+    },
+    research_roadmap: {
+      introduction: 'Based on your recognized variants, these are the research areas most relevant to explore.',
+      pillars: pillars.map((p, i) => ({
+        pillar: p, priority: i + 1,
+        reason: `You have ${byPillar[p].length} recognized variant${byPillar[p].length === 1 ? '' : 's'} in ${p}.`,
+        top_searches: [...new Set(byPillar[p].flatMap((v) => v.searches))].slice(0, 4),
+      })),
+    },
+    privacy_confirmation: { data_received: 'Variant calls only', data_retained: false, session_ends: 'Data cleared on session close', file_processed: 'Client-side only' },
+    disclaimer: { user_facing: 'This report is for educational purposes only. Not a medical diagnosis.', display: 'always_visible' },
+    // UI-compat aliases (same shape the AI-driven path produces):
+    overview: {
+      strengths: [],
+      areasToExplore: enriched.slice(0, 6).map((a) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype })),
+      systemView: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
+    },
+    fullReport: pillars.map((p) => ({ pillar: p, variants: byPillar[p] })),
+    researchRoadmap: pillars.map((p, i) => ({
+      priority: i + 1, pillar: p,
+      why: `You have ${byPillar[p].length} recognized variant${byPillar[p].length === 1 ? '' : 's'} in ${p}.`,
+      searches: [...new Set(byPillar[p].flatMap((v) => v.searches))].slice(0, 4),
+    })),
+  }
+}
+
 async function handleInterpretGenome(request) {
   let body
   try {
@@ -841,14 +908,45 @@ async function handleInterpretGenome(request) {
 
   try {
     const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
-    const { text, provider, model } = await callGenome(prompt)
-    const parsed = extractJson(text)
+    // Try the AI cascade up to twice. Scout (our tier-2 fallback) occasionally
+    // returns prose-with-JSON-embedded or truncated output that extractJson
+    // can't recover. A single retry catches most of those transient blips
+    // without adding meaningful latency to the happy path.
+    let attempt = null
+    let parsed = null
+    try {
+      attempt = await callGenome(prompt)
+      parsed = extractJson(attempt.text)
+      if (!parsed) {
+        console.warn(`[interpret-genome] first attempt produced non-JSON on ${attempt.model}; retrying once`)
+        attempt = await callGenome(prompt)
+        parsed = extractJson(attempt.text)
+      }
+    } catch (aiErr) {
+      // ALL Groq tiers failed (rate-limited, network, etc). We do NOT want to
+      // 502 the user in this case — instead, fall through to the minimal
+      // report below. Log for observability.
+      console.warn(`[interpret-genome] AI cascade failed: ${aiErr?.status || 'net'} ${aiErr?.message?.slice(0, 160)}. Serving variant-only fallback.`)
+    }
+
     if (!parsed) {
+      // Graceful fallback: build a MINIMAL valid response from the variants
+      // alone. The UI can still render pillar-level guidance, book matches,
+      // and a research roadmap; the user avoids a hard error. We return 200
+      // with `_aiFallback: true` so downstream can show a subtle notice
+      // ("AI analysis was unavailable — showing your variant-based roadmap").
+      const minimal = buildMinimalGenomeReport(variants, VARIANT_CATALOG)
       return NextResponse.json(
-        { error: 'Analysis temporarily unavailable. Results still accessible.', raw: (text || '').slice(0, 500), provider, model },
-        { status: 502 }
+        {
+          ...minimal,
+          aiProvider: attempt?.provider || 'fallback',
+          aiModel: attempt?.model || 'variant-catalog',
+          _aiFallback: true,
+        },
+        { status: 200 }
       )
     }
+    const { text, provider, model } = attempt
     // Map new Session-5 schema to the shape the frontend genome-client expects
     const overall = parsed.overall_summary || {}
     const normalized = {

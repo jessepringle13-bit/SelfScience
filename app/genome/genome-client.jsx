@@ -16,12 +16,16 @@ import {
   RotateCcw,
   Loader2,
   BookOpen,
+  Download,
+  Printer,
+  FileText,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { parseGenomeFile } from '@/lib/genome-parser'
 import { VARIANT_CATALOG, SAMPLE_VARIANTS } from '@/lib/variant-catalog'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { getBooksForVariants, PILLAR_LABELS } from '@/lib/books'
+import { buildGenomeMarkdown, downloadTextFile, buildVariantsCsv, reportFilename } from '@/lib/genome-report'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -299,6 +303,17 @@ export default function GenomeClient() {
             </button>
           </div>
 
+          {/* --- Save Your Report --- */}
+          <SaveReportCard report={report} variants={variants} stats={stats} />
+
+          {report?._aiFallback && (
+            <div className="ss-no-print mt-4 rounded-lg border border-[#F4C56E] bg-[#FFFBEA] p-3 text-xs text-[#7A5A00]">
+              <strong>Note:</strong> Our AI analyzer was busy at the moment your report was generated, so this
+              is a lighter variant-only view based on our curated variant catalog and your recognized rsIDs.
+              You can re-run the analysis in a minute or two to get the full AI-generated interpretation.
+            </div>
+          )}
+
           {/* Tabs */}
           <div className="mt-8 flex flex-wrap gap-1 rounded-full bg-ss-surface p-1 ring-1 ring-ss-border-warm/70">
             {[
@@ -321,15 +336,15 @@ export default function GenomeClient() {
           </div>
 
           <div className="mt-8">
-            {activeTab === 'overview' && (
+            <div data-tab="overview" className={activeTab === 'overview' ? '' : 'ss-tab-hidden'}>
               <OverviewTab report={report} onSearch={goSearch} />
-            )}
-            {activeTab === 'full' && (
+            </div>
+            <div data-tab="full" className={activeTab === 'full' ? '' : 'ss-tab-hidden'}>
               <FullReportTab report={report} onSearch={goSearch} />
-            )}
-            {activeTab === 'roadmap' && (
+            </div>
+            <div data-tab="roadmap" className={activeTab === 'roadmap' ? '' : 'ss-tab-hidden'}>
               <RoadmapTab report={report} onSearch={goSearch} />
-            )}
+            </div>
           </div>
         </section>
       )}
@@ -681,6 +696,93 @@ function PillarBadge({ pillar }) {
     </span>
   )
 }
+
+/**
+ * Save-your-report card. Shows above the tabs on the results view.
+ * Offers three download options: Markdown (full report), CSV (variants only),
+ * and Print / Save-as-PDF (uses the browser print flow with our print CSS,
+ * which expands all tabs and hides chrome).
+ */
+function SaveReportCard({ report, variants, stats }) {
+  const books = getBooksForVariants(variants || {})
+
+  const handleDownloadMd = () => {
+    const md = buildGenomeMarkdown({ report, variants: variants || {}, stats, books })
+    downloadTextFile(md, reportFilename('md'), 'text/markdown;charset=utf-8')
+    trackEvent(EVENTS.GENOME_RESULTS_VIEWED, { action: 'download_md' })
+  }
+
+  const handleDownloadCsv = () => {
+    const csv = buildVariantsCsv(variants || {}, stats)
+    downloadTextFile(csv, reportFilename('csv'), 'text/csv;charset=utf-8')
+    trackEvent(EVENTS.GENOME_RESULTS_VIEWED, { action: 'download_csv' })
+  }
+
+  const handlePrint = () => {
+    // Expand every collapsible pillar block so nothing is hidden on the
+    // printed page. We toggle a global document class that our print CSS
+    // uses to force-open every <details> and unhide the sticky footer.
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('ss-print-mode')
+      document.querySelectorAll('details').forEach((d) => { d.open = true })
+    }
+    setTimeout(() => {
+      window.print()
+      // Cleanup once print dialog closes. Browsers fire afterprint reliably.
+      const cleanup = () => {
+        document.documentElement.classList.remove('ss-print-mode')
+        window.removeEventListener('afterprint', cleanup)
+      }
+      window.addEventListener('afterprint', cleanup)
+    }, 60)
+    trackEvent(EVENTS.GENOME_RESULTS_VIEWED, { action: 'print' })
+  }
+
+  return (
+    <div className="ss-no-print mt-6 rounded-2xl border border-ss-border-warm bg-gradient-to-br from-ss-surface to-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ss-teal/10 text-ss-teal">
+            <FileText size={18} />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-ss-teal">Save your report</div>
+            <div className="mt-0.5 text-xs text-ss-muted">
+              We don&rsquo;t store your results. Download or print now so you have a copy for later research.
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadMd}
+            className="inline-flex items-center gap-1.5 rounded-full bg-ss-teal px-4 py-2 text-xs font-semibold text-white transition hover:bg-ss-teal/90"
+            title="Portable text file with your full report, links, and reading list"
+          >
+            <Download size={13} /> Download report (.md)
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 rounded-full border border-ss-teal bg-white px-4 py-2 text-xs font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
+            title="Opens your browser's print dialog. Choose &quot;Save as PDF&quot; to keep a copy."
+          >
+            <Printer size={13} /> Print / Save as PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
+            className="inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm bg-white px-4 py-2 text-xs font-semibold text-ss-muted transition hover:border-ss-teal hover:text-ss-teal"
+            title="Just the recognized variants as a CSV — useful for spreadsheets or other tools"
+          >
+            <Download size={13} /> Variants (.csv)
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))

@@ -54,3 +54,40 @@
 /* Hide scrollbar for horizontal scroll on featured research */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ==========================================================================
+   Genome Report — tab visibility + print styles
+   -------------------------------------------------------------------------- */
+
+/* Inactive tabs are display:none on screen, but we WANT them visible when the
+   user prints the page (Save-as-PDF flow). The .ss-print-mode class is added
+   to <html> by the Print button just before window.print(). */
+.ss-tab-hidden { display: none; }
+html.ss-print-mode .ss-tab-hidden { display: block !important; }
+
+/* Print-only rules — apply for both the browser Print dialog AND for the
+   ss-print-mode expansion we do on-screen just before triggering print. */
+@media print {
+  html.ss-print-mode .ss-tab-hidden,
+  .ss-tab-hidden { display: block !important; }
+
+  /* Hide chrome that shouldn't be in a printed report: nav, footers, buttons,
+     tab switcher, and any element explicitly marked ss-no-print. */
+  header, nav, footer,
+  .ss-no-print,
+  [class*="sticky"],
+  button {
+    display: none !important;
+  }
+
+  /* Give printed sections proper spacing + page breaks. */
+  body { background: white !important; color: #1a1a1a; }
+  .container { max-width: 100% !important; padding: 0 !important; }
+  h1, h2, h3 { page-break-after: avoid; }
+  section, article, [data-tab] { page-break-inside: avoid; }
+  [data-tab] { padding-top: 24px; border-top: 1px solid #ddd; margin-top: 24px; }
+  [data-tab]:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+
+  /* Ensure background colors and text colors print. Chromium respects this. */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
