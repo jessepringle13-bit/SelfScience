@@ -1176,3 +1176,26 @@ agent_communication:
         when backend APIs hit rate limits and do not indicate a bug in the implementation.
 
 
+
+
+    -agent: "main"
+      message: |
+        FEATURE: Return ALL recognized variants in Overview (previously capped at 6/3).
+        
+        Backend changes in /app/app/api/[[...path]]/route.js:
+        1) buildMinimalGenomeReport (>30-variant fallback path): removed .slice(0,6)
+           on top_awareness_areas and overview.areasToExplore — now includes every
+           enriched variant. Bumped per-pillar top_searches from 4 → 8.
+        2) AI-driven path (<=30 variants): the AI schema forces top_strengths /
+           top_awareness_areas to exactly 3 items, and LLMs also silently drop most
+           variants from pillar_reports. Fix: aggregate ALL strengths+awareness from
+           pillar_reports into overview, AND add catalog-based fallback cards for
+           any recognized variant the AI dropped. Same merge applied to fullReport
+           so the grouped view is also complete.
+        3) Frontend: OverviewTab now shows count in header: "Areas to Explore (N)"
+           and "Your Genetic Strengths (N)".
+        
+        Verified via curl-equivalent:
+        - Fallback (37 recognized): overview.areasToExplore=37, fullReport total=37
+        - AI path  (15 recognized): overview total=15 (3 strengths + 12 areas),
+          fullReport total=15 (AI covered 2, catalog filled 13)

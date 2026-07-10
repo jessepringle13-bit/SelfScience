@@ -487,7 +487,7 @@ function OverviewTab({ report, onSearch }) {
       <div>
         <SectionHeader
           icon={<ShieldCheck size={16} className="text-ss-green" />}
-          title="Your Genetic Strengths"
+          title={`Your Genetic Strengths${s.length ? ` (${s.length})` : ''}`}
           hint="Variants generally associated with favorable traits in the literature."
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -499,8 +499,8 @@ function OverviewTab({ report, onSearch }) {
       <div>
         <SectionHeader
           icon={<Sparkles size={16} className="text-ss-amber" />}
-          title="Areas to Explore"
-          hint="Variants worth understanding better; not a diagnosis or warning."
+          title={`Areas to Explore${a.length ? ` (${a.length})` : ''}`}
+          hint="Every recognized variant worth understanding better — not a diagnosis or warning."
         />
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
           {a.map((it, i) => (

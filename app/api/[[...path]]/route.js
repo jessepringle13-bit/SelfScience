@@ -856,13 +856,19 @@ function buildMinimalGenomeReport(variants, catalog) {
     }
   }
   const pillars = Object.keys(byPillar).sort()
+  // Return ALL enriched variants as Areas to Explore. Users with 100+ recognized
+  // variants explicitly want to see every one of them surfaced in the overview,
+  // not just a truncated preview. The FullReport / Roadmap tabs already show
+  // the full grouped view, but the Overview tab is where users first look for
+  // "what did SelfScience find in me?" — so we no longer slice this list.
+  const allEnriched = enriched.map((a) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype }))
   return {
     session_id: Math.random().toString(36).slice(2, 10),
     variants_recognized: recognized,
     pillar_reports: pillars.map((p) => ({ pillar: p, strengths: [], awareness_areas: byPillar[p] })),
     overall_summary: {
       top_strengths: [],
-      top_awareness_areas: enriched.slice(0, 6),
+      top_awareness_areas: enriched,
       system_view: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
     },
     research_roadmap: {
@@ -870,7 +876,7 @@ function buildMinimalGenomeReport(variants, catalog) {
       pillars: pillars.map((p, i) => ({
         pillar: p, priority: i + 1,
         reason: `You have ${byPillar[p].length} recognized variant${byPillar[p].length === 1 ? '' : 's'} in ${p}.`,
-        top_searches: [...new Set(byPillar[p].flatMap((v) => v.searches))].slice(0, 4),
+        top_searches: [...new Set(byPillar[p].flatMap((v) => v.searches))].slice(0, 8),
       })),
     },
     privacy_confirmation: { data_received: 'Variant calls only', data_retained: false, session_ends: 'Data cleared on session close', file_processed: 'Client-side only' },
@@ -878,14 +884,14 @@ function buildMinimalGenomeReport(variants, catalog) {
     // UI-compat aliases (same shape the AI-driven path produces):
     overview: {
       strengths: [],
-      areasToExplore: enriched.slice(0, 6).map((a) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype })),
+      areasToExplore: allEnriched,
       systemView: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
     },
     fullReport: pillars.map((p) => ({ pillar: p, variants: byPillar[p] })),
     researchRoadmap: pillars.map((p, i) => ({
       priority: i + 1, pillar: p,
       why: `You have ${byPillar[p].length} recognized variant${byPillar[p].length === 1 ? '' : 's'} in ${p}.`,
-      searches: [...new Set(byPillar[p].flatMap((v) => v.searches))].slice(0, 4),
+      searches: [...new Set(byPillar[p].flatMap((v) => v.searches))].slice(0, 8),
     })),
   }
 }
@@ -958,14 +964,76 @@ async function handleInterpretGenome(request) {
       )
     }
     const { text, provider, model } = attempt
-    // Map new Session-5 schema to the shape the frontend genome-client expects
+    // Map new Session-5 schema to the shape the frontend genome-client expects.
+    //
+    // NOTE 1: The AI schema forces top_strengths/top_awareness_areas to exactly
+    // 3 items each (see prompts.js), but users want to see EVERY recognized
+    // variant in the Overview. So we aggregate ALL variants from pillar_reports
+    // into overview.areasToExplore / overview.strengths.
+    //
+    // NOTE 2: LLMs frequently silently drop recognized variants from their
+    // pillar_reports output (returning 2-5 variants when we sent 15-25). To
+    // guarantee the user sees every recognized variant, we enrich the AI's
+    // rich narratives with catalog-based fallback entries for anything the
+    // AI dropped. AI-covered variants keep their rich `user_explanation` and
+    // `landmark_study`; dropped variants get a solid catalog-driven card.
     const overall = parsed.overall_summary || {}
+    const pillarReports = parsed.pillar_reports || []
+    const covered = new Set()
+    // Flatten every strength across every pillar for Overview.
+    const allStrengths = pillarReports.flatMap((p) =>
+      (p.strengths || []).map((v) => {
+        if (v.rsid) covered.add(v.rsid)
+        return {
+          name: `${v.gene || ''} ${v.strength_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
+          plain: v.user_explanation || v.one_line || '',
+          pillar: p.pillar || v.pillar || '',
+          rsid: v.rsid || '', gene: v.gene || '', genotype: v.genotype || '',
+        }
+      })
+    )
+    // Flatten every awareness area across every pillar for Overview.
+    const allAwareness = pillarReports.flatMap((p) =>
+      (p.awareness_areas || []).map((v) => {
+        if (v.rsid) covered.add(v.rsid)
+        return {
+          name: `${v.gene || ''} ${v.awareness_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
+          plain: v.user_explanation || v.research_direction || v.one_line || '',
+          pillar: p.pillar || v.pillar || '',
+          rsid: v.rsid || '', gene: v.gene || '', genotype: v.genotype || '',
+        }
+      })
+    )
+    // Add catalog-based cards for any recognized variant the AI dropped.
+    const droppedCards = []
+    const droppedByPillar = {}
+    for (const [rsid, gt] of Object.entries(variants)) {
+      if (covered.has(rsid)) continue
+      const meta = VARIANT_CATALOG[rsid]
+      if (!meta) continue
+      const card = {
+        name: `${meta.gene} ${meta.description}`,
+        plain: `Research literature is available for ${meta.gene}. Explore on SelfScience for the latest studies.`,
+        pillar: meta.pillar || 'General',
+        rsid, gene: meta.gene, genotype: gt,
+      }
+      droppedCards.push(card)
+      const p = meta.pillar || 'General'
+      droppedByPillar[p] = droppedByPillar[p] || []
+      droppedByPillar[p].push({
+        gene: meta.gene, rsid, genotype: gt,
+        classification: 'Awareness',
+        explanation: `Research area: ${meta.description}. Search below for the latest peer-reviewed studies.`,
+        landmarkStudy: '',
+        searches: [`${meta.gene} ${meta.description.split('—')[0].trim()}`, `${meta.gene} health research`],
+      })
+    }
     const normalized = {
       // New Session-5 schema (raw)
       ...parsed,
       // Compat aliases for existing UI:
       overview: {
-        strengths: (overall.top_strengths || []).map((s) => ({
+        strengths: allStrengths.length ? allStrengths : (overall.top_strengths || []).map((s) => ({
           name: s.label || s.strength_name || '',
           plain: s.one_line || '',
           pillar: s.pillar || '',
@@ -973,39 +1041,48 @@ async function handleInterpretGenome(request) {
           gene: s.gene || '',
           genotype: s.genotype || '',
         })),
-        areasToExplore: (overall.top_awareness_areas || []).map((a) => ({
-          name: a.label || a.awareness_name || '',
-          plain: a.one_line || '',
-          pillar: a.pillar || '',
-          rsid: a.rsid || '',
-          gene: a.gene || '',
-          genotype: a.genotype || '',
-        })),
+        areasToExplore: [...allAwareness, ...droppedCards],
         systemView: overall.system_view || '',
       },
-      fullReport: (parsed.pillar_reports || []).map((p) => ({
-        pillar: p.pillar,
-        variants: [
-          ...(p.strengths || []).map((v) => ({
-            gene: v.gene, rsid: v.rsid, genotype: v.genotype,
-            classification: 'Strength',
-            explanation: v.user_explanation || '',
-            landmarkStudy: v.landmark_study?.title
-              ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
-              : '',
-            searches: v.search_queries || [],
-          })),
-          ...(p.awareness_areas || []).map((v) => ({
-            gene: v.gene, rsid: v.rsid, genotype: v.genotype,
-            classification: 'Awareness',
-            explanation: v.user_explanation || v.research_direction || '',
-            landmarkStudy: v.landmark_study?.title
-              ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
-              : '',
-            searches: v.search_queries || [],
-          })),
-        ],
-      })),
+      fullReport: (() => {
+        // Merge AI's rich pillar_reports with catalog-based entries for any
+        // recognized variant the AI dropped. That way FullReport tab is a
+        // complete grouped view of every recognized variant.
+        const aiPillars = (parsed.pillar_reports || []).map((p) => ({
+          pillar: p.pillar,
+          variants: [
+            ...(p.strengths || []).map((v) => ({
+              gene: v.gene, rsid: v.rsid, genotype: v.genotype,
+              classification: 'Strength',
+              explanation: v.user_explanation || '',
+              landmarkStudy: v.landmark_study?.title
+                ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
+                : '',
+              searches: v.search_queries || [],
+            })),
+            ...(p.awareness_areas || []).map((v) => ({
+              gene: v.gene, rsid: v.rsid, genotype: v.genotype,
+              classification: 'Awareness',
+              explanation: v.user_explanation || v.research_direction || '',
+              landmarkStudy: v.landmark_study?.title
+                ? `${v.landmark_study.title} — ${v.landmark_study.authors || ''} (${v.landmark_study.year || ''})`
+                : '',
+              searches: v.search_queries || [],
+            })),
+          ],
+        }))
+        // Now merge in dropped-variant catalog entries, either into existing
+        // pillar buckets or as new pillar groups.
+        const pillarMap = new Map(aiPillars.map((p) => [p.pillar, p]))
+        for (const [pName, catalogVariants] of Object.entries(droppedByPillar)) {
+          if (pillarMap.has(pName)) {
+            pillarMap.get(pName).variants.push(...catalogVariants)
+          } else {
+            pillarMap.set(pName, { pillar: pName, variants: catalogVariants })
+          }
+        }
+        return Array.from(pillarMap.values())
+      })(),
       researchRoadmap: (parsed.research_roadmap?.pillars || []).map((r) => ({
         priority: r.priority, pillar: r.pillar, why: r.reason, searches: r.top_searches || [],
       })),
