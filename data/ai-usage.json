@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-11T02:44:42.671Z",
+  "lastUpdated": "2026-07-11T03:04:14.705Z",
   "totals": {
-    "calls": 165,
-    "inTokens": 114234,
-    "outTokens": 67503,
-    "usd": 0.02106361
+    "calls": 167,
+    "inTokens": 116250,
+    "outTokens": 70189,
+    "usd": 0.02520137
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -36,13 +36,13 @@
       "last": "2026-07-10T21:19:51.894Z"
     },
     "together|meta-llama/Llama-3.3-70B-Instruct-Turbo|genome": {
-      "calls": 17,
-      "inTokens": 6543,
-      "outTokens": 8759,
-      "usd": 0.01346576,
+      "calls": 19,
+      "inTokens": 8559,
+      "outTokens": 11445,
+      "usd": 0.01760352,
       "unknownPrice": false,
       "first": "2026-07-10T21:31:44.172Z",
-      "last": "2026-07-11T02:42:56.730Z"
+      "last": "2026-07-11T03:04:02.003Z"
     },
     "openrouter|meta-llama/llama-3.1-70b-instruct|genome": {
       "calls": 15,
@@ -116,10 +116,10 @@
       "usd": 0.015097699999999999
     },
     "2026-07-11": {
-      "calls": 139,
-      "inTokens": 95160,
-      "outTokens": 31784,
-      "usd": 0.005965910000000002
+      "calls": 141,
+      "inTokens": 97176,
+      "outTokens": 34470,
+      "usd": 0.010103670000000002
     }
   },
   "ring": [
@@ -2102,6 +2102,30 @@
       "outTokens": 2738,
       "usd": 0.00034956,
       "latencyMs": 75940
+    },
+    {
+      "ts": "2026-07-11T03:03:44.600Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1008,
+      "outTokens": 1384,
+      "usd": 0.00210496,
+      "latencyMs": 19360
+    },
+    {
+      "ts": "2026-07-11T03:04:02.003Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1008,
+      "outTokens": 1302,
+      "usd": 0.0020328,
+      "latencyMs": 17355
     }
   ]
 }

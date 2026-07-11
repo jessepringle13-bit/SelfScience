@@ -1371,3 +1371,35 @@ agent_communication:
           `classification` field.
         - No regressions to genome fallback path, /admin, or search endpoint.
 
+
+
+    -agent: "main"
+      message: |
+        BUG FIX: FOXO3 & BCMO1 classification corrections (user-reported).
+        
+        1) FOXO3 rs2802292:
+           - OLD: positive: ['TT','AA'] — flagged TT as "longevity" Strength
+           - Literature verified: G allele is the minor/longevity-associated
+             allele (Willcox 2008 Okinawan, replicated across German, Italian,
+             Japanese, Hawaiian cohorts — GG ~2.75× more common in longevity
+             cases vs TT). TT is common reference, not adverse or protective.
+           - NEW: positive: ['GG'], awareness: [] (TT/GT → Neutral)
+           - Copy for TT (Neutral) uses user's exact requested wording about
+             lifestyle interventions activating related cellular pathways.
+           - Copy for GG (Strength) includes cohort names and ~2.75× odds ratio.
+        
+        2) BCMO1 rs12934922:
+           - OLD: positive: ['TT','AA'], awareness: ['AA','TT'] — everything
+             was in every bucket, hedged as "strand ambiguous default Typical".
+             Wrong.
+           - Literature verified (web_search + PubMed 22113863): rs12934922 is
+             the R267S variant. AA is the reference genotype (typical conversion).
+             T allele encodes Serine → ~57% reduction (heterozygous) to ~69%
+             reduction (homozygous TT) in beta-carotene → retinol conversion.
+           - NEW: positive: ['AA'], awareness: ['TT','AT','TA']
+        
+        Verified via curl:
+        - rs2802292 TT → Neutral with new lifestyle copy ✅
+        - rs2802292 GG → Strength with centenarian-cohort detail ✅
+        - rs12934922 AA → Strength (reference genotype) ✅
+        - rs12934922 TT → Awareness with 57%/69% reduction detail ✅
