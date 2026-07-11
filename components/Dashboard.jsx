@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill } from 'lucide-react'
+import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants } from '@/lib/supplementProtocol'
 import { PILLARS } from '@/components/site-nav'
@@ -158,6 +158,12 @@ export default function Dashboard() {
               Icon={Globe2}
               title="Population Compare"
               blurb="See how rare your genotype is and where in the world it&rsquo;s most common."
+            />
+            <ToolCard
+              href="/ancestry"
+              Icon={Compass}
+              title="Ancestry Report"
+              blurb="A rough educational ancestry sketch from your geographically stratified variants."
             />
           </div>
         </DashSection>

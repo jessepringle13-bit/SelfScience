@@ -17,6 +17,9 @@ import {
   Leaf,
   Droplet,
   Baby,
+  TestTube2,
+  Globe2,
+  Compass,
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 
@@ -37,9 +40,11 @@ export function SiteNav({ variant = 'light' }) {
   const isDark = variant === 'dark'
   const pathname = usePathname() || ''
   const [pillarsOpen, setPillarsOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pillarsRef = useRef(null)
+  const toolsRef = useRef(null)
   const aboutRef = useRef(null)
 
   // Close dropdowns on Escape
@@ -47,6 +52,7 @@ export function SiteNav({ variant = 'light' }) {
     const onKey = (e) => {
       if (e.key === 'Escape') {
         setPillarsOpen(false)
+        setToolsOpen(false)
         setAboutOpen(false)
       }
     }
@@ -60,10 +66,13 @@ export function SiteNav({ variant = 'light' }) {
   // Fixes the previous hover-based UX where the panel would disappear whenever
   // the cursor briefly crossed the gap between the button and the menu.
   useEffect(() => {
-    if (!pillarsOpen && !aboutOpen) return
+    if (!pillarsOpen && !toolsOpen && !aboutOpen) return
     const onDocClick = (e) => {
       if (pillarsOpen && pillarsRef.current && !pillarsRef.current.contains(e.target)) {
         setPillarsOpen(false)
+      }
+      if (toolsOpen && toolsRef.current && !toolsRef.current.contains(e.target)) {
+        setToolsOpen(false)
       }
       if (aboutOpen && aboutRef.current && !aboutRef.current.contains(e.target)) {
         setAboutOpen(false)
@@ -71,7 +80,7 @@ export function SiteNav({ variant = 'light' }) {
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
-  }, [pillarsOpen, aboutOpen])
+  }, [pillarsOpen, toolsOpen, aboutOpen])
 
   const base = isDark
     ? 'border-white/15 bg-ss-teal/40 backdrop-blur-md text-white'
@@ -86,6 +95,17 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/how-it-works',  label: 'How It Works',  blurb: 'A tour under the hood.' },
   ]
   const aboutActive = ABOUT_ITEMS.some((i) => i.href === pathname)
+  // Deep-dive tools that used to live as individual header links. Grouped
+  // under a single "Tools" dropdown so the desktop nav stays scannable.
+  // On mobile the drawer still lists them individually so nothing is hidden.
+  const TOOL_ITEMS = [
+    { href: '/biomarkers',         label: 'Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
+    { href: '/training',           label: 'Training Protocol', Icon: Activity,  blurb: 'Zone-based training + sport affinity.' },
+    { href: '/drug-check',         label: 'Drug Check',        Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
+    { href: '/population-compare', label: 'Population Compare',Icon: Globe2,    blurb: 'How your variants compare globally.' },
+    { href: '/ancestry',           label: 'Ancestry Report',   Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
+  ]
+  const toolsActive = TOOL_ITEMS.some((i) => i.href === pathname)
 
   return (
     <header className={`absolute inset-x-0 top-0 z-40 border-b ${base}`}>
@@ -105,6 +125,7 @@ export function SiteNav({ variant = 'light' }) {
               type="button"
               onClick={() => {
                 setPillarsOpen((v) => !v)
+                setToolsOpen(false)
                 setAboutOpen(false)
               }}
               className={`inline-flex items-center gap-1 ${linkBase}`}
@@ -141,10 +162,49 @@ export function SiteNav({ variant = 'light' }) {
           </div>
 
           <a href="/reading-list" className={linkClass('/reading-list')}>Reading List</a>
-          <a href="/biomarkers" className={linkClass('/biomarkers')}>Biomarkers</a>
-          <a href="/training" className={linkClass('/training')}>Training</a>
-          <a href="/drug-check" className={linkClass('/drug-check')}>Drug Check</a>
-          <a href="/population-compare" className={linkClass('/population-compare')}>Populations</a>
+
+          {/* Tools dropdown — consolidates Biomarkers / Training / Drug Check /
+              Populations / Ancestry so the desktop nav doesn't get crowded. */}
+          <div className="relative" ref={toolsRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setToolsOpen((v) => !v)
+                setPillarsOpen(false)
+                setAboutOpen(false)
+              }}
+              className={`inline-flex items-center gap-1 ${toolsActive ? linkActive : linkBase}`}
+              aria-expanded={toolsOpen}
+              aria-haspopup="menu"
+            >
+              Tools <ChevronDown size={14} className={`transition ${toolsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {toolsOpen && (
+              <div
+                role="menu"
+                className="absolute left-1/2 top-full z-50 mt-2 w-[420px] -translate-x-1/2 rounded-xl bg-white p-2 shadow-2xl ring-1 ring-black/10"
+              >
+                {TOOL_ITEMS.map(({ href, label, Icon, blurb }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    onClick={() => setToolsOpen(false)}
+                    className={`flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg ${
+                      pathname === href ? 'bg-ss-bg' : ''
+                    }`}
+                  >
+                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ss-teal/10 text-ss-teal">
+                      <Icon size={16} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-bold text-ss-teal">{label}</span>
+                      <span className="mt-0.5 block text-[12px] text-ss-muted">{blurb}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* About dropdown: About / Mission / How It Works — same click pattern */}
           <div className="relative" ref={aboutRef}>
@@ -153,6 +213,7 @@ export function SiteNav({ variant = 'light' }) {
               onClick={() => {
                 setAboutOpen((v) => !v)
                 setPillarsOpen(false)
+                setToolsOpen(false)
               }}
               className={`inline-flex items-center gap-1 ${aboutActive ? linkActive : linkBase}`}
               aria-expanded={aboutOpen}
@@ -212,6 +273,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/training" className="hover:opacity-80">Training</a>
             <a href="/drug-check" className="hover:opacity-80">Drug Check</a>
             <a href="/population-compare" className="hover:opacity-80">Populations</a>
+            <a href="/ancestry" className="hover:opacity-80">Ancestry</a>
             <details className="group">
               <summary className="flex cursor-pointer items-center justify-between hover:opacity-80">
                 <span>Pillars</span>

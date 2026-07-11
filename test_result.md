@@ -692,6 +692,53 @@ frontend:
               sample data (LCT identified as rarest, ALDH2 as most population-
               skewed which matches known population genetics).
 
+  - task: "Tier 2 #10 — Ancestry Report (naive ML posterior across 5 superpopulations)"
+    implemented: true
+    working: true
+    file: "/app/app/ancestry/ancestry-client.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            New /ancestry page (client-only). estimateAncestry() in
+            /app/lib/ancestryEstimator.js runs a naive maximum-likelihood
+            posterior over AFR/AMR/EAS/EUR/SAS given the Hardy–Weinberg
+            genotype probabilities from populationDetailFrequencies.js. Uniform
+            prior, log-sum-exp normalisation for numerical stability. Includes
+            an "informative variant" heuristic (≥2× ratio between highest and
+            lowest population) that drives an honest confidence label
+            (very-low / low / moderate) — deliberately conservative given the
+            small SNP panel. The UI includes a top disclaimer, stacked composition
+            bar, ranked population cards, a per-variant contributions table
+            with informative/neutral badges, a "How this is calculated" explainer,
+            a strong bottom disclaimer, and a cross-link to Population Compare.
+            Manual screenshot testing on the sample genome yields EUR ~66% / AMR
+            ~25% / SAS ~8.4% at "Very low — exploratory" confidence, which is
+            consistent with the sample data (LCT persistence TT + FTO AT).
+
+  - task: "Header consolidation — Tools dropdown replaces 4 individual tool links"
+    implemented: true
+    working: true
+    file: "/app/components/site-nav.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Desktop nav previously carried 8+ items (Search · Pillars · Reading
+            List · Biomarkers · Training · Drug Check · Populations · About ·
+            Support). Consolidated the 5 deep-dive tools (Biomarkers, Training,
+            Drug Check, Populations, Ancestry) into a single "Tools ▼" dropdown
+            matching the existing Pillars / About pattern. Click-outside +
+            Escape close behaviour preserved. Mobile drawer still lists tools
+            individually so nothing is hidden. Dashboard "Deep-Dive Tools" grid
+            also gained an Ancestry Report card. Screenshot verified.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"
