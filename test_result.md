@@ -790,6 +790,42 @@ frontend:
             to "Refreshing..." spinner → composition estimate refreshes with
             updated variant count (14 up from 6, matches larger _variants map).
 
+  - task: "Tier 3 — Practitioner Report Mode (print-ready clinician summary)"
+    implemented: true
+    working: true
+    file: "/app/app/practitioner-report/practitioner-report-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            New /practitioner-report page renders a single-sheet clinician-
+            facing summary designed to hand to a doctor. Sections:
+              1. Overview counts (SNPs recognised, awareness, strengths, PGx
+                 genes, biomarker fields filled)
+              2. Awareness findings table (gene / rsID / genotype / note)
+              3. Strengths findings table
+              4. PGx phenotype table across 7 CPIC-relevant genes with the
+                 supporting rsID:genotype calls exposed for verification
+              5. Biomarker panel (only shows fields the user has filled)
+              6. Additional neutral findings (compact)
+              7. Raw genotype appendix — every recognised rsID + call for
+                 cross-referencing against clinical panels
+            Header includes editable patient name, practitioner name, and
+            report date (persisted in sessionStorage). Everything else derives
+            from the existing genome report + biomarker localStorage.
+            Print stylesheet: SiteNav + on-screen action buttons are marked
+            .ss-screen-only and hidden on print; new .ss-print-sheet scope
+            overrides the aggressive global "header/footer/button hidden"
+            print rules so the report letterhead + disclaimer footer survive.
+            Verified: screen render, filled name inputs, and print-media
+            emulation all look clean; biomarker section populates when
+            localStorage 'selfscience_biomarker_values' has values.
+            Also added to Tools dropdown (desktop nav), mobile drawer, and
+            Dashboard "Deep-Dive Tools" grid.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

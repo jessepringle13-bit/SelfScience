@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass } from 'lucide-react'
+import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass, FileText } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants } from '@/lib/supplementProtocol'
 import { PILLARS } from '@/components/site-nav'
@@ -164,6 +164,12 @@ export default function Dashboard() {
               Icon={Compass}
               title="Ancestry Report"
               blurb="A rough educational ancestry sketch from your geographically stratified variants."
+            />
+            <ToolCard
+              href="/practitioner-report"
+              Icon={FileText}
+              title="Practitioner Report"
+              blurb="Clinician-facing single-page summary, ready to print or save as PDF."
             />
           </div>
         </DashSection>

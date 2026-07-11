@@ -90,6 +90,28 @@ html.ss-print-mode .ss-tab-hidden { display: block !important; }
 
   /* Ensure background colors and text colors print. Chromium respects this. */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Practitioner-report opt-in overrides — keep letterhead + footer visible,
+     tighten table row breaks, drop nav-adjacent padding. The `.ss-print-sheet`
+     wrapper marks the block that must survive printing intact. */
+  .ss-print-sheet header,
+  .ss-print-sheet footer { display: block !important; }
+  .ss-print-sheet button { display: inline-flex !important; }  /* keep date input's spinner arrows off but allow inline controls */
+  .ss-print-sheet input,
+  .ss-print-sheet input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent !important;
+  }
+  .ss-print-sheet section { page-break-inside: auto; }
+  .ss-print-sheet table tr { page-break-inside: avoid; }
+  .ss-print-sheet { font-size: 11px; }
+}
+
+/* Elements marked ss-screen-only should NEVER appear in a printed report.
+   Used for the app nav + on-page action buttons. */
+@media print {
+  .ss-screen-only { display: none !important; }
 }
 
 /* PWA: leave clearance below content so the MobileNav bottom bar (max-width

@@ -20,6 +20,7 @@ import {
   TestTube2,
   Globe2,
   Compass,
+  FileText,
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 
@@ -103,7 +104,8 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/training',           label: 'Training Protocol', Icon: Activity,  blurb: 'Zone-based training + sport affinity.' },
     { href: '/drug-check',         label: 'Drug Check',        Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
     { href: '/population-compare', label: 'Population Compare',Icon: Globe2,    blurb: 'How your variants compare globally.' },
-    { href: '/ancestry',           label: 'Ancestry Report',   Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
+    { href: '/ancestry',            label: 'Ancestry Report',      Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
+    { href: '/practitioner-report', label: 'Practitioner Report',  Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
   ]
   const toolsActive = TOOL_ITEMS.some((i) => i.href === pathname)
 
@@ -274,6 +276,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/drug-check" className="hover:opacity-80">Drug Check</a>
             <a href="/population-compare" className="hover:opacity-80">Populations</a>
             <a href="/ancestry" className="hover:opacity-80">Ancestry</a>
+            <a href="/practitioner-report" className="hover:opacity-80">Practitioner Report</a>
             <details className="group">
               <summary className="flex cursor-pointer items-center justify-between hover:opacity-80">
                 <span>Pillars</span>
