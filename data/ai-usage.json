@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-11T01:00:55.431Z",
+  "lastUpdated": "2026-07-11T01:14:12.701Z",
   "totals": {
-    "calls": 34,
-    "inTokens": 23515,
-    "outTokens": 36276,
-    "usd": 0.015203229999999998
+    "calls": 35,
+    "inTokens": 24532,
+    "outTokens": 37698,
+    "usd": 0.01734955
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -36,13 +36,13 @@
       "last": "2026-07-10T21:19:51.894Z"
     },
     "together|meta-llama/Llama-3.3-70B-Instruct-Turbo|genome": {
-      "calls": 12,
-      "inTokens": 5526,
-      "outTokens": 7337,
-      "usd": 0.01131944,
+      "calls": 13,
+      "inTokens": 6543,
+      "outTokens": 8759,
+      "usd": 0.01346576,
       "unknownPrice": false,
       "first": "2026-07-10T21:31:44.172Z",
-      "last": "2026-07-10T22:31:14.095Z"
+      "last": "2026-07-11T01:13:42.701Z"
     },
     "openrouter|meta-llama/llama-3.1-70b-instruct|genome": {
       "calls": 11,
@@ -107,10 +107,10 @@
       "usd": 0.015097699999999999
     },
     "2026-07-11": {
-      "calls": 8,
-      "inTokens": 4441,
-      "outTokens": 557,
-      "usd": 0.00010553
+      "calls": 9,
+      "inTokens": 5458,
+      "outTokens": 1979,
+      "usd": 0.00225185
     }
   },
   "ring": [
@@ -521,6 +521,18 @@
       "outTokens": 96,
       "usd": 0.00002746,
       "latencyMs": 645
+    },
+    {
+      "ts": "2026-07-11T01:13:42.701Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1017,
+      "outTokens": 1422,
+      "usd": 0.00214632,
+      "latencyMs": 13906
     }
   ]
 }

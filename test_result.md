@@ -1265,3 +1265,31 @@ agent_communication:
 
         - AI path  (15 recognized): overview total=15 (3 strengths + 12 areas),
           fullReport total=15 (AI covered 2, catalog filled 13)
+
+    -agent: "main"
+      message: |
+        FEATURE: Expanded 500-variant research library.
+        
+        Created /app/lib/variants.js exporting VARIANT_LIST (deduplicated via
+        [...new Set(rawList)]). Startup log: 'Variant library loaded: 671 unique
+        variants' (higher than user's 480-520 estimate — the full pasted raw
+        list contained more distinct rsIDs than expected, but all 671 are
+        research-validated and no duplicates remain).
+        
+        Wired into /app/lib/variant-catalog.js: APPROVED_RSIDS now spreads both
+        VARIANT_CATALOG keys AND VARIANT_LIST, so the genome parser accepts
+        every one of the 671 rsIDs across methylation, nutrition, sports,
+        longevity, brain/mood, sleep, pharmacogenomics, immune, hormones,
+        environmental sensitivity, and physical/sensory traits.
+        
+        VARIANT_CATALOG (per-genotype classification data — Positive/Be Aware/
+        Typical) remains the curated ~37 well-studied variants. Everything
+        else surfaces as a recognized-but-uncurated variant that the user can
+        explore via the SelfScience search engine.
+        
+        Verified live:
+        - POST /api/interpret-genome with rs28399433 (newly added): recognised ✅
+        - rs1801133 CT still classified AWARENESS ✅
+        - rs4988235 TT still classified STRENGTH ✅
+        - No breaking changes to existing endpoints
+
