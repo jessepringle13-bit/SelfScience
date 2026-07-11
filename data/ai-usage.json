@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-11T03:04:14.705Z",
+  "lastUpdated": "2026-07-11T03:41:35.797Z",
   "totals": {
-    "calls": 167,
-    "inTokens": 116250,
-    "outTokens": 70189,
-    "usd": 0.02520137
+    "calls": 174,
+    "inTokens": 120394,
+    "outTokens": 76615,
+    "usd": 0.031591030000000006
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -36,22 +36,22 @@
       "last": "2026-07-10T21:19:51.894Z"
     },
     "together|meta-llama/Llama-3.3-70B-Instruct-Turbo|genome": {
-      "calls": 19,
-      "inTokens": 8559,
-      "outTokens": 11445,
-      "usd": 0.01760352,
+      "calls": 24,
+      "inTokens": 11559,
+      "outTokens": 15329,
+      "usd": 0.023661440000000002,
       "unknownPrice": false,
       "first": "2026-07-10T21:31:44.172Z",
-      "last": "2026-07-11T03:04:02.003Z"
+      "last": "2026-07-11T03:41:05.795Z"
     },
     "openrouter|meta-llama/llama-3.1-70b-instruct|genome": {
-      "calls": 15,
-      "inTokens": 16213,
-      "outTokens": 39595,
-      "usd": 0.005022719999999999,
+      "calls": 17,
+      "inTokens": 17357,
+      "outTokens": 42137,
+      "usd": 0.005354459999999998,
       "unknownPrice": false,
       "first": "2026-07-10T21:35:54.562Z",
-      "last": "2026-07-11T02:44:12.669Z"
+      "last": "2026-07-11T03:41:06.026Z"
     },
     "openrouter|meta-llama/llama-3.1-70b-instruct:free|reliability": {
       "calls": 2,
@@ -116,10 +116,10 @@
       "usd": 0.015097699999999999
     },
     "2026-07-11": {
-      "calls": 141,
-      "inTokens": 97176,
-      "outTokens": 34470,
-      "usd": 0.010103670000000002
+      "calls": 148,
+      "inTokens": 101320,
+      "outTokens": 40896,
+      "usd": 0.01649333
     }
   },
   "ring": [
@@ -2126,6 +2126,90 @@
       "outTokens": 1302,
       "usd": 0.0020328,
       "latencyMs": 17355
+    },
+    {
+      "ts": "2026-07-11T03:35:31.551Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "fail",
+      "httpStatus": 504,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 20002
+    },
+    {
+      "ts": "2026-07-11T03:36:49.719Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-70b-instruct",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1144,
+      "outTokens": 2542,
+      "usd": 0.00033173999999999996,
+      "latencyMs": 78169
+    },
+    {
+      "ts": "2026-07-11T03:38:18.251Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1000,
+      "outTokens": 1308,
+      "usd": 0.00203104,
+      "latencyMs": 16142
+    },
+    {
+      "ts": "2026-07-11T03:39:10.702Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1000,
+      "outTokens": 1291,
+      "usd": 0.00201608,
+      "latencyMs": 14205
+    },
+    {
+      "ts": "2026-07-11T03:40:31.642Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1000,
+      "outTokens": 1285,
+      "usd": 0.0020108,
+      "latencyMs": 10000
+    },
+    {
+      "ts": "2026-07-11T03:41:05.795Z",
+      "provider": "together",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "task": "genome",
+      "status": "fail",
+      "httpStatus": 504,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 20001
+    },
+    {
+      "ts": "2026-07-11T03:41:06.026Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-70b-instruct",
+      "task": "genome",
+      "status": "fail",
+      "httpStatus": 429,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 232
     }
   ]
 }

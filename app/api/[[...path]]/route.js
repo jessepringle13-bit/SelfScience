@@ -11,6 +11,7 @@ import {
   buildGenomePrompt,
 } from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS, classifyVariant, describeVariant } from '@/lib/variant-catalog'
+import { classifyGenome, CLASSIFICATION_TO_LEGACY } from '@/lib/genomeClassifier'
 import { getPillarQuery } from '@/lib/pillars'
 import { searchCache, makeCacheKey } from '@/lib/cache'
 import { getUsageSnapshot, fetchOpenRouterCredit } from '@/lib/ai-usage'
@@ -914,6 +915,63 @@ function buildMinimalGenomeReport(variants, catalog) {
   }
 }
 
+/**
+ * Apply Step 1 (deterministic) classifications as the authoritative badge on
+ * every card in a genome API response. AI output can only contribute
+ * plain-text narrative — badges come from Step 1. Overview.strengths and
+ * overview.areasToExplore are re-bucketed after the override so the two
+ * sections stay accurate.
+ */
+function applyStep1Overrides(response, step1ByRsid, step1Meta) {
+  const legacyOf = (cls) =>
+    cls === 'positive' ? 'Strength'
+    : cls === 'awareness' ? 'Awareness'
+    : cls === 'neutral' ? 'Neutral'
+    : null
+  const overrideCard = (card) => {
+    if (!card || !card.rsid) return card
+    const s1 = step1ByRsid.get(card.rsid)
+    if (!s1) return card
+    const legacy = legacyOf(s1.classification)
+    if (!legacy) return card
+    // Prefer Step 1's classification_text (already merged with curated copy
+    // from variant-catalog.js). Fall back to the AI narrative otherwise.
+    return {
+      ...card,
+      classification: legacy,
+      plain: s1.classification_text || card.plain,
+      _step1: true,
+    }
+  }
+  const allOverview = [
+    ...(response.overview?.strengths || []),
+    ...(response.overview?.areasToExplore || []),
+  ].map(overrideCard)
+  if (response.overview) {
+    response.overview.strengths = allOverview.filter((c) => c.classification === 'Strength')
+    response.overview.areasToExplore = allOverview.filter((c) => c.classification !== 'Strength')
+  }
+  if (Array.isArray(response.fullReport)) {
+    for (const group of response.fullReport) {
+      group.variants = (group.variants || []).map((v) => {
+        const s1 = step1ByRsid.get(v.rsid)
+        if (!s1) return v
+        const legacy = legacyOf(s1.classification)
+        return legacy
+          ? { ...v, classification: legacy, explanation: s1.classification_text || v.explanation, _step1: true }
+          : v
+      })
+    }
+  }
+  response.step1 = {
+    variant_count: step1ByRsid.size,
+    unclassified_count: step1Meta?.unclassified_rsids?.length || 0,
+    pillar_summary: step1Meta?.pillar_summary || {},
+  }
+  return response
+}
+
+
 async function handleInterpretGenome(request) {
   let body
   try {
@@ -932,6 +990,17 @@ async function handleInterpretGenome(request) {
   if (Object.keys(variants).length === 0) {
     return NextResponse.json({ error: 'No recognized variants in the submitted set.' }, { status: 400 })
   }
+
+  // ============================================================
+  // STEP 1 — Deterministic classification (no AI, runs in ~1ms).
+  // The badge on every card (positive/awareness/neutral) comes from here
+  // and NOTHING else overrides it. The AI's job (Step 2) is only to write
+  // richer plain-language text; if the AI's classification disagrees with
+  // Step 1, Step 1 wins. Applied via applyStep1Overrides() below.
+  // ============================================================
+  const step1 = classifyGenome(variants)
+  const step1ByRsid = new Map()
+  for (const v of step1.variants) step1ByRsid.set(v.rsid, v)
 
   try {
     // Empirical: with >50 recognized variants the AI cascade consistently
@@ -971,15 +1040,13 @@ async function handleInterpretGenome(request) {
       // with `_aiFallback: true` so downstream can show a subtle notice
       // ("AI analysis was unavailable — showing your variant-based roadmap").
       const minimal = buildMinimalGenomeReport(variants, VARIANT_CATALOG)
-      return NextResponse.json(
-        {
-          ...minimal,
-          aiProvider: attempt?.provider || 'fallback',
-          aiModel: attempt?.model || 'variant-catalog',
-          _aiFallback: true,
-        },
-        { status: 200 }
-      )
+      const withStep1 = applyStep1Overrides({
+        ...minimal,
+        aiProvider: attempt?.provider || 'fallback',
+        aiModel: attempt?.model || 'variant-catalog',
+        _aiFallback: true,
+      }, step1ByRsid, step1)
+      return NextResponse.json(withStep1, { status: 200 })
     }
     const { text, provider, model } = attempt
     // Map new Session-5 schema to the shape the frontend genome-client expects.
@@ -1085,7 +1152,7 @@ async function handleInterpretGenome(request) {
         priority: r.priority, pillar: r.pillar, why: r.reason, searches: r.top_searches || [],
       })),
     }
-    return NextResponse.json({ ...normalized, aiProvider: provider, aiModel: model })
+    return NextResponse.json(applyStep1Overrides({ ...normalized, aiProvider: provider, aiModel: model }, step1ByRsid, step1))
   } catch (err) {
     console.error('interpret-genome error:', err?.message)
     return NextResponse.json(

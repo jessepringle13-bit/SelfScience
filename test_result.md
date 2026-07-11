@@ -1403,3 +1403,56 @@ agent_communication:
         - rs2802292 GG → Strength with centenarian-cohort detail ✅
         - rs12934922 AA → Strength (reference genotype) ✅
         - rs12934922 TT → Awareness with 57%/69% reduction detail ✅
+
+    -agent: "main"
+      message: |
+        FEATURE: Step 1 deterministic classification engine.
+        
+        Files created (all /app/lib/):
+        - haplotypeClassifiers.js (557 lines, 10 haplotype functions +
+          runAllHaplotypes orchestrator) — TSC-converted from user's .ts source
+        - variantClassifications.js (1022 lines, 132 single-SNP entries with
+          positive/awareness/neutral text) — TSC-converted from user's .ts source
+        - genomeClassifier.js — orchestrator with the user-requested MERGE
+          behavior (badge from new table, curated plain-text overlay from
+          existing /lib/variant-catalog.js when available)
+        - genomeParser.js — text-based parser per spec (alongside existing
+          /lib/genome-parser.js which handles File objects + .zip)
+        
+        Wiring in /app/app/api/[[...path]]/route.js:
+        - handleInterpretGenome now runs classifyGenome() FIRST (~1ms local),
+          then applies its badges as authoritative overrides on the AI response.
+          Added applyStep1Overrides() helper for the transform.
+        - Response now includes a `step1` metadata object with variant_count,
+          pillar_summary, and unclassified_count.
+        - Every Step-1-badged card gains `_step1: true` for debuggability.
+        
+        Bug caught & fixed during integration:
+        - haplotype classifiers default `classification = "neutral"` when
+          insufficient input data is provided (a defaulting quirk of the
+          source .ts). This caused 10 phantom "Typical" cards for uploads
+          that only had 1-2 rsIDs. Fixed with HAPLOTYPE_REQUIRED_INPUTS
+          guard in genomeClassifier.js — skips haplotype card if NONE of the
+          required rsIDs are present in the parsed genome.
+        
+        Startup log confirmed: "Step 1 classifier loaded. Variant table:
+        132 entries, Haplotype functions: 10"
+        
+        Verified via curl with mixed panel (APOE e3/e4, MTHFR CT, LCT TT,
+        ALDH2 AA, FOXO3 GG, BCMO1 AA, ...):
+        - APOE haplotype correctly emitted single e3/e4 card marked Awareness
+        - Every S1-badged card matches the classifier's decision
+        - Curated plain text (FOXO3 centenarian detail, MTHFR 30-70% enzyme,
+          ALDH2 acetaldehyde) preserved through the merge
+        
+        KNOWN DATA CONFLICT:
+        - BCMO1 rs12934922: new variantClassifications table uses G/A alleles
+          convention (GG=positive, AA=awareness), whereas the previously-
+          curated variant-catalog.js used A/T convention (AA=positive,
+          TT=awareness). This is a strand-orientation disagreement between
+          the two data sources. Right now the new table wins the badge, but
+          the curated plain-text still shows "reduces conversion" for what
+          the new table classifies as Awareness AA — those two happen to be
+          semantically consistent so the UX still reads correctly. Flagged
+          to user for future reconciliation.
+
