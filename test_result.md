@@ -1831,3 +1831,61 @@ agent_communication:
 
         No new env vars, no API keys, fully client-side. Rules are pure
         JS predicates so they degrade gracefully if a rule throws.
+
+
+    -agent: "main"
+      message: |
+        TIER 1 #4 — PERSONALIZED DASHBOARD — Complete.
+
+        Files added:
+          • /app/lib/genomeSession.js — sessionStorage-only helpers
+            (saveGenomeResults, getGenomeResults, clearGenomeResults,
+            hasGenomeResults, notifyGenomeResultsChanged). Guards for SSR;
+            never touches localStorage or the DB.
+          • /app/app/api/pubmed-search/route.js — dedicated server route
+            for gene-targeted PubMed searches. Uses esearch + esummary,
+            respects PUBMED_API_KEY server-side only, next-fetch revalidate
+            of 3600s. Returns { pmid, title, authors, journal, year,
+            pubmedUrl } list. Never throws to client — errors return an
+            empty list so the dashboard degrades gracefully.
+          • /app/components/Dashboard.jsx — the personalized post-upload
+            homepage view with all 6 spec'd sections in order:
+              1) Your Top Findings (top 3 Be Aware cards)
+              2) Your Strengths (top 3 Benefit cards)
+              3) Pillar Score Overview (10 pillar tiles w/ mini stacked bars)
+              4) Research Matched to You (parallel PubMed fetches for top
+                 3 non-haplotype genes with loading skeleton + empty state)
+              5) Your Protocol Preview (first 3 matched supplement rules)
+              6) Explore Your Pillars (10 pillar tiles → search filter)
+            Uses only ss-* brand tokens; educational disclaimer at bottom.
+
+        Files modified:
+          • /app/app/page.js — added <App> wrapper that decides between
+            Dashboard and DiscoverHome via hasGenomeResults(). Adds a
+            floating "My Dashboard / Discover" toggle at top center that
+            only appears when genome data exists. Existing App component
+            renamed to DiscoverHome; content unchanged.
+          • /app/app/genome/genome-client.jsx — persists final report
+            to sessionStorage via saveGenomeResults() when analysis
+            completes; clears via clearGenomeResults() when user hits
+            "Analyze another file". Both routes fire the
+            `selfscience:genome-changed` custom event so any mounted
+            Dashboard component picks up the change without a reload.
+
+        Verified via Playwright:
+          • Home without genome → renders unchanged Discover marketing view
+          • Upload sample data → return to `/` shows Dashboard by default
+          • Toggle switches views without page reload
+          • All 6 sections render correctly
+          • PubMed fetch works live — real 2026 papers loaded for LCT,
+            CYP1A2, ALDH2 from the sample data's top 3 genes
+          • Protocol preview shows the MTHFR 5-MTHF card from the matched
+            supplement protocol
+          • Pillar tiles render color-coded stacked bars per pillar
+
+        Compliance:
+          • NEXT_PUBLIC_ prefix not introduced anywhere
+          • Genome data lives only in sessionStorage (privacy-by-design)
+          • PubMed fetch happens server-side via /api/pubmed-search
+          • No secret keys exposed client-side
+          • No TypeScript files introduced

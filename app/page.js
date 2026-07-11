@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Search,
@@ -14,6 +14,8 @@ import {
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
 import { trackEvent, EVENTS } from '@/lib/analytics'
+import { hasGenomeResults } from '@/lib/genomeSession'
+import Dashboard from '@/components/Dashboard'
 
 /* -------------------------------- Sample data ------------------------------ */
 
@@ -182,7 +184,77 @@ const PILL_TO_PILLAR = {
 
 /* --------------------------------- Page ------------------------------------ */
 
+/**
+ * Root of the homepage. Decides whether to render the personalized
+ * Dashboard (once genome results are in sessionStorage) or the general
+ * Discover marketing home. Renders a small "My Dashboard / Discover"
+ * toggle at the top of the page but only when genome results exist.
+ *
+ * The sessionStorage check is deferred to a useEffect so we don't cause
+ * hydration mismatches (window doesn't exist during server render).
+ */
 function App() {
+  const [hasGenome, setHasGenome] = useState(false)
+  const [view, setView] = useState('discover') // 'dashboard' | 'discover'
+
+  useEffect(() => {
+    const check = () => {
+      const has = hasGenomeResults()
+      setHasGenome(has)
+      if (has) setView('dashboard') // Default to dashboard when genome data exists
+    }
+    check()
+    window.addEventListener('selfscience:genome-changed', check)
+    // Also refresh when the tab regains focus (in case genome was uploaded
+    // in another tab).
+    window.addEventListener('focus', check)
+    return () => {
+      window.removeEventListener('selfscience:genome-changed', check)
+      window.removeEventListener('focus', check)
+    }
+  }, [])
+
+  return (
+    <>
+      {/* View toggle \u2014 only shown when genome data exists. */}
+      {hasGenome && (
+        <div className="fixed left-1/2 top-4 z-40 -translate-x-1/2">
+          <div className="flex items-center gap-1 rounded-full border border-ss-border-warm bg-white/95 p-1 shadow-md backdrop-blur">
+            <button
+              onClick={() => setView('dashboard')}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                view === 'dashboard'
+                  ? 'bg-ss-teal text-white'
+                  : 'text-ss-muted hover:text-ss-teal'
+              }`}
+            >
+              My Dashboard
+            </button>
+            <button
+              onClick={() => setView('discover')}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                view === 'discover'
+                  ? 'bg-ss-teal text-white'
+                  : 'text-ss-muted hover:text-ss-teal'
+              }`}
+            >
+              Discover
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hasGenome && view === 'dashboard' ? <Dashboard /> : <DiscoverHome />}
+    </>
+  )
+}
+
+/**
+ * The existing marketing / discovery homepage \u2014 unchanged content,
+ * just renamed from `App` to `DiscoverHome` so `App` can wrap it with
+ * the Dashboard toggle logic.
+ */
+function DiscoverHome() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [activePill, setActivePill] = useState(null)

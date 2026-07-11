@@ -34,6 +34,7 @@ import EvidenceBadge from '@/components/EvidenceBadge'
 import { getEvidenceStrength } from '@/lib/evidenceStrength'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 import YourProtocolTab from '@/components/YourProtocolTab'
+import { saveGenomeResults, clearGenomeResults, notifyGenomeResultsChanged } from '@/lib/genomeSession'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -141,7 +142,14 @@ export default function GenomeClient() {
       const json = await res.json()
       // Attach the raw variant genotypes so downstream UI (like Recommended
       // Reading) can match against variantTriggers without another request.
-      setReport({ ...json, _variants: parsed.variants || {} })
+      const finalReport = { ...json, _variants: parsed.variants || {} }
+      setReport(finalReport)
+      // Persist to sessionStorage so the personalized Dashboard on `/` can
+      // pick this up. sessionStorage clears when the tab closes.
+      try {
+        saveGenomeResults(finalReport)
+        notifyGenomeResultsChanged()
+      } catch { /* noop */ }
       stopTicker()
       setProgress(100)
       setProgressLabel('Report ready ✓')
@@ -195,6 +203,10 @@ export default function GenomeClient() {
     setVariants(null)
     setStats(null)
     setReport(null)
+    try {
+      clearGenomeResults()
+      notifyGenomeResultsChanged()
+    } catch { /* noop */ }
     setActiveTab('overview')
   }
 
