@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna } from 'lucide-react'
+import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants } from '@/lib/supplementProtocol'
 import { PILLARS } from '@/components/site-nav'
@@ -128,7 +128,41 @@ export default function Dashboard() {
           <SeeAllLink href="/genome?tab=protocol" label="See your full protocol" />
         </DashSection>
 
-        {/* 6. EXPLORE YOUR PILLARS */}
+        {/* 6. DEEP-DIVE TOOLS */}
+        <DashSection
+          title="Deep-Dive Tools"
+          subtitle="Explore what your genome means in specific contexts — labs, training, medications, and global populations."
+          toneClass="text-ss-teal"
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <ToolCard
+              href="/biomarkers"
+              Icon={TestTube2}
+              title="Lab Biomarkers"
+              blurb="Log blood work and see how it correlates with your genome findings."
+            />
+            <ToolCard
+              href="/training"
+              Icon={Activity}
+              title="Training Protocol"
+              blurb="Personalized zone-based training + sport affinity based on your variants."
+            />
+            <ToolCard
+              href="/drug-check"
+              Icon={Pill}
+              title="Drug Check"
+              blurb="Look up a medication and see estimated pharmacogenomic guidance."
+            />
+            <ToolCard
+              href="/population-compare"
+              Icon={Globe2}
+              title="Population Compare"
+              blurb="See how rare your genotype is and where in the world it&rsquo;s most common."
+            />
+          </div>
+        </DashSection>
+
+        {/* 7. EXPLORE YOUR PILLARS */}
         <DashSection title="Explore Your Pillars" subtitle="Dive into the research grouped by pillar." toneClass="text-ss-teal">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {PILLARS.map((p) => (
@@ -254,6 +288,24 @@ function ExplorePillarCard({ pillar }) {
         <div className="mt-1 text-xs text-ss-muted line-clamp-2">{pillar.description}</div>
       </div>
       <ArrowRight size={14} className="mt-2 flex-shrink-0 text-ss-muted" />
+    </Link>
+  )
+}
+
+function ToolCard({ href, Icon, title, blurb }) {
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className="flex items-center justify-between">
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal transition group-hover:bg-ss-teal group-hover:text-white">
+          <Icon size={18} strokeWidth={1.75} />
+        </span>
+        <ArrowRight size={14} className="text-ss-muted transition group-hover:translate-x-0.5 group-hover:text-ss-teal" />
+      </div>
+      <div className="mt-3 text-sm font-bold text-ss-teal">{title}</div>
+      <div className="mt-1 text-xs text-ss-muted">{blurb}</div>
     </Link>
   )
 }

@@ -662,10 +662,39 @@ frontend:
             Renders responsive 2-col grid of shared <ResultCard/> with skeleton loader,
             empty state, and error state. Filters: source (all/pubmed/s2), date (any/1/5/10),
             pillar pills. Date filter is client-side. Reliability filter shown as disabled note.
+  - task: "Tier 2 #11 — Population Compare (per-superpopulation visualisation of user variants)"
+    implemented: true
+    working: true
+    file: "/app/app/population-compare/population-compare-client.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            New /population-compare page (client-only, zero backend calls).
+            - Reads flattenReportCards(sessionStorage) to gather user variants.
+            - New data module /app/lib/populationDetailFrequencies.js seeds 40 well-
+              characterized rsIDs with gnomAD-style per-superpopulation allele
+              frequencies (AFR/AMR/EAS/EUR/SAS) + Hardy–Weinberg
+              computeGenotypeStats() to derive the user's genotype frequency in
+              each population and a global rarity score.
+            - Three views: Highlights (rarest + most-skewed lists with mini bar
+              chips), Bar Chart (per-variant horizontal bars across 5 pops),
+              Heatmap (row-normalized grid with intensity shading).
+            - Empty state when no genome uploaded; graceful no-data fallback for
+              variants missing from the population table.
+            - Dashboard now has a "Deep-Dive Tools" section linking Biomarkers,
+              Training, Drug Check, and Population Compare.
+            - Nav links added on desktop (`Populations`) and mobile drawer.
+            - Manual screenshot testing confirms all 3 views render correctly on
+              sample data (LCT identified as rarest, ALDH2 as most population-
+              skewed which matches known population genetics).
 
 metadata:
   created_by: "main_agent"
-  version: "1.2"
+  version: "1.3"
   test_sequence: 2
   run_ui: false
 
