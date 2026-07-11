@@ -143,6 +143,7 @@ export function SiteNav({ variant = 'light' }) {
           <a href="/reading-list" className={linkClass('/reading-list')}>Reading List</a>
           <a href="/biomarkers" className={linkClass('/biomarkers')}>Biomarkers</a>
           <a href="/training" className={linkClass('/training')}>Training</a>
+          <a href="/drug-check" className={linkClass('/drug-check')}>Drug Check</a>
 
           {/* About dropdown: About / Mission / How It Works — same click pattern */}
           <div className="relative" ref={aboutRef}>
@@ -208,6 +209,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/genome" className="hover:opacity-80">Upload Genome</a>
             <a href="/biomarkers" className="hover:opacity-80">Biomarkers</a>
             <a href="/training" className="hover:opacity-80">Training</a>
+            <a href="/drug-check" className="hover:opacity-80">Drug Check</a>
             <details className="group">
               <summary className="flex cursor-pointer items-center justify-between hover:opacity-80">
                 <span>Pillars</span>

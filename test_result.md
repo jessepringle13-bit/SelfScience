@@ -2007,3 +2007,61 @@ agent_communication:
             footer on every recommendation block.
           • Full disclaimer at both top and bottom.
           • No env vars, no API calls, purely deterministic rules.
+
+
+    -agent: "main"
+      message: |
+        TIER 2 #8 — DRUG CHECKER — Complete.
+        Also shipped: Sport Affinity subsystem on /training tab.
+
+        Files added:
+          • /app/lib/sportAffinity.js — 22-sport catalog scored against
+            variant profile with signed weights (ACTN3, PPARGC1A, PPARA,
+            ADRB2, COL5A1, COL1A1, IL6, MMP1). Returns top 5 favored +
+            top 5 caution sports with rationale strings.
+          • /app/lib/pgxClassifier.js — Single-SNP phenotype inference for
+            CYP2C19, CYP2D6, CYP2C9, VKORC1, SLCO1B1, DPYD, TPMT. Prefers
+            report._variants raw map so PGx-only rsIDs (not in wellness
+            classification tables) still work.
+          • /app/lib/drugCatalog.js — 26 medications spanning antiplatelets,
+            PPIs, SSRIs, opioids, TCAs, beta-blockers, ADHD meds, warfarin
+            (CYP2C9+VKORC1 combined), CYP2C9 substrates, statins (SLCO1B1),
+            fluoropyrimidines (DPYD), thiopurines (TPMT). Each has
+            severity-tiered guidance function returning
+            {severity, headline, body, action}.
+          • /app/app/drug-check/page.js + drug-check-client.jsx —
+            Search-with-autosuggest, popular drugs quick-buttons, guidance
+            card with 4-severity chip system (Standard/Monitor/Caution/
+            Alternative), full 7-gene PGx phenotype snapshot with clickable
+            drug tags per gene.
+          • Modified /app/app/training/training-client.jsx — added Sport
+            Affinity section (Top 5 Favored + Top 5 Caution lists with
+            rank pills, signed scores, per-sport rationale, soft disclaimer)
+
+        Files modified:
+          • /app/components/site-nav.jsx — added "Drug Check" and
+            "Training" nav links (desktop + mobile drawer)
+
+        Verified via Playwright:
+          • /drug-check renders with disclaimer, search, popular checks
+          • Clopidogrel with CYP2C19 *2 heterozygous → correctly shows
+            'Intermediate Metabolizer' + Caution chip + CPIC alternative
+            language
+          • VKORC1 TT → 'Higher warfarin sensitivity' ✅
+          • SLCO1B1 CT → 'Decreased statin transporter' ✅
+          • PGx phenotype snapshot renders 7 gene cards with clickable
+            drug tags (Clopidogrel highlighted teal when active)
+          • /training Sport Affinity: athlete test payload → Swimming +7,
+            Cycling +6, Zone 2 +6 favored; Sprinting -5, CrossFit -5,
+            Weightlifting -4 caution
+          • All disclaimers present at top AND bottom of both pages
+
+        Compliance:
+          • Every drug guidance frames as "discussion point with your
+            prescriber" — never medical advice
+          • CPIC language cited where applicable
+          • "Estimated from single-SNP consumer genome data" footnote on
+            every result card
+          • Sport Affinity uses "genetically favored" vs "consider with
+            caution" — never "avoid" without soft framing
+          • Zero API calls, zero env vars, zero secret exposure
