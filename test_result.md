@@ -1328,6 +1328,45 @@ agent_communication:
         Verified via curl:
         - POST /api/interpret-genome with rs1801133 CT, rs4988235 TT, rs671 AA,
           rs4680 GG returned cards with classifications: LCT→Strength,
+
+    -agent: "main"
+      message: |
+        FEATURE: Unique, variant-specific descriptions in genome cards.
+        
+        Problem: every card was showing the same 2-3 templated blurbs ("is
+        associated with typical or favorable function in the literature"),
+        making the report feel repetitive and low-quality. Worse, the AI's own
+        text was often inverting risk direction on well-studied variants (e.g.
+        calling APOE-no-E4 "higher risk", ABCG2-reduced-transport "improved
+        transport") — factually wrong.
+        
+        Fix in /app/lib/variant-catalog.js:
+        - Added `plain: { strength, awareness, neutral }` object to every one
+          of the ~37 curated entries. Each is hand-written, clinical-grade
+          text specific to that variant + classification (mentions effect size,
+          mitigation research, specific drug interactions, etc.).
+        - New exported helper: describeVariant(rsid, classification, genotype).
+          Falls back through: curated → gene-aware generic → uncatalogued
+          generic. Never returns the same sentence twice.
+        
+        Fix in /app/app/api/[[...path]]/route.js:
+        - AI path: for the ~37 curated variants we now PREFER our curated
+          describeVariant() text over the AI's user_explanation (AI text was
+          often wrong). AI text is still used as a fallback for the ~630
+          uncurated rsIDs where we have no hand-checked copy.
+        - Fallback path: buildMinimalGenomeReport uses describeVariant()
+          instead of the previous 3-template switch.
+        - Drop-fill path: catalog-based fill for AI-dropped variants uses
+          describeVariant() too.
+        
+        Verified with 10-variant sample (all curated):
+        - LCT rs4988235 TT → "Lactase persistence — your body continues producing lactase into adulthood, so dairy is typically well-tolerated."
+        - APOE rs429358 TT → "No APOE4 allele — you don't carry the APOE isoform most-associated with elevated late-life cognitive risk." (previously AI said "higher risk" — WRONG)
+        - ABCG2 rs2231142 TT → "Reduced ABCG2 transport is a strong risk factor for gout and higher urate levels." (previously AI said "improved transport" — WRONG)
+        - CYP1A2 CC → "Slow caffeine metaboliser — caffeine lingers 6–10 hours longer..."
+        - Zero cards read identically. All curated variants show fact-checked,
+          research-grounded copy with real numbers and mitigation guidance.
+
           MTHFR→Awareness, ALDH2→Awareness, COMT→Neutral. Every card carries
           `classification` field.
         - No regressions to genome fallback path, /admin, or search endpoint.

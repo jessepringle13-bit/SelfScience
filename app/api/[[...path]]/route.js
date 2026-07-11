@@ -10,7 +10,7 @@ import {
   buildPlainLanguagePrompt,
   buildGenomePrompt,
 } from '@/lib/prompts'
-import { VARIANT_CATALOG, APPROVED_RSIDS, classifyVariant } from '@/lib/variant-catalog'
+import { VARIANT_CATALOG, APPROVED_RSIDS, classifyVariant, describeVariant } from '@/lib/variant-catalog'
 import { getPillarQuery } from '@/lib/pillars'
 import { searchCache, makeCacheKey } from '@/lib/cache'
 import { getUsageSnapshot, fetchOpenRouterCredit } from '@/lib/ai-usage'
@@ -848,11 +848,9 @@ function buildMinimalGenomeReport(variants, catalog) {
     if (meta?.pillar) {
       const p = meta.pillar
       byPillar[p] = byPillar[p] || []
-      const clsCopy = cls === 'Strength'
-        ? `Your ${gt} genotype at ${meta.gene} is associated with typical or favorable function in the literature. Explore the studies to learn more.`
-        : cls === 'Awareness'
-        ? `Your ${gt} genotype at ${meta.gene} is associated with reduced function or elevated attention in the literature — worth understanding better, not a diagnosis.`
-        : `Research area: ${meta.description}. The SelfScience search engine can surface studies on this variant directly.`
+      // Variant-specific plain-language text (curated per rsID+classification).
+      // Falls back to a gene-aware generic when curated copy isn't available.
+      const clsCopy = describeVariant(rsid, cls, gt)
       byPillar[p].push({
         gene: meta.gene, rsid, genotype: gt,
         classification: cls,
@@ -1006,17 +1004,26 @@ async function handleInterpretGenome(request) {
     const pillarReports = parsed.pillar_reports || []
     const covered = new Set()
     // Collect every variant the AI wrote about, preserving its rich narrative
-    // but re-classifying via catalog rules.
+    // but re-classifying via catalog rules. When we have curated per-variant
+    // copy in VARIANT_CATALOG we PREFER that over the AI's `user_explanation`
+    // — LLMs frequently invert the risk direction on well-studied variants
+    // (e.g. calling APOE-no-E4 "higher risk" or ABCG2 reduced-transport
+    // "improved transport"). Curated copy is fact-checked; AI copy is a
+    // fallback for the ~630 uncurated rsIDs in VARIANT_LIST.
     const aiCards = []
     for (const p of pillarReports) {
       for (const v of [...(p.strengths || []), ...(p.awareness_areas || [])]) {
         if (v.rsid) covered.add(v.rsid)
-        const cls = classifyVariant(v.rsid, v.genotype || variants[v.rsid])
+        const gt = v.genotype || variants[v.rsid]
+        const cls = classifyVariant(v.rsid, gt)
+        const hasCurated = !!VARIANT_CATALOG[v.rsid]?.plain
+        const aiText = v.user_explanation || v.research_direction || v.one_line || ''
+        const plainText = hasCurated ? describeVariant(v.rsid, cls, gt) : (aiText || describeVariant(v.rsid, cls, gt))
         aiCards.push({
-          rsid: v.rsid || '', gene: v.gene || '', genotype: v.genotype || variants[v.rsid] || '',
+          rsid: v.rsid || '', gene: v.gene || '', genotype: gt || '',
           pillar: p.pillar || v.pillar || '',
           name: `${v.gene || ''} ${v.strength_name || v.awareness_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
-          plain: v.user_explanation || v.research_direction || v.one_line || '',
+          plain: plainText,
           classification: cls,
           landmark_study: v.landmark_study || null,
           search_queries: v.search_queries || [],
@@ -1029,11 +1036,10 @@ async function handleInterpretGenome(request) {
       const meta = VARIANT_CATALOG[rsid]
       if (!meta) continue
       const cls = classifyVariant(rsid, gt)
-      const plain = cls === 'Strength'
-        ? `Your ${gt} genotype at ${meta.gene} is associated with typical or favorable function in the literature.`
-        : cls === 'Awareness'
-        ? `Your ${gt} genotype at ${meta.gene} is worth understanding better — not a diagnosis. Explore the studies below.`
-        : `Research area: ${meta.description}. The SelfScience search engine can surface studies on this variant.`
+      // Variant-specific plain text — curated where available, gene-aware
+      // generic fallback otherwise. Never the identical filler across every
+      // card.
+      const plain = describeVariant(rsid, cls, gt)
       aiCards.push({
         rsid, gene: meta.gene, genotype: gt,
         pillar: meta.pillar || 'General',
