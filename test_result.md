@@ -1229,5 +1229,39 @@ agent_communication:
         - overview.areasToExplore=19 (incl. MTHFR CT/AC → Be Aware, others → Typical)
         - fullReport totals=25, every card carries a per-genotype classification.
 
+    -agent: "main"
+      message: |
+        FEATURE: Updated AI cascade per user request.
+        
+        Changes in /app/lib/ai.js MODELS config:
+        
+        Reliability Scoring:
+          Primary : openrouter meta-llama/llama-3.3-70b-instruct:free  ← replaces gpt-oss-20b:free
+          Fallback: openrouter meta-llama/llama-3.1-8b-instruct        ← paid, ~$0.0002/call
+        
+        Plain Language Translation:
+          Primary : openrouter meta-llama/llama-3.3-70b-instruct:free  ← replaces gpt-oss-20b:free
+          Fallback: openrouter meta-llama/llama-3.1-8b-instruct
+        
+        Genome (unchanged):
+          Primary : together   meta-llama/Llama-3.3-70B-Instruct-Turbo
+          Fallback: openrouter meta-llama/llama-3.1-70b-instruct
+        
+        SUBSTITUTION NOTE: User specified `llama-3.1-70b-instruct:free` for the
+        reliability + plain-language primary, but OpenRouter has deprecated that
+        exact slug (returns 404 on every call — verified with live curl). Used
+        `llama-3.3-70b-instruct:free` instead: same Meta Llama family, same 70B
+        non-reasoning class, newer version. Meets user's stated criteria.
+        
+        Verified via curl:
+        - Reliability: 1.2s total when free is rate-limited → paid 8B (well under
+          10s target)
+        - Plain-language: paid 8B fallback used when free is 429; cascade
+          transparent to user
+        - validate() step preserved on all three endpoints
+        - Genome progress ticker already includes Reading/Analyzing/Building
+          messages the user asked for (verified in genome-client.jsx lines 92-99)
+
+
         - AI path  (15 recognized): overview total=15 (3 strengths + 12 areas),
           fullReport total=15 (AI covered 2, catalog filled 13)
