@@ -1618,3 +1618,44 @@ agent_communication:
         - Small uploads (≤70) still get full Together AI experience
           (verified 8-variant upload = 7.9s via together_ai).
         - Jesse's file now returns HTTP 200 in 778ms with 69 cards rendered.
+
+
+    -agent: "main"
+      message: |
+        VARIANT CLASSIFICATION CORRECTIONS — 10 fixes applied and verified.
+        User cross-verified against their own genome file and reported the
+        badge or card copy was wrong on 10 SNPs. All fixed in:
+          • /app/lib/variantClassifications.js (all 10)
+          • /app/lib/haplotypeClassifiers.js (ACTN3 TT text tweak)
+          • /app/lib/genomeClassifier.js (HAPLOTYPE_PREFER_DETAIL set → ACTN3)
+          • /app/lib/variant-catalog.js (rs662799 plain.awareness override)
+
+        Corrections:
+          1. ACTN3 rs1815739 — TT now shows endurance-specific text (was
+             conflated with CC power text via catalog override).
+          2. PPARG rs1801282 — CC → neutral (Pro/Pro standard); CG/GG → positive.
+          3. PPARGC1A rs8192678 — CC/CT/TT genotypes added (23andMe strand),
+             CC=awareness (Gly/Gly blunted), TT=positive (Ser/Ser).
+          4. LCT rs4988235 — added GG=awareness alongside existing CC=awareness
+             (23andMe strand support).
+          5. LCT rs182549 — flipped: TT=positive, CC=awareness (was reversed).
+          6. APOA5 rs662799 — added AA=awareness (was undefined; user file has
+             AA meaning risk allele).
+          7. MTNR1B rs1387153 — TT now awareness (was positive), CC=positive.
+          8. PCSK9 rs11591147 — GG=neutral (was positive), GT/TT=positive
+             (LOF allele is the minor T, not GG).
+          9. CETP rs708272 — flipped: GG=positive (higher HDL), AA=awareness.
+         10. IL23R rs11209026 — badge kept, awareness_text rewritten
+             ("elevated gut inflammatory signaling").
+
+        Verification: /tmp/verify_api.mjs runs 28 test cases against the live
+        /api/interpret-genome endpoint (100-variant filler payload forces
+        AI-skip path to isolate Step 1 output). Result: 28/28 PASS. Every
+        badge + card_body keyword matches the user's spec.
+
+        Regression spot-check: rs1801133 CT, rs9939609 AA, rs12934922 AA,
+        rs2802292 TT/GG, rs671 GG all still classify correctly. rs4680 AA
+        classification is unrelated pre-existing COMT haplotype behavior.
+
+        No backend testing agent call needed — deterministic Step 1 verified
+        end-to-end via API-level test script.
