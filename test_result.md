@@ -1963,3 +1963,47 @@ agent_communication:
           • Genome data only ever loaded from sessionStorage (no leakage
             to biomarker localStorage)
           • Zero API calls, zero new env vars, zero key exposure
+
+
+    -agent: "main"
+      message: |
+        TIER 2 #7 — TRAINING PROTOCOL GENERATOR — Complete.
+
+        Files added:
+          • /app/lib/trainingProtocol.js — 10 variant-driven training rules
+            grouped into 3 categories:
+              style    (3): ACTN3 RR (power), ACTN3 XX (endurance), ACTN3 RX (balanced)
+              cardio   (3): PPARGC1A Gly/Gly, PPARA CC, ADRB2 Arg16
+              recovery (4): COL5A1 TT, COL1A1 TT, IL6 -174 CC, MMP1 2G/2G
+            Uses hasHaplotype for ACTN3 (matches classifier haplotype labels
+            'power' / 'endurance' / 'balanced') and hasGenotype for the rest.
+          • /app/app/training/page.js — server shell
+          • /app/app/training/training-client.jsx — full page with header,
+            top+bottom disclaimer callouts, intro card with counter,
+            3 category sections (Training Style / Cardio & Metabolic /
+            Recovery & Connective Tissue), per-recommendation blocks with
+            Variant/Mechanism/Research basis rows.
+
+        Files modified:
+          • /app/components/site-nav.jsx — added "Training" link
+            (both desktop nav + mobile drawer). Mobile bottom tab bar
+            intentionally unchanged at 4 slots (Home/Search/Genome/Labs);
+            Training is desktop-first + drawer-accessible on mobile.
+
+        Verified via Playwright:
+          • Full athlete test payload (ACTN3 TT + PPARGC1A CC + PPARA CC +
+            ADRB2 GG + COL5A1 TT + COL1A1 TT + IL6 CC + MMP1 GG) triggered
+            6 variant-driven protocols with 11 individual recommendations.
+          • Every rec renders with correct Variant/Mechanism/Research basis
+            rows and Behavioral/dose pill badges.
+          • ACTN3 XX endurance card correctly identified via haplotype_name
+            'endurance' from classifyACTN3 (matches on both haplotype status
+            AND fallback genotype for robustness).
+
+        Compliance:
+          • All research-language, no medical claims.
+          • Every rec cites a research basis sentence.
+          • "Educational research context — not a training prescription"
+            footer on every recommendation block.
+          • Full disclaimer at both top and bottom.
+          • No env vars, no API calls, purely deterministic rules.
