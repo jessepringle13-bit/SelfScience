@@ -1776,3 +1776,58 @@ agent_communication:
         filler payloads to force the AI-skip path (>70 threshold) so we
         test the deterministic Step 1 output the user actually sees on
         their real 150+ variant upload. All 3 tests PASS.
+
+
+    -agent: "main"
+      message: |
+        TIER 1 #3 — SUPPLEMENT PROTOCOL GENERATOR — Complete.
+
+        Files added:
+          • /app/lib/supplementProtocol.js — 14 hand-curated
+            variant-to-protocol mappings covering all three categories:
+              priority  (9): MTHFR compound-het, MTHFR single-het,
+                             BCMO1 low-converter, FADS1/2 reduced,
+                             COL5A1 connective tissue, PPARGC1A Gly/Gly,
+                             SIRT1 TT, VDR low-response, FUT2 non-secretor
+              lifestyle (2): MTNR1B GG late-eating, CYP1A2 slow caffeine
+              awareness (3): COMT Val/Val, SLCO1B1 statin sensitivity,
+                             APOE ε3/ε4 or ε4/ε4
+            Exports matchProtocolToUserVariants(report), flattenReportCards(),
+            PROTOCOL_DISCLAIMER, and CATEGORY_META.
+          • /app/components/YourProtocolTab.jsx — presentational tab with
+            top+bottom disclaimer callouts, intro card with match counter,
+            three category sections with icons/subtitles, per-entry cards
+            with color-coded left border, and per-recommendation blocks
+            showing Variant/Mechanism/Research basis in a clean 3-row layout.
+
+        Wiring:
+          • /app/app/genome/genome-client.jsx — added 'Your Protocol' as
+            the 4th tab (between 'Full Report' and 'Research Roadmap').
+          • /app/lib/genomeAIGenerator.js — added is_haplotype +
+            haplotype_name propagation to toOverviewCard so haplotype
+            classifiers (MTHFR, APOE, COMT, ACTN3, NAT2, etc.) can be
+            matched by their status labels ('compound_heterozygous',
+            'e3/e4', 'val_val', 'endurance', etc.).
+
+        Compliance guardrails baked in:
+          • Every recommendation cites a "Research basis" sentence.
+          • Awareness cards are framed as provider discussion points, not
+            self-directed actions (SLCO1B1 explicitly for statin discussion
+            with prescriber, APOE ε4 explicitly about lifestyle + provider
+            conversation).
+          • Full disclaimer text ("These suggestions are based on published
+            research associations and are for educational insight only.
+            Consult a qualified healthcare provider before starting any
+            supplement protocol.") appears at BOTH top and bottom of the tab.
+          • No 'cure', 'treat', 'prevent', 'diagnose', or 'prescribe'
+            language anywhere.
+
+        Verified via /tmp/debug_protocol.mjs (realistic 100+ variant
+        payload with MTHFR AG/GT, APOE ε3/ε4, COMT GG, MTNR1B GG, CYP1A2
+        CC, etc.): 5 priority + 2 lifestyle + 3 awareness matches, all
+        rendering correctly. Sample data (25 variants) triggers 1
+        priority match (MTHFR) with 4 individual recommendations — verified
+        via Playwright screenshot.
+
+        No new env vars, no API keys, fully client-side. Rules are pure
+        JS predicates so they degrade gracefully if a rule throws.

@@ -33,6 +33,7 @@ import { buildGenomeResultsForShare } from '@/lib/shareCard'
 import EvidenceBadge from '@/components/EvidenceBadge'
 import { getEvidenceStrength } from '@/lib/evidenceStrength'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
+import YourProtocolTab from '@/components/YourProtocolTab'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -402,6 +403,7 @@ export default function GenomeClient() {
             {[
               { key: 'overview', label: 'Overview' },
               { key: 'full', label: 'Full Report' },
+              { key: 'protocol', label: 'Your Protocol' },
               { key: 'roadmap', label: 'Research Roadmap' },
             ].map((t) => (
               <button
@@ -424,6 +426,9 @@ export default function GenomeClient() {
             </div>
             <div data-tab="full" className={activeTab === 'full' ? '' : 'ss-tab-hidden'}>
               <FullReportTab report={report} onSearch={goSearch} />
+            </div>
+            <div data-tab="protocol" className={activeTab === 'protocol' ? '' : 'ss-tab-hidden'}>
+              <YourProtocolTab report={report} />
             </div>
             <div data-tab="roadmap" className={activeTab === 'roadmap' ? '' : 'ss-tab-hidden'}>
               <RoadmapTab report={report} onSearch={goSearch} />
