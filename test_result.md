@@ -1456,3 +1456,36 @@ agent_communication:
           semantically consistent so the UX still reads correctly. Flagged
           to user for future reconciliation.
 
+
+
+    -agent: "main"
+      message: |
+        FEATURE: Step 2 (AI plain-language generator) built + endpoint tested.
+        
+        Files created:
+        - /app/lib/genomeAIGenerator.js — client-callable generateGenomeReport()
+          that takes a Step 1 ClassifiedGenome, batches a single AI prompt, and
+          merges AI text with Step 1's authoritative badges. Safe fallback
+          cards when the AI returns malformed JSON.
+        - /app/app/api/genome/generate/route.js — dedicated server endpoint
+          (Together AI 70B primary → OpenRouter paid 70B fallback). Keys read
+          from process.env only.
+        
+        Env keys verified: TOGETHER_API_KEY + OPENROUTER_API_KEY in /app/.env
+        (no NEXT_PUBLIC_ prefix — server-only).
+        
+        End-to-end smoke test:
+        - 3-variant ClassifiedGenome → generateGenomeReport() completed in
+          5.8 seconds via Together AI (target: <45s).
+        - All 3 cards emitted with Step 1 badges intact (Consider/Benefit/
+          Benefit). Card titles + bodies from AI where JSON parsed cleanly;
+          safe fallbacks otherwise.
+        - Direct curl to /api/genome/generate: 3.0s, valid JSON output.
+        
+        FRONTEND WIRING DEFERRED:
+        - Existing genome-client.jsx UI reads the OLD shape (overview /
+          fullReport). Step 2's output is a different shape ({ cards: [] }).
+        - Current prod flow already routes badges through Step 1 via
+          applyStep1Overrides() in /api/interpret-genome, so app is safe.
+        - Frontend swap needs a coordinated UI refactor (~2-3h) — not done
+          this session to keep production stable.
