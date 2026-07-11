@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ShieldAlert, Trash2, ArrowRight, TestTube2, Loader2 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
+import RegenTools from '@/components/RegenTools'
 import {
   BIOMARKERS,
   STATUS_META,
@@ -82,6 +83,7 @@ export default function BiomarkersClient() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {report && <RegenTools compact />}
             {summary.filled > 0 && (
               <button
                 onClick={clearAll}

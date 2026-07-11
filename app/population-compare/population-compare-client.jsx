@@ -28,7 +28,7 @@ import {
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { getGenomeResults } from '@/lib/genomeSession'
-import { flattenReportCards } from '@/lib/supplementProtocol'
+import { collectRawGenotypeRows } from '@/lib/genomeCards'
 import {
   computeGenotypeStats,
   formatPct,
@@ -36,6 +36,7 @@ import {
   POP_CODES,
   getPopulationDetail,
 } from '@/lib/populationDetailFrequencies'
+import RegenTools from '@/components/RegenTools'
 
 const VIEWS = [
   { key: 'highlights', label: 'Highlights', Icon: Sparkles },
@@ -55,23 +56,26 @@ export default function PopulationCompareClient() {
     return () => window.removeEventListener('selfscience:genome-changed', onChange)
   }, [])
 
-  // Build the analysed variant set once. We look up each classified card
-  // against the population data table; anything without data is silently
-  // dropped so the UI never shows a fabricated flat distribution.
+  // Build the analysed variant set once. We iterate the RAW parsed genome
+  // (report._variants) instead of the classified card list because some
+  // haplotype cards (COMT, APOE, MTHFR, …) rewrite `genotype` as a status
+  // string like "val_val" — which would nonsensically be interpreted as
+  // "AA" once non-ACGT chars were stripped. Cards give us display metadata
+  // only; raw calls come from _variants.
   const rows = useMemo(() => {
     if (!report) return []
-    const cards = flattenReportCards(report)
+    const rawRows = collectRawGenotypeRows(report)
     const out = []
-    for (const c of cards) {
-      const stats = computeGenotypeStats(c.rsid, c.genotype)
+    for (const r of rawRows) {
+      const stats = computeGenotypeStats(r.rsid, r.rawGenotype)
       if (!stats) continue
-      const detail = getPopulationDetail(c.rsid)
+      const detail = getPopulationDetail(r.rsid)
       out.push({
-        rsid: c.rsid,
-        gene: c.gene || '',
-        trait: c.trait || c.name || '',
-        pillar: c.pillar || '',
-        classification: c.classification || 'neutral',
+        rsid: r.rsid,
+        gene: r.gene,
+        trait: r.trait,
+        pillar: r.pillar,
+        classification: r.classification,
         genotype: stats.genotype,
         copies: stats.copies,
         zygosity: stats.zygosity,
@@ -122,7 +126,10 @@ export default function PopulationCompareClient() {
               African, Latino / Admixed, East Asian, European, and South Asian.
             </p>
           </div>
-          <PopulationLegend />
+          <div className="flex flex-col items-end gap-2">
+            <PopulationLegend />
+            {report && <RegenTools />}
+          </div>
         </div>
 
         {/* Empty state — no genome */}

@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ShieldAlert, Dumbbell, HeartPulse, ShieldCheck, Info, ArrowRight, Loader2, Trophy, AlertTriangle } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
+import RegenTools from '@/components/RegenTools'
 import { getGenomeResults } from '@/lib/genomeSession'
 import {
   matchTrainingToUserVariants,
@@ -65,12 +66,15 @@ export default function TrainingClient() {
               recovery cadence — built from your variant findings.
             </p>
           </div>
-          <Link
-            href="/genome"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
-          >
-            See genome findings <ArrowRight size={13} />
-          </Link>
+          <div className="flex items-center gap-2">
+            {report && <RegenTools compact />}
+            <Link
+              href="/genome"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
+            >
+              See genome findings <ArrowRight size={13} />
+            </Link>
+          </div>
         </div>
 
         {/* Top disclaimer */}

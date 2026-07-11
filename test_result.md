@@ -739,6 +739,57 @@ frontend:
             individually so nothing is hidden. Dashboard "Deep-Dive Tools" grid
             also gained an Ancestry Report card. Screenshot verified.
 
+  - task: "BUG FIX — rs4680 (COMT) shown as AA on Population/Ancestry when raw was GG"
+    implemented: true
+    working: true
+    file: "/app/lib/genomeCards.js, /app/lib/populationDetailFrequencies.js, /app/app/population-compare/population-compare-client.jsx, /app/app/ancestry/ancestry-client.jsx, /app/lib/ancestryEstimator.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Root cause: haplotype cards emitted by classifyGenome() rewrite the
+            `genotype` field to a STATUS string like "val_val" (COMT), "e3/e4"
+            (APOE), "compound_heterozygous" (MTHFR). When Population Compare +
+            Ancestry read the classified card list via flattenReportCards, they
+            stripped non-ACGT chars from "val_val" and got "AA" — nonsensically
+            interpreted as Met/Met. Real raw call was "GG" (Val/Val).
+            Fix: new helper collectRawGenotypeRows() iterates
+            report._variants (the raw parsed genome map) directly and pairs
+            each rsid with card metadata for display. Both Population Compare
+            and Ancestry now use this. Also added reverse-strand fallback in
+            computeGenotypeStats() so raw files that use the minus strand
+            (some AncestryDNA calls) parse correctly.
+            Verified end-to-end: forcing rs4680 = "GG" in sessionStorage and
+            reloading /ancestry now shows the correct African best-fit at 49%
+            (was "AA — Latino/Admixed"). Population Compare bar chart for
+            rs4680 GG matches the reference numbers the user provided:
+            AFR 49%, AMR 30%, EAS 49%, EUR 27%, SAS 31%.
+
+  - task: "Regenerate button for all tool pages (client-side re-analysis trigger)"
+    implemented: true
+    working: true
+    file: "/app/components/RegenTools.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            New shared RegenTools component surfaces a "Refresh analysis" pill
+            on Biomarkers, Training, Drug Check, Population Compare, and
+            Ancestry pages. Clicking re-POSTs the raw variants map (from
+            report._variants) to /api/interpret-genome, saves the fresh report
+            to sessionStorage, and fires selfscience:genome-changed so every
+            open tool re-renders. Rate-limited to 1 regen / 60s via
+            sessionStorage-persisted cooldown timer with visible countdown.
+            Verified: sample genome → click Refresh analysis → button switches
+            to "Refreshing..." spinner → composition estimate refreshes with
+            updated variant count (14 up from 6, matches larger _variants map).
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

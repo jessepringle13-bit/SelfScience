@@ -25,6 +25,7 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
+import RegenTools from '@/components/RegenTools'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { estimateAncestry } from '@/lib/ancestryEstimator'
 import { formatPct, SUPERPOPULATIONS } from '@/lib/populationDetailFrequencies'
@@ -48,18 +49,21 @@ export default function AncestryClient() {
 
       <div className="container pt-8 pb-24">
         {/* Header */}
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
-            <Compass size={14} /> Ancestry Report
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
+              <Compass size={14} /> Ancestry Report
+            </div>
+            <h1 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
+              A rough sketch of where your variants come from.
+            </h1>
+            <p className="mt-2 max-w-2xl text-ss-muted">
+              This is an <span className="font-semibold">educational estimate</span>, not a real ancestry
+              service. We compare a small set of geographically stratified variants in your genome to five
+              reference superpopulations and show which one they most resemble.
+            </p>
           </div>
-          <h1 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
-            A rough sketch of where your variants come from.
-          </h1>
-          <p className="mt-2 max-w-2xl text-ss-muted">
-            This is an <span className="font-semibold">educational estimate</span>, not a real ancestry
-            service. We compare a small set of geographically stratified variants in your genome to five
-            reference superpopulations and show which one they most resemble.
-          </p>
+          {report && <RegenTools />}
         </div>
 
         {/* Persistent top disclaimer */}

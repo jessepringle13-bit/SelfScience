@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Search, Pill, ShieldAlert, Info, ArrowRight, Loader2, X } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
+import RegenTools from '@/components/RegenTools'
 import { getGenomeResults } from '@/lib/genomeSession'
 import {
   DRUG_CATALOG,
@@ -65,6 +66,7 @@ export default function DrugCheckClient() {
               — for conversations with your prescriber, not a replacement for clinical testing.
             </p>
           </div>
+          {report && <RegenTools />}
         </div>
 
         {/* Top disclaimer */}
