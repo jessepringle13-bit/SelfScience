@@ -826,6 +826,39 @@ frontend:
             Also added to Tools dropdown (desktop nav), mobile drawer, and
             Dashboard "Deep-Dive Tools" grid.
 
+  - task: "Ancestry — External services card + AIM marker expansion"
+    implemented: true
+    working: true
+    file: "/app/app/ancestry/ancestry-client.jsx, /app/lib/populationDetailFrequencies.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Two ancestry-page improvements:
+            1. "Want higher accuracy?" card below the composition estimate,
+               linking three free full-genome ancestry services (DNA.land,
+               GEDmatch, Impute.me) with brief blurbs and an explicit
+               "no affiliation / no referral fees" disclaimer. Users manually
+               re-upload their same 23andMe / AncestryDNA file to these
+               services — nothing is proxied server-side.
+            2. Three new ancestry-informative markers (AIMs) added to
+               populationDetailFrequencies.js so the composition estimator has
+               real discriminatory power:
+               - rs4833103 (DARC / ACKR1 Duffy null): AFR 0.99, EUR/EAS ~0.001
+               - rs2814778 (same locus — commonly reported alternative rsID)
+               - rs1426654 (SLC24A5 European skin lightening): EUR ~0.999,
+                 AFR ~0.07, EAS ~0.005, bimodal SAS ~0.55
+               These are ancestry-only markers (not clinically actionable) —
+               labelled as such in the file so nobody grafts them onto the
+               research pillars. rs4988235 (LCT) was already in the panel.
+            Verified with a synthesised genome carrying Duffy null CC + SLC24A5
+            heterozygous: variant count jumped from 14 → 17, informative
+            markers from 6 → 9, and both new rsIDs appear in the contributions
+            table.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

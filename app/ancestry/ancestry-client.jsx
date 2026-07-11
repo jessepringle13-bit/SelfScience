@@ -23,6 +23,7 @@ import {
   Globe2,
   Info,
   ShieldAlert,
+  ExternalLink,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
@@ -165,6 +166,9 @@ export default function AncestryClient() {
                 ))}
               </div>
             </div>
+
+            {/* External services — help users get a higher-fidelity estimate */}
+            <ExternalAncestryServices />
 
             {/* Contributions table */}
             <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-ss-border-warm/60">
@@ -332,6 +336,81 @@ function RankedPopCard({ rank, row }) {
       <div className="mt-3 text-2xl font-extrabold text-ss-text">
         {formatPct(row.share)}
       </div>
+    </div>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
+// External services — help users get a higher-fidelity estimate than a
+// 50-marker panel could ever give. These are all free, community-run
+// services; we don't take any referral fee and don't share user data with
+// them (users manually upload the same 23andMe / AncestryDNA file).
+
+const EXTERNAL_ANCESTRY_SERVICES = [
+  {
+    name: 'DNA.land',
+    url: 'https://dna.land',
+    tag: 'free',
+    blurb: '1000 Genomes reference; good African and admixed coverage.',
+  },
+  {
+    name: 'GEDmatch',
+    url: 'https://www.gedmatch.com',
+    tag: 'free tier',
+    blurb: 'Research-grade; connects to genetic genealogy databases.',
+  },
+  {
+    name: 'Impute.me',
+    url: 'https://www.impute.me',
+    tag: 'free · open-source',
+    blurb: 'Academic-grade; runs full PCA against reference panels.',
+  },
+]
+
+function ExternalAncestryServices() {
+  return (
+    <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-ss-border-warm/60">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
+          <Globe2 size={18} />
+        </span>
+        <div>
+          <h2 className="text-lg font-bold text-ss-text">Want higher accuracy?</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-ss-muted">
+            Our ancestry estimate uses a small panel of {'~'}50 markers. For full-genome ancestry
+            analysis, upload the same 23andMe / AncestryDNA file to one of these free services —
+            they use 600,000+ variants against curated reference panels:
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {EXTERNAL_ANCESTRY_SERVICES.map((svc) => (
+          <a
+            key={svc.name}
+            href={svc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col rounded-xl border border-ss-border-warm bg-white p-4 transition hover:-translate-y-0.5 hover:border-ss-teal hover:shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold text-ss-teal">{svc.name}</span>
+              <ExternalLink size={12} className="text-ss-muted transition group-hover:text-ss-teal" />
+            </div>
+            <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-ss-orange">
+              {svc.tag}
+            </span>
+            <p className="mt-2 text-xs leading-relaxed text-ss-muted">{svc.blurb}</p>
+          </a>
+        ))}
+      </div>
+
+      <p className="mt-4 text-[11px] leading-relaxed text-ss-muted">
+        These services are independent projects — SelfScience has no affiliation with them and
+        does not receive referral fees. You upload your genome file directly to their site; we
+        never send your data anywhere on your behalf.
+      </p>
     </div>
   )
 }
