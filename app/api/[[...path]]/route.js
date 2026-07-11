@@ -872,7 +872,12 @@ function buildMinimalGenomeReport(variants, catalog) {
   // not just a truncated preview. The FullReport / Roadmap tabs already show
   // the full grouped view, but the Overview tab is where users first look for
   // "what did SelfScience find in me?" — so we no longer slice this list.
-  const toCard = (a) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype })
+  const toCard = (a, cls) => ({ name: a.label, plain: a.one_line, pillar: a.pillar, rsid: a.rsid, gene: a.gene, genotype: a.genotype, classification: cls })
+  const strengthCards = strengthEnriched.map((a) => toCard(a, 'Strength'))
+  const awarenessCards = awarenessEnriched.map((a) => toCard(a, 'Awareness'))
+  const neutralCards = enriched
+    .filter((e) => !strengthEnriched.includes(e) && !awarenessEnriched.includes(e))
+    .map((a) => toCard(a, 'Neutral'))
   return {
     session_id: Math.random().toString(36).slice(2, 10),
     variants_recognized: recognized,
@@ -898,8 +903,8 @@ function buildMinimalGenomeReport(variants, catalog) {
     disclaimer: { user_facing: 'This report is for educational purposes only. Not a medical diagnosis.', display: 'always_visible' },
     // UI-compat aliases (same shape the AI-driven path produces):
     overview: {
-      strengths: strengthEnriched.map(toCard),
-      areasToExplore: [...awarenessEnriched, ...enriched.filter((e) => !strengthEnriched.includes(e) && !awarenessEnriched.includes(e))].map(toCard),
+      strengths: strengthCards,
+      areasToExplore: [...awarenessCards, ...neutralCards],
       systemView: 'Genetics is not destiny. This report provides research pointers based on your recognized variants.',
     },
     fullReport: pillars.map((p) => ({ pillar: p, variants: byPillar[p] })),
@@ -1042,7 +1047,9 @@ async function handleInterpretGenome(request) {
     // Bucket by catalog classification for Overview
     const strengthCards = aiCards.filter((c) => c.classification === 'Strength')
     const otherCards = aiCards.filter((c) => c.classification !== 'Strength')
-    const toOverview = (c) => ({ name: c.name, plain: c.plain, pillar: c.pillar, rsid: c.rsid, gene: c.gene, genotype: c.genotype })
+    // Include classification on each card so the frontend filter pills can
+    // distinguish "Be Aware" from "Typical" inside the Areas to Explore grid.
+    const toOverview = (c) => ({ name: c.name, plain: c.plain, pillar: c.pillar, rsid: c.rsid, gene: c.gene, genotype: c.genotype, classification: c.classification })
     // Group by pillar for FullReport
     const byPillar = new Map()
     for (const c of aiCards) {

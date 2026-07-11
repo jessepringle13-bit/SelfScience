@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { Coffee } from 'lucide-react'
 import {
@@ -39,6 +39,8 @@ export function SiteNav({ variant = 'light' }) {
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const pillarsRef = useRef(null)
+  const aboutRef = useRef(null)
 
   // Close dropdowns on Escape
   useEffect(() => {
@@ -51,6 +53,25 @@ export function SiteNav({ variant = 'light' }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  // Close dropdowns when clicking outside. This is the click-based UX pattern:
+  // the dropdown stays open (regardless of where you move your cursor) until
+  // you either pick a link, hit Escape, or click somewhere else on the page.
+  // Fixes the previous hover-based UX where the panel would disappear whenever
+  // the cursor briefly crossed the gap between the button and the menu.
+  useEffect(() => {
+    if (!pillarsOpen && !aboutOpen) return
+    const onDocClick = (e) => {
+      if (pillarsOpen && pillarsRef.current && !pillarsRef.current.contains(e.target)) {
+        setPillarsOpen(false)
+      }
+      if (aboutOpen && aboutRef.current && !aboutRef.current.contains(e.target)) {
+        setAboutOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [pillarsOpen, aboutOpen])
 
   const base = isDark
     ? 'border-white/15 bg-ss-teal/40 backdrop-blur-md text-white'
@@ -78,27 +99,31 @@ export function SiteNav({ variant = 'light' }) {
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
           <a href="/search" className={linkClass('/search')}>Search</a>
 
-          {/* Pillars dropdown */}
-          <div
-            className="relative"
-            onMouseEnter={() => setPillarsOpen(true)}
-            onMouseLeave={() => setPillarsOpen(false)}
-          >
+          {/* Pillars dropdown — click to open, click outside/Escape to close */}
+          <div className="relative" ref={pillarsRef}>
             <button
               type="button"
-              onClick={() => setPillarsOpen((v) => !v)}
+              onClick={() => {
+                setPillarsOpen((v) => !v)
+                setAboutOpen(false)
+              }}
               className={`inline-flex items-center gap-1 ${linkBase}`}
               aria-expanded={pillarsOpen}
+              aria-haspopup="menu"
             >
               Pillars <ChevronDown size={14} className={`transition ${pillarsOpen ? 'rotate-180' : ''}`} />
             </button>
             {pillarsOpen && (
-              <div className="absolute left-1/2 top-full z-50 mt-2 w-[640px] -translate-x-1/2 rounded-xl bg-white p-4 shadow-2xl ring-1 ring-black/10">
+              <div
+                role="menu"
+                className="absolute left-1/2 top-full z-50 mt-2 w-[640px] -translate-x-1/2 rounded-xl bg-white p-4 shadow-2xl ring-1 ring-black/10"
+              >
                 <div className="grid grid-cols-3 gap-1">
                   {PILLARS.map(({ key, name, Icon, description }) => (
                     <a
                       key={key}
                       href={`/search?pillar=${encodeURIComponent(name)}`}
+                      onClick={() => setPillarsOpen(false)}
                       className="group flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg"
                     >
                       <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ss-teal/10 text-ss-teal group-hover:bg-ss-teal group-hover:text-white">
@@ -117,26 +142,27 @@ export function SiteNav({ variant = 'light' }) {
 
           <a href="/reading-list" className={linkClass('/reading-list')}>Reading List</a>
 
-          {/* About dropdown: About / Mission / How It Works */}
-          <div
-            className="relative"
-            onMouseEnter={() => setAboutOpen(true)}
-            onMouseLeave={() => setAboutOpen(false)}
-          >
+          {/* About dropdown: About / Mission / How It Works — same click pattern */}
+          <div className="relative" ref={aboutRef}>
             <button
               type="button"
-              onClick={() => setAboutOpen((v) => !v)}
+              onClick={() => {
+                setAboutOpen((v) => !v)
+                setPillarsOpen(false)
+              }}
               className={`inline-flex items-center gap-1 ${aboutActive ? linkActive : linkBase}`}
               aria-expanded={aboutOpen}
+              aria-haspopup="menu"
             >
               About <ChevronDown size={14} className={`transition ${aboutOpen ? 'rotate-180' : ''}`} />
             </button>
             {aboutOpen && (
-              <div className="absolute left-1/2 top-full z-50 mt-2 w-[300px] -translate-x-1/2 rounded-xl bg-white p-2 shadow-2xl ring-1 ring-black/10">
+              <div role="menu" className="absolute left-1/2 top-full z-50 mt-2 w-[300px] -translate-x-1/2 rounded-xl bg-white p-2 shadow-2xl ring-1 ring-black/10">
                 {ABOUT_ITEMS.map((it) => (
                   <a
                     key={it.href}
                     href={it.href}
+                    onClick={() => setAboutOpen(false)}
                     className={`block rounded-lg p-3 transition hover:bg-ss-bg ${
                       pathname === it.href ? 'bg-ss-bg' : ''
                     }`}

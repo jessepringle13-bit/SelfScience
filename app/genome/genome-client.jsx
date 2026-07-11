@@ -14,6 +14,7 @@ import {
   ChevronUp,
   ArrowRight,
   RotateCcw,
+  RefreshCw,
   Loader2,
   BookOpen,
   Download,
@@ -189,12 +190,40 @@ export default function GenomeClient() {
     setActiveTab('overview')
   }
 
-  const goSearch = (q, pillar) => {
+  // Open a search in a NEW TAB so the user's genome results stay put and they
+  // can keep bouncing between multiple lookups. We also intentionally drop the
+  // pillar filter: users have said they want to see EVERY paper related to a
+  // gene (e.g. all "MTHFR" studies), not just papers within the pillar the
+  // variant happened to be categorised under.
+  const goSearch = (q /* pillar param intentionally ignored */) => {
     const usp = new URLSearchParams()
     usp.set('q', q)
-    if (pillar) usp.set('pillar', pillar)
-    router.push(`/search?${usp.toString()}`)
+    if (typeof window !== 'undefined') {
+      window.open(`/search?${usp.toString()}`, '_blank', 'noopener,noreferrer')
+    } else {
+      router.push(`/search?${usp.toString()}`)
+    }
   }
+
+  // Regenerate the AI analysis with the currently loaded variants without
+  // requiring the user to re-upload their file. Rate-limited client-side to
+  // one regen per 60 seconds to avoid burning AI credits on rapid double-taps.
+  const [regenLockedUntil, setRegenLockedUntil] = useState(0)
+  const [regenTick, setRegenTick] = useState(0) // forces re-render for countdown label
+  useEffect(() => {
+    if (regenLockedUntil <= Date.now()) return
+    const iv = setInterval(() => setRegenTick((t) => t + 1), 1000)
+    return () => clearInterval(iv)
+  }, [regenLockedUntil])
+  const regenSecondsLeft = Math.max(0, Math.ceil((regenLockedUntil - Date.now()) / 1000))
+
+  const handleRegenerate = useCallback(async () => {
+    if (!variants || Object.keys(variants).length === 0) return
+    if (Date.now() < regenLockedUntil) return
+    setRegenLockedUntil(Date.now() + 60_000)
+    trackEvent(EVENTS.GENOME_RESULTS_VIEWED, { triggered_by: 'regenerate' })
+    await runAnalysis({ variants, stats: stats || { recognized: Object.keys(variants).length, format: 'Regenerated' } })
+  }, [variants, stats, regenLockedUntil, runAnalysis])
 
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
@@ -321,12 +350,23 @@ export default function GenomeClient() {
                 {stats?.recognized} recognized variants · {stats?.format}
               </p>
             </div>
-            <button
-              onClick={reset}
-              className="inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm bg-white px-4 py-2 text-xs font-semibold text-ss-muted transition hover:border-ss-teal hover:text-ss-teal"
-            >
-              <RotateCcw size={13} /> Analyze another file
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleRegenerate}
+                disabled={regenSecondsLeft > 0}
+                title={regenSecondsLeft > 0 ? `Wait ${regenSecondsLeft}s before regenerating again` : 'Ask the AI to re-analyse your variants for a fresh interpretation'}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm bg-white px-4 py-2 text-xs font-semibold text-ss-teal transition hover:border-ss-teal disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw size={13} />
+                {regenSecondsLeft > 0 ? `Regenerate (${regenSecondsLeft}s)` : 'Regenerate analysis'}
+              </button>
+              <button
+                onClick={reset}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm bg-white px-4 py-2 text-xs font-semibold text-ss-muted transition hover:border-ss-teal hover:text-ss-teal"
+              >
+                <RotateCcw size={13} /> Analyze another file
+              </button>
+            </div>
           </div>
 
           {/* --- Save Your Report --- */}
@@ -451,7 +491,8 @@ function DropZone({ onFile, inputRef }) {
 /* ------------------------------ Tabs ------------------------------------- */
 
 function OverviewCard({ item, tone, onSearch }) {
-  const border = tone === 'strength' ? '#2E7D32' : '#964219'
+  const border = tone === 'strength' ? '#2E7D32' : tone === 'aware' ? '#964219' : '#7A7974'
+  const ctaLabel = tone === 'strength' ? 'Explore research' : tone === 'aware' ? 'Find research' : 'Explore research'
   return (
     <div
       className="flex flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-black/5"
@@ -467,47 +508,164 @@ function OverviewCard({ item, tone, onSearch }) {
         <code className="rounded bg-ss-bg px-1.5 py-0.5">{item.rsid}</code>
         <span>·</span>
         <span className="font-semibold">{item.genotype}</span>
+        {item.classification && (
+          <>
+            <span>·</span>
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{
+                backgroundColor: (CLASSIFICATION_STYLE[item.classification] || CLASSIFICATION_STYLE.Neutral).bg,
+                color:           (CLASSIFICATION_STYLE[item.classification] || CLASSIFICATION_STYLE.Neutral).color,
+              }}
+            >
+              {(CLASSIFICATION_STYLE[item.classification] || CLASSIFICATION_STYLE.Neutral).label}
+            </span>
+          </>
+        )}
       </div>
       <button
-        onClick={() => onSearch(`${item.gene} ${item.name}`, item.pillar)}
+        onClick={() => onSearch(item.gene || item.name)}
         className="mt-4 inline-flex w-fit items-center gap-1 text-xs font-semibold text-ss-teal hover:underline"
       >
-        {tone === 'strength' ? 'Explore research' : 'Find research'} <ArrowRight size={12} />
+        {ctaLabel} <ArrowRight size={12} />
       </button>
     </div>
   )
+}
+
+/**
+ * Filter pills used across Overview / Full Report tabs to let the user narrow
+ * down variant cards by classification. Client-side, instant. Values:
+ *   'all'       — show every card
+ *   'strength'  — Positive only
+ *   'awareness' — Be Aware only
+ *   'neutral'   — Typical only
+ * The special values 'pos-to-neg' / 'neg-to-pos' are supported by the caller
+ * to switch the SORT order rather than filter — see FilteredCards.
+ */
+function ClassificationFilter({ value, onChange, counts }) {
+  const items = [
+    { key: 'all',        label: `All (${counts.all})` },
+    { key: 'strength',   label: `Positive (${counts.strength})`,   color: '#2E7D32' },
+    { key: 'awareness',  label: `Be Aware (${counts.awareness})`,  color: '#964219' },
+    { key: 'neutral',    label: `Typical (${counts.neutral})`,     color: '#7A7974' },
+    { key: 'pos-to-neg', label: '↓ Positive → Be Aware' },
+    { key: 'neg-to-pos', label: '↑ Be Aware → Positive' },
+  ]
+  return (
+    <div className="ss-no-print mt-3 flex flex-wrap gap-2">
+      {items.map((it) => {
+        const active = value === it.key
+        return (
+          <button
+            key={it.key}
+            type="button"
+            onClick={() => onChange(it.key)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+              active
+                ? 'border-ss-teal bg-ss-teal text-white'
+                : 'border-ss-border-warm bg-white text-ss-muted hover:border-ss-teal hover:text-ss-teal'
+            }`}
+          >
+            {it.color && (
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: active ? '#fff' : it.color }}
+              />
+            )}
+            {it.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Given a filter key and an array of cards, return the (possibly filtered
+ * and/or reordered) cards. Sorting uses Strength → Awareness → Neutral as
+ * the canonical Positive → Negative ordering (there is no true "Negative"
+ * classification — the app's most-conservative bucket is "Be Aware").
+ */
+function applyClassificationFilter(cards, filterKey) {
+  const rank = (c) => (c.classification === 'Strength' ? 0 : c.classification === 'Awareness' ? 1 : 2)
+  if (filterKey === 'strength')  return cards.filter((c) => c.classification === 'Strength')
+  if (filterKey === 'awareness') return cards.filter((c) => c.classification === 'Awareness')
+  if (filterKey === 'neutral')   return cards.filter((c) => c.classification === 'Neutral' || !c.classification)
+  if (filterKey === 'pos-to-neg') return [...cards].sort((a, b) => rank(a) - rank(b))
+  if (filterKey === 'neg-to-pos') return [...cards].sort((a, b) => rank(b) - rank(a))
+  return cards
 }
 
 function OverviewTab({ report, onSearch }) {
   const s = report?.overview?.strengths || []
   const a = report?.overview?.areasToExplore || []
   const sys = report?.overview?.systemView
+  const [filter, setFilter] = useState('all')
+  // Combined pool for filter/sort operations. When filter is 'all' we render
+  // the two original sections (Strengths + Areas) intact. Otherwise we render
+  // a single unified grid so the filter feels honest — "Positive" shouldn't
+  // still have an empty "Areas to Explore" header underneath it.
+  const allCards = [...s, ...a]
+  const counts = {
+    all:       allCards.length,
+    strength:  allCards.filter((c) => c.classification === 'Strength').length,
+    awareness: allCards.filter((c) => c.classification === 'Awareness').length,
+    neutral:   allCards.filter((c) => !c.classification || c.classification === 'Neutral').length,
+  }
+  const filtered = applyClassificationFilter(allCards, filter)
+  const showUnified = filter !== 'all'
+
   return (
     <div className="space-y-10">
-      <div>
-        <SectionHeader
-          icon={<ShieldCheck size={16} className="text-ss-green" />}
-          title={`Your Genetic Strengths${s.length ? ` (${s.length})` : ''}`}
-          hint="Variants generally associated with favorable traits in the literature."
-        />
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-          {s.map((it, i) => (
-            <OverviewCard key={i} item={it} tone="strength" onSearch={onSearch} />
-          ))}
+      <ClassificationFilter value={filter} onChange={setFilter} counts={counts} />
+
+      {showUnified ? (
+        <div>
+          <SectionHeader
+            icon={<Sparkles size={16} className="text-ss-teal" />}
+            title={`Filtered variants (${filtered.length})`}
+            hint="Click any card to search the research for that gene — opens in a new tab so you don't lose your report."
+          />
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {filtered.map((it, i) => (
+              <OverviewCard
+                key={`${it.rsid}-${i}`}
+                item={it}
+                tone={it.classification === 'Strength' ? 'strength' : it.classification === 'Awareness' ? 'aware' : 'neutral'}
+                onSearch={onSearch}
+              />
+            ))}
+          </div>
         </div>
-      </div>
-      <div>
-        <SectionHeader
-          icon={<Sparkles size={16} className="text-ss-amber" />}
-          title={`Areas to Explore${a.length ? ` (${a.length})` : ''}`}
-          hint="Every recognized variant worth understanding better — not a diagnosis or warning."
-        />
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-          {a.map((it, i) => (
-            <OverviewCard key={i} item={it} tone="aware" onSearch={onSearch} />
-          ))}
-        </div>
-      </div>
+      ) : (
+        <>
+          <div>
+            <SectionHeader
+              icon={<ShieldCheck size={16} className="text-ss-green" />}
+              title={`Your Genetic Strengths${s.length ? ` (${s.length})` : ''}`}
+              hint="Variants generally associated with favorable traits in the literature."
+            />
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              {s.map((it, i) => (
+                <OverviewCard key={i} item={it} tone="strength" onSearch={onSearch} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <SectionHeader
+              icon={<Sparkles size={16} className="text-ss-amber" />}
+              title={`Areas to Explore${a.length ? ` (${a.length})` : ''}`}
+              hint="Every recognized variant worth understanding better — not a diagnosis or warning."
+            />
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              {a.map((it, i) => (
+                <OverviewCard key={i} item={it} tone="aware" onSearch={onSearch} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
       {sys && (
         <div className="rounded-xl bg-ss-teal/5 p-6 text-center italic text-ss-teal">
           “{sys}”
@@ -584,15 +742,37 @@ function _FinishSpacer() {
 function FullReportTab({ report, onSearch }) {
   const groups = report?.fullReport || []
   const [open, setOpen] = useState(() => new Set(groups.map((g, i) => (i === 0 ? g.pillar : null)).filter(Boolean)))
+  const [filter, setFilter] = useState('all')
   const toggle = (pillar) => {
     const n = new Set(open)
     n.has(pillar) ? n.delete(pillar) : n.add(pillar)
     setOpen(n)
   }
+
+  // Flatten variants across pillars for filter counts, then re-nest for display.
+  const allVariants = groups.flatMap((g) => g.variants || [])
+  const counts = {
+    all:       allVariants.length,
+    strength:  allVariants.filter((v) => v.classification === 'Strength').length,
+    awareness: allVariants.filter((v) => v.classification === 'Awareness').length,
+    neutral:   allVariants.filter((v) => !v.classification || v.classification === 'Neutral').length,
+  }
+  const displayedGroups = groups
+    .map((g) => ({
+      ...g,
+      variants: applyClassificationFilter(g.variants || [], filter),
+    }))
+    // Hide pillar groups that end up empty after filtering.
+    .filter((g) => (g.variants || []).length > 0)
+  // When a filter/sort is active, keep every group expanded so the user
+  // can see all matching variants at a glance.
+  const effectiveOpen = filter === 'all' ? open : new Set(displayedGroups.map((g) => g.pillar))
+
   return (
     <div className="space-y-4">
-      {groups.map((g) => {
-        const isOpen = open.has(g.pillar)
+      <ClassificationFilter value={filter} onChange={setFilter} counts={counts} />
+      {displayedGroups.map((g) => {
+        const isOpen = effectiveOpen.has(g.pillar)
         return (
           <div key={g.pillar} className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
             <button
@@ -646,7 +826,7 @@ function VariantCard({ variant, pillar, onSearch }) {
           {variant.searches.map((q) => (
             <button
               key={q}
-              onClick={() => onSearch(q, pillar)}
+              onClick={() => onSearch(q)}
               className="inline-flex items-center gap-1 rounded-full border border-ss-teal/30 bg-ss-privacy-tint px-3 py-1 text-[12px] font-medium text-ss-teal transition hover:border-ss-teal hover:bg-ss-teal hover:text-white"
             >
               {q} <ArrowRight size={11} />
@@ -684,7 +864,7 @@ function RoadmapTab({ report, onSearch }) {
                 {r.searches?.map((q) => (
                   <button
                     key={q}
-                    onClick={() => onSearch(q, r.pillar)}
+                    onClick={() => onSearch(q)}
                     className="inline-flex items-center gap-1 rounded-full border border-ss-teal/30 bg-white px-3 py-1 text-[12px] font-medium text-ss-teal transition hover:border-ss-teal hover:bg-ss-teal hover:text-white"
                   >
                     {q} <ArrowRight size={11} />

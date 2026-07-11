@@ -1293,3 +1293,42 @@ agent_communication:
         - rs4988235 TT still classified STRENGTH ✅
         - No breaking changes to existing endpoints
 
+
+    -agent: "main"
+      message: |
+        FEATURE PASS: 5 UX improvements from user feedback (production report).
+        
+        1) Genome variant → search: strips pillar filter. `goSearch(q)` now only
+           passes the search query (was appending &pillar=... which limited results
+           to a single pillar bucket). User can now find every "MTHFR" study.
+        2) Studies open in new tab: goSearch uses window.open(url,'_blank',
+           'noopener,noreferrer') instead of router.push, so the genome report
+           persists in the origin tab while the user reads studies.
+        3) Classification filter: new ClassificationFilter component with pills
+           for All / Positive / Be Aware / Typical + two sort modes (Positive→Be
+           Aware and Be Aware→Positive). Rendered above OverviewTab and
+           FullReportTab. Cards now carry `classification` from the backend so
+           the filter is instant client-side.
+        4) Regenerate button: new "🔄 Regenerate analysis" button next to
+           "Analyze another file". Re-POSTs to /api/interpret-genome with the
+           cached variants — no re-upload. Rate-limited client-side to 1 call
+           per 60s to prevent AI-credit burn; button shows "Regenerate (Ns)"
+           countdown while cooling down.
+        5) Pillar (and About) dropdowns: replaced hover-open with click-open +
+           outside-click-to-close. The old onMouseEnter/Leave was firing on the
+           8px visual gap between button and panel, closing the menu whenever
+           the user tried to move to a pillar. Now stays open until you pick
+           a pillar, hit Escape, or click elsewhere.
+        
+        Files changed:
+        - /app/app/genome/genome-client.jsx  (all four genome UX items)
+        - /app/app/api/[[...path]]/route.js  (attach `classification` to overview cards)
+        - /app/components/site-nav.jsx        (click-based dropdowns + outside-click)
+        
+        Verified via curl:
+        - POST /api/interpret-genome with rs1801133 CT, rs4988235 TT, rs671 AA,
+          rs4680 GG returned cards with classifications: LCT→Strength,
+          MTHFR→Awareness, ALDH2→Awareness, COMT→Neutral. Every card carries
+          `classification` field.
+        - No regressions to genome fallback path, /admin, or search endpoint.
+
