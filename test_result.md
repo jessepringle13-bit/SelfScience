@@ -1659,3 +1659,79 @@ agent_communication:
 
         No backend testing agent call needed — deterministic Step 1 verified
         end-to-end via API-level test script.
+
+
+    -agent: "main"
+      message: |
+        SHARE CARD FEATURE (Tier 1 #1) — Complete and verified end-to-end.
+
+        Files added:
+          • /app/lib/shareCard.js — buildShareText(), exportCardAsPng(),
+            shareCardOrCopy(), downloadBlob(), buildGenomeResultsForShare().
+            Fully client-side; no API keys, no network calls.
+          • /app/components/ShareCard.jsx — 1080x1350 portrait card,
+            SelfScience wordmark + DNA icon, Top Be Aware findings, Top
+            Strengths findings, 9-segment pillar overview bar with legend,
+            selfscience.io watermark. Uses only ss-* brand tokens.
+          • /app/components/ShareCardModal.jsx — Modal with live scaled
+            preview (CSS transform) + hidden full-size copy for html2canvas
+            export at 2x density. Focus trap, Escape/backdrop close,
+            aria-modal, download + share + copy-text + toast.
+          • /app/app/genome/genome-client.jsx — Orange "Share your results"
+            button added to results header, ShareCardModal mounted.
+
+        Dependencies: html2canvas@1.4.1 (added to package.json via yarn).
+
+        Verified via Playwright automation:
+          • Sample data load → results page shows "Share your results" button
+          • Clicking opens modal with correctly scaled preview
+          • Download PNG produces a 258KB, 1080x1350 crisp PNG matching
+            the on-screen preview (verified visually — every section renders
+            correctly: header, findings rows, pillar bar with color-coded
+            segments, watermark).
+          • Share text follows the exact bracketed-findings pattern:
+            "My top genomic findings on SelfScience: [MTHFR Folate Metabolism]
+             [LCT Lactase Persistence] — explore yours at selfscience.io"
+          • Toast confirmation appears on download / copy.
+          • Gene names from haplotypes (MTHFR) resolve correctly instead of
+            showing raw rsID lists.
+
+        No new environment variables, no API key exposure, all rendering
+        client-side.
+
+
+    -agent: "main"
+      message: |
+        EVIDENCE BADGES + POPULATION FREQUENCY (Tier 1 #2) — Complete.
+
+        Files added:
+          • /app/lib/evidenceStrength.js — 79 rsID entries classified into
+            'established' (10+ studies), 'emerging' (2-9), or 'preliminary'
+            (1-2). Includes EVIDENCE_TIER_META with exact tooltip copy.
+            Every rsID commonly referenced by the app has coverage:
+            MTHFR/MTR/MTRR/FUT2, COMT/SLC6A4, LCT, CYP1A2, ALDH2, ADH1B,
+            FTO/MC4R, PPARG/TCF7L2, BCMO1/GC/VDR, FADS1/FADS2, HFE,
+            APOE/PCSK9/APOB/CETP/APOA5/LPL/TNF/IL6, MTNR1B/PER3/CLOCK,
+            ACTN3/PPARA/PPARGC1A/COL5A1, NAT2/GSTP1/GPX1,
+            CYP2C19/CYP2D6/CYP2C9/VKORC1, IL23R/NLRP3, FOXO3/TP53.
+          • /app/lib/populationFrequencies.js — Matching 78 rsID entries with
+            gnomAD-style global allele frequencies as decimals.
+            formatFrequency() converts to "48" (>=10%) or "3.0" (<10%).
+            Missing rsIDs return null → chip is gracefully hidden. Every
+            value backed by literature; ~40 flagged with `// estimate`
+            comment where confident gnomAD numbers weren't available.
+          • /app/components/EvidenceBadge.jsx — Small pill with tier-specific
+            colors (ss-green for Established, amber-100/900 for Emerging,
+            ss-muted for Preliminary), accessible tooltip triggered by
+            hover + keyboard focus, exact tooltip copy per spec.
+          • /app/app/genome/genome-client.jsx — VariantMetaChips helper
+            component wired into BOTH OverviewCard and VariantCard (Full
+            Report). Renders below existing gene/rsid/genotype row.
+
+        Verified via Playwright: ESTABLISHED chip + "X% of people have this
+        variant" chip appear on LCT/CYP1A2/ALDH2/FOXO3/APOE/MTHFR cards.
+        Hover triggers a dark tooltip with the exact spec copy. Cards
+        without lookup data (e.g. SLC01B1 rs4149056) render nothing —
+        no broken chips, no "undefined%".
+
+        No new environment variables, no API calls, fully static data.

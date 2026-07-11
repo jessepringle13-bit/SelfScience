@@ -20,6 +20,7 @@ import {
   Download,
   Printer,
   FileText,
+  Share2,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { parseGenomeFile } from '@/lib/genome-parser'
@@ -27,6 +28,11 @@ import { VARIANT_CATALOG, SAMPLE_VARIANTS } from '@/lib/variant-catalog'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { getBooksForVariants, PILLAR_LABELS } from '@/lib/books'
 import { buildGenomeMarkdown, downloadTextFile, buildVariantsCsv, reportFilename } from '@/lib/genome-report'
+import ShareCardModal from '@/components/ShareCardModal'
+import { buildGenomeResultsForShare } from '@/lib/shareCard'
+import EvidenceBadge from '@/components/EvidenceBadge'
+import { getEvidenceStrength } from '@/lib/evidenceStrength'
+import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -54,6 +60,7 @@ export default function GenomeClient() {
   const [stats, setStats] = useState(null)       // { recognized, format }
   const [report, setReport] = useState(null)     // Gemini JSON
   const [activeTab, setActiveTab] = useState('overview')
+  const [shareOpen, setShareOpen] = useState(false)
 
   // Fire GA event exactly once when the results view first renders.
   const resultsTrackedRef = useRef(false)
@@ -352,6 +359,16 @@ export default function GenomeClient() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
+                onClick={() => {
+                  setShareOpen(true)
+                  try { trackEvent?.(EVENTS?.SHARE_CARD_OPEN || 'share_card_open') } catch { /* noop */ }
+                }}
+                title="Create a shareable visual summary of your top findings"
+                className="inline-flex items-center gap-1.5 rounded-full bg-ss-orange px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark"
+              >
+                <Share2 size={13} /> Share your results
+              </button>
+              <button
                 onClick={handleRegenerate}
                 disabled={regenSecondsLeft > 0}
                 title={regenSecondsLeft > 0 ? `Wait ${regenSecondsLeft}s before regenerating again` : 'Ask the AI to re-analyse your variants for a fresh interpretation'}
@@ -414,6 +431,13 @@ export default function GenomeClient() {
           </div>
         </section>
       )}
+
+      {/* Share Card modal — client-side visual summary of top findings. */}
+      <ShareCardModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        genomeResults={buildGenomeResultsForShare(report)}
+      />
 
       {/* Sticky footer disclaimer */}
       <div className="sticky bottom-0 z-20 border-t border-ss-border-warm bg-white/95 backdrop-blur">
@@ -523,12 +547,39 @@ function OverviewCard({ item, tone, onSearch }) {
           </>
         )}
       </div>
+      {/* Evidence strength + population frequency chips — gracefully hidden
+          when either lookup is missing for this rsID. */}
+      <VariantMetaChips rsid={item.rsid} />
       <button
         onClick={() => onSearch(item.gene || item.name)}
         className="mt-4 inline-flex w-fit items-center gap-1 text-xs font-semibold text-ss-teal hover:underline"
       >
         {ctaLabel} <ArrowRight size={12} />
       </button>
+    </div>
+  )
+}
+
+/**
+ * Renders the "Established / Emerging / Preliminary" evidence badge next to
+ * a "X% of people have this variant" frequency chip. Both fields degrade
+ * gracefully: missing data => component renders nothing (no placeholder,
+ * no "undefined%"). Positioned directly below the existing gene/rsid chip
+ * row on every card. See /lib/evidenceStrength.js + /lib/populationFrequencies.js
+ * for the data sources.
+ */
+function VariantMetaChips({ rsid }) {
+  const evidence = getEvidenceStrength(rsid)
+  const frequency = getPopulationFrequency(rsid)
+  if (!evidence && frequency == null) return null
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      {evidence && <EvidenceBadge tier={evidence.tier} />}
+      {frequency != null && (
+        <span className="inline-flex items-center rounded-full border border-ss-border-warm px-2 py-0.5 text-[10px] text-ss-muted">
+          {formatFrequency(frequency)}% of people have this variant
+        </span>
+      )}
     </div>
   )
 }
@@ -817,6 +868,8 @@ function VariantCard({ variant, pillar, onSearch }) {
           {cls.label}
         </span>
       </div>
+      {/* Evidence strength + population frequency chips. */}
+      <VariantMetaChips rsid={variant.rsid} />
       <p className="mt-3 text-sm text-ss-text">{variant.explanation}</p>
       {variant.landmarkStudy ? (
         <p className="mt-2 text-xs italic text-ss-muted">Landmark study: {variant.landmarkStudy}</p>
