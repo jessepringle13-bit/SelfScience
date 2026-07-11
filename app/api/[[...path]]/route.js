@@ -2,16 +2,16 @@ import { NextResponse } from 'next/server'
 import {
   scoreReliability as callReliability,
   translatePlainLanguage as callPlainLanguage,
-  interpretGenome as callGenome,
   extractJson,
 } from '@/lib/ai'
 import {
   buildReliabilityPrompt,
   buildPlainLanguagePrompt,
-  buildGenomePrompt,
 } from '@/lib/prompts'
 import { VARIANT_CATALOG, APPROVED_RSIDS, classifyVariant, describeVariant } from '@/lib/variant-catalog'
 import { classifyGenome, CLASSIFICATION_TO_LEGACY } from '@/lib/genomeClassifier'
+import { generateGenomeReportServer, adaptReportToLegacyShape } from '@/lib/genomeAIGenerator'
+import { callGenomeGenerateProvider } from '@/lib/genomeGenerateProvider'
 import { getPillarQuery } from '@/lib/pillars'
 import { searchCache, makeCacheKey } from '@/lib/cache'
 import { getUsageSnapshot, fetchOpenRouterCredit } from '@/lib/ai-usage'
@@ -1003,162 +1003,48 @@ async function handleInterpretGenome(request) {
   for (const v of step1.variants) step1ByRsid.set(v.rsid, v)
 
   try {
-    // Empirical: with >50 recognized variants the AI cascade consistently
-    // fails schema validation (models return garbage JSON when the prompt
-    // list is that long) OR times out on Emergent's 60s ingress. In that
-    // regime the variant-only fallback is BOTH faster AND more reliable —
-    // it uses the curated variant-catalog to generate a solid pillar
-    // breakdown, book matches, and search-starting-points from your
-    // recognized variants directly. So we skip the AI cascade entirely
-    // for large uploads.
-    //
-    // Small uploads (sample data, targeted panels) still get the AI-driven
-    // interpretation because with <=50 variants the model can handle the
-    // prompt reliably in ~15-20s.
-    const numVariants = Object.keys(variants).length
-    const SKIP_AI_THRESHOLD = 30
-    const skipAi = numVariants > SKIP_AI_THRESHOLD
-
-    let attempt = null
-    let parsed = null
-    if (!skipAi) {
-      const prompt = buildGenomePrompt(variants, VARIANT_CATALOG)
-      try {
-        attempt = await callGenome(prompt)
-        parsed = extractJson(attempt.text)
-      } catch (aiErr) {
-        console.warn(`[interpret-genome] AI cascade failed: ${aiErr?.status || 'net'} ${aiErr?.message?.slice(0, 160)}. Serving variant-only fallback.`)
-      }
-    } else {
-      console.info(`[interpret-genome] ${numVariants} variants > threshold ${SKIP_AI_THRESHOLD} — serving variant-only fallback directly.`)
-    }
-
-    if (!parsed) {
-      // Graceful fallback: build a MINIMAL valid response from the variants
-      // alone. The UI can still render pillar-level guidance, book matches,
-      // and a research roadmap; the user avoids a hard error. We return 200
-      // with `_aiFallback: true` so downstream can show a subtle notice
-      // ("AI analysis was unavailable — showing your variant-based roadmap").
-      const minimal = buildMinimalGenomeReport(variants, VARIANT_CATALOG)
-      const withStep1 = applyStep1Overrides({
-        ...minimal,
-        aiProvider: attempt?.provider || 'fallback',
-        aiModel: attempt?.model || 'variant-catalog',
-        _aiFallback: true,
-      }, step1ByRsid, step1)
-      return NextResponse.json(withStep1, { status: 200 })
-    }
-    const { text, provider, model } = attempt
-    // Map new Session-5 schema to the shape the frontend genome-client expects.
-    //
-    // NOTE 1: The AI schema forces top_strengths/top_awareness_areas to exactly
-    // 3 items each (see prompts.js), but users want to see EVERY recognized
-    // variant in the Overview. So we aggregate ALL variants from pillar_reports
-    // into overview.areasToExplore / overview.strengths.
-    //
-    // NOTE 2: LLMs frequently silently drop recognized variants from their
-    // pillar_reports output (returning 2-5 variants when we sent 15-25). To
-    // guarantee the user sees every recognized variant, we enrich the AI's
-    // rich narratives with catalog-based fallback entries for anything the
-    // AI dropped. AI-covered variants keep their rich `user_explanation` and
-    // `landmark_study`; dropped variants get a solid catalog-driven card.
-    //
-    // NOTE 3: The classification (Positive / Be Aware / Typical) is decided
-    // by classifyVariant() using the user's genotype, NOT by the AI's
-    // strengths/awareness bucketing. The AI is inconsistent about this; our
-    // catalog rules are authoritative.
-    const overall = parsed.overall_summary || {}
-    const pillarReports = parsed.pillar_reports || []
-    const covered = new Set()
-    // Collect every variant the AI wrote about, preserving its rich narrative
-    // but re-classifying via catalog rules. When we have curated per-variant
-    // copy in VARIANT_CATALOG we PREFER that over the AI's `user_explanation`
-    // — LLMs frequently invert the risk direction on well-studied variants
-    // (e.g. calling APOE-no-E4 "higher risk" or ABCG2 reduced-transport
-    // "improved transport"). Curated copy is fact-checked; AI copy is a
-    // fallback for the ~630 uncurated rsIDs in VARIANT_LIST.
-    const aiCards = []
-    for (const p of pillarReports) {
-      for (const v of [...(p.strengths || []), ...(p.awareness_areas || [])]) {
-        if (v.rsid) covered.add(v.rsid)
-        const gt = v.genotype || variants[v.rsid]
-        const cls = classifyVariant(v.rsid, gt)
-        const hasCurated = !!VARIANT_CATALOG[v.rsid]?.plain
-        const aiText = v.user_explanation || v.research_direction || v.one_line || ''
-        const plainText = hasCurated ? describeVariant(v.rsid, cls, gt) : (aiText || describeVariant(v.rsid, cls, gt))
-        aiCards.push({
-          rsid: v.rsid || '', gene: v.gene || '', genotype: gt || '',
-          pillar: p.pillar || v.pillar || '',
-          name: `${v.gene || ''} ${v.strength_name || v.awareness_name || v.variant_name || ''}`.trim() || v.gene || v.rsid || '',
-          plain: plainText,
-          classification: cls,
-          landmark_study: v.landmark_study || null,
-          search_queries: v.search_queries || [],
-        })
-      }
-    }
-    // Add catalog-based cards for any recognized variant the AI dropped.
-    for (const [rsid, gt] of Object.entries(variants)) {
-      if (covered.has(rsid)) continue
-      const meta = VARIANT_CATALOG[rsid]
-      if (!meta) continue
-      const cls = classifyVariant(rsid, gt)
-      // Variant-specific plain text — curated where available, gene-aware
-      // generic fallback otherwise. Never the identical filler across every
-      // card.
-      const plain = describeVariant(rsid, cls, gt)
-      aiCards.push({
-        rsid, gene: meta.gene, genotype: gt,
-        pillar: meta.pillar || 'General',
-        name: `${meta.gene} ${meta.description}`,
-        plain,
-        classification: cls,
-        landmark_study: null,
-        search_queries: [`${meta.gene} ${meta.description.split('—')[0].trim()}`, `${meta.gene} health research`],
-      })
-    }
-    // Bucket by catalog classification for Overview
-    const strengthCards = aiCards.filter((c) => c.classification === 'Strength')
-    const otherCards = aiCards.filter((c) => c.classification !== 'Strength')
-    // Include classification on each card so the frontend filter pills can
-    // distinguish "Be Aware" from "Typical" inside the Areas to Explore grid.
-    const toOverview = (c) => ({ name: c.name, plain: c.plain, pillar: c.pillar, rsid: c.rsid, gene: c.gene, genotype: c.genotype, classification: c.classification })
-    // Group by pillar for FullReport
-    const byPillar = new Map()
-    for (const c of aiCards) {
-      const key = c.pillar || 'General'
-      if (!byPillar.has(key)) byPillar.set(key, [])
-      byPillar.get(key).push({
-        gene: c.gene, rsid: c.rsid, genotype: c.genotype,
-        classification: c.classification,
-        explanation: c.plain,
-        landmarkStudy: c.landmark_study?.title
-          ? `${c.landmark_study.title} — ${c.landmark_study.authors || ''} (${c.landmark_study.year || ''})`
-          : '',
-        searches: c.search_queries || [],
-      })
-    }
-    const normalized = {
-      // New Session-5 schema (raw)
-      ...parsed,
-      // Compat aliases for existing UI:
-      overview: {
-        strengths: strengthCards.map(toOverview),
-        areasToExplore: otherCards.map(toOverview),
-        systemView: overall.system_view || '',
-      },
-      fullReport: Array.from(byPillar.entries()).map(([pillar, vs]) => ({ pillar, variants: vs })),
-      researchRoadmap: (parsed.research_roadmap?.pillars || []).map((r) => ({
-        priority: r.priority, pillar: r.pillar, why: r.reason, searches: r.top_searches || [],
-      })),
-    }
-    return NextResponse.json(applyStep1Overrides({ ...normalized, aiProvider: provider, aiModel: model }, step1ByRsid, step1))
+    // ============================================================
+    // Step 2 — AI plain-language card generation.
+    // The Step 2 pipeline (see /lib/genomeAIGenerator.js) is a strict
+    // single-pass architecture:
+    //   1. Build a batched prompt from the Step 1 ClassifiedGenome.
+    //   2. Call the Together AI → OpenRouter cascade.
+    //   3. Merge AI text into cards. Step 1 CLASSIFICATIONS are preserved
+    //      no matter what the AI returns. If the AI dropped a variant or
+    //      returned garbage, the card body falls back to Step 1's
+    //      classification_text — the badge is still correct.
+    //   4. Adapt to the legacy UI response shape so the existing
+    //      genome-client.jsx tabs render without any UI changes.
+    // ============================================================
+    const step2 = await generateGenomeReportServer(step1, callGenomeGenerateProvider)
+    const legacy = adaptReportToLegacyShape(step2, step1)
+    // Preserve the older `_step1: true` marker + AI provider metadata for
+    // debuggability. `_aiFallback` flips true when the AI provider failed
+    // entirely and every card body is coming from Step 1 text.
+    const aiFailed = !step2.ai_source || step2.ai_source === 'unavailable' || step2.ai_source === 'unknown'
+    return NextResponse.json({
+      ...legacy,
+      _aiFallback: aiFailed,
+    })
   } catch (err) {
     console.error('interpret-genome error:', err?.message)
-    return NextResponse.json(
-      { error: 'Analysis temporarily unavailable. Results still accessible.', detail: err?.message?.slice(0, 200) },
-      { status: err?.status || 500 }
-    )
+    // Absolute last resort — build a minimal report directly from the
+    // variant catalog. This should only trigger if Step 1 itself throws
+    // (e.g. an unexpected input), which is extremely rare.
+    try {
+      const minimal = buildMinimalGenomeReport(variants, VARIANT_CATALOG)
+      const withStep1 = applyStep1Overrides(
+        { ...minimal, aiProvider: 'fallback', aiModel: 'variant-catalog', _aiFallback: true },
+        step1ByRsid,
+        step1,
+      )
+      return NextResponse.json(withStep1, { status: 200 })
+    } catch (fallbackErr) {
+      return NextResponse.json(
+        { error: 'Analysis temporarily unavailable. Please try again.', detail: (err?.message || fallbackErr?.message)?.slice(0, 200) },
+        { status: 500 },
+      )
+    }
   }
 }
 

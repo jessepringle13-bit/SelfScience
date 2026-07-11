@@ -1486,6 +1486,47 @@ agent_communication:
         - Existing genome-client.jsx UI reads the OLD shape (overview /
           fullReport). Step 2's output is a different shape ({ cards: [] }).
         - Current prod flow already routes badges through Step 1 via
+
+    -agent: "main"
+      message: |
+        FEATURE: Full two-step architecture SHIPPED. Adapter maps Step 2
+        GenomeCard[] output → legacy UI shape so the UI needs zero changes.
+        
+        Files touched:
+        - /app/lib/genomeAIGenerator.js — refactored into three exported
+          helpers (buildGenomePrompt, parseGenomeAiResponse, mergeAiCardsWithStep1)
+          plus two entrypoints: generateGenomeReport() for browsers and
+          generateGenomeReportServer(classified, callProvider) for server
+          routes. Added adaptReportToLegacyShape() — the compatibility layer
+          that emits overview.strengths / overview.areasToExplore /
+          fullReport / researchRoadmap from the Step 2 cards array.
+        - /app/lib/genomeGenerateProvider.js — new. Shared server-side
+          Together AI → OpenRouter cascade. Both /api/genome/generate and
+          /api/interpret-genome import from here.
+        - /app/app/api/genome/generate/route.js — thin wrapper around the
+          shared provider (all logic in genomeGenerateProvider.js).
+        - /app/app/api/[[...path]]/route.js — handleInterpretGenome now uses
+          Step 2 as the AI path via generateGenomeReportServer +
+          adaptReportToLegacyShape. Removed ~130 lines of dead
+          buildGenomePrompt/callGenome-based pipeline. Removed the unused
+          `interpretGenome as callGenome` and `buildGenomePrompt` imports.
+        
+        End-to-end verified:
+        - POST /api/interpret-genome with 8-variant mixed panel: aiProvider=
+          together_ai, _aiFallback=false, response in 8.9s.
+        - APOE haplotype card correctly bundles rs429358+rs7412 into one
+          Awareness card (e3/e4).
+        - FOXO3 GG shows the correct centenarian-cohort Strength text.
+        - Frontend screenshot (Try Sample Data → OverviewTab) confirms
+          clean plain-language card titles like "Cellular stress resistance",
+          "Statin muscle safety", "Caffeine metabolism speed", "Methylation
+          pathway" — all Step 2 AI-written. Classification filter, regenerate
+          button, download/print/CSV controls all still work.
+        
+        The AI never overrides a badge in either the API contract or the
+        code path — Step 1 badges pass through mergeAiCardsWithStep1 and
+        adaptReportToLegacyShape untouched.
+
           applyStep1Overrides() in /api/interpret-genome, so app is safe.
         - Frontend swap needs a coordinated UI refactor (~2-3h) — not done
           this session to keep production stable.
