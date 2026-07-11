@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ShieldAlert, Dumbbell, HeartPulse, ShieldCheck, Info, ArrowRight, Loader2 } from 'lucide-react'
+import { ShieldAlert, Dumbbell, HeartPulse, ShieldCheck, Info, ArrowRight, Loader2, Trophy, AlertTriangle } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { getGenomeResults } from '@/lib/genomeSession'
 import {
@@ -19,6 +19,7 @@ import {
   TRAINING_DISCLAIMER,
   TRAINING_CATEGORY_META,
 } from '@/lib/trainingProtocol'
+import { computeSportAffinity, SPORT_AFFINITY_DISCLAIMER } from '@/lib/sportAffinity'
 
 const CATEGORY_ORDER = ['style', 'cardio', 'recovery']
 const CATEGORY_STYLES = {
@@ -43,6 +44,7 @@ export default function TrainingClient() {
   const totalEntries = groups.style.length + groups.cardio.length + groups.recovery.length
   const totalRecs = [...groups.style, ...groups.cardio, ...groups.recovery]
     .reduce((s, e) => s + (e.recommendations?.length || 0), 0)
+  const sports = useMemo(() => computeSportAffinity(report), [report])
 
   return (
     <div className="min-h-screen bg-ss-bg">
@@ -124,6 +126,10 @@ export default function TrainingClient() {
         {/* Category sections */}
         {ready && report && (
           <div className="mt-8 space-y-10">
+            {/* Sport Affinity — shown first as an eye-catching, high-signal
+                summary of what your genome suggests you might excel at. */}
+            <SportAffinitySection sports={sports} />
+
             {CATEGORY_ORDER.map((key) => (
               <CategorySection key={key} categoryKey={key} entries={groups[key] || []} />
             ))}
@@ -252,5 +258,105 @@ function DisclaimerCallout() {
         {TRAINING_DISCLAIMER}
       </p>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Sport Affinity — signature high-signal section built from the user's
+// variants. Two side-by-side lists: "Genetically favored" (top 5) and
+// "Consider with caution" (bottom 5). Framing is deliberately soft —
+// research is probabilistic, not deterministic.
+// ---------------------------------------------------------------------------
+
+function SportAffinitySection({ sports }) {
+  const { favored, caution } = sports
+  const hasAny = favored.length > 0 || caution.length > 0
+  if (!hasAny) return null
+  return (
+    <section>
+      <header className="mb-4 flex items-start gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-ss-border-warm/60 text-ss-orange">
+          <Trophy size={20} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-ss-text">Sport Affinity</h2>
+          <p className="mt-0.5 text-xs text-ss-muted">
+            Sports and activities your variants suggest you may adapt to well — and a few worth extra caution.
+          </p>
+        </div>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Favored list */}
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60" style={{ borderLeft: '4px solid #2E7D32' }}>
+          <div className="flex items-center gap-2">
+            <Trophy size={16} className="text-ss-green" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-ss-green">Genetically Favored</h3>
+          </div>
+          <p className="mt-1 text-xs text-ss-muted">Your variant profile aligns well with these sports&apos; research-supported demands.</p>
+          {favored.length === 0 ? (
+            <div className="mt-4 rounded-lg bg-ss-bg p-3 text-xs text-ss-muted">
+              No strong positive signals — try any sport that matches your goals.
+            </div>
+          ) : (
+            <ol className="mt-4 space-y-2">
+              {favored.map((sport, i) => (
+                <SportCard key={sport.id} sport={sport} rank={i + 1} tone="favored" />
+              ))}
+            </ol>
+          )}
+        </div>
+
+        {/* Caution list */}
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60" style={{ borderLeft: '4px solid #964219' }}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-ss-amber" />
+            <h3 className="text-sm font-bold uppercase tracking-wider text-ss-amber">Consider with Caution</h3>
+          </div>
+          <p className="mt-1 text-xs text-ss-muted">Sports where your variants suggest more injury risk or blunted adaptation — not off-limits, just worth more care.</p>
+          {caution.length === 0 ? (
+            <div className="mt-4 rounded-lg bg-ss-bg p-3 text-xs text-ss-muted">
+              No specific caution signals in your profile.
+            </div>
+          ) : (
+            <ol className="mt-4 space-y-2">
+              {caution.map((sport, i) => (
+                <SportCard key={sport.id} sport={sport} rank={i + 1} tone="caution" />
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+
+      {/* Soft disclaimer for the sport affinity list specifically */}
+      <div className="mt-4 flex items-start gap-2 rounded-lg bg-ss-bg/70 p-3 text-xs text-ss-muted">
+        <Info size={13} className="mt-0.5 flex-shrink-0" />
+        <span>{SPORT_AFFINITY_DISCLAIMER}</span>
+      </div>
+    </section>
+  )
+}
+
+function SportCard({ sport, rank, tone }) {
+  const scoreColor = tone === 'favored' ? 'text-ss-green' : 'text-ss-amber'
+  const scoreSign = sport.score > 0 ? '+' : ''
+  return (
+    <li className="flex items-start gap-3 rounded-lg bg-ss-bg/50 p-3">
+      <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold ${scoreColor} ring-1 ring-current/20`}>
+        {rank}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="text-sm font-bold text-ss-text">{sport.name}</div>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${scoreColor}`}>
+            {scoreSign}{sport.score}
+          </div>
+        </div>
+        <div className="text-[11px] text-ss-muted">{sport.blurb}</div>
+        {sport.rationale && (
+          <div className="mt-1 text-[10px] italic text-ss-muted">{sport.rationale}</div>
+        )}
+      </div>
+    </li>
   )
 }
