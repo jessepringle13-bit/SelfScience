@@ -1005,22 +1005,27 @@ async function handleInterpretGenome(request) {
   try {
     // ============================================================
     // Step 2 — AI plain-language card generation.
-    // The Step 2 pipeline (see /lib/genomeAIGenerator.js) is a strict
-    // single-pass architecture:
-    //   1. Build a batched prompt from the Step 1 ClassifiedGenome.
-    //   2. Call the Together AI → OpenRouter cascade.
-    //   3. Merge AI text into cards. Step 1 CLASSIFICATIONS are preserved
-    //      no matter what the AI returns. If the AI dropped a variant or
-    //      returned garbage, the card body falls back to Step 1's
-    //      classification_text — the badge is still correct.
-    //   4. Adapt to the legacy UI response shape so the existing
-    //      genome-client.jsx tabs render without any UI changes.
+    //
+    // For LARGE uploads we skip Step 2 entirely and let Step 1's curated
+    // text carry the cards. Rationale: with >70 classified variants the AI
+    // cascade reliably burns the full 38s budget before returning anything
+    // useful (Together AI's response streaming stalls on the huge prompt).
+    // Emergent's 60s ingress leaves no room for that + serialization + the
+    // occasional slow first-byte. So we short-circuit — instant response,
+    // Step 1 text (fact-checked, curated for ~37 well-studied variants)
+    // fills every card body, badges are still correct.
     // ============================================================
-    const step2 = await generateGenomeReportServer(step1, callGenomeGenerateProvider)
+    const AI_SKIP_THRESHOLD = 70
+    let step2
+    if (step1.classified_count > AI_SKIP_THRESHOLD) {
+      console.info(`[interpret-genome] ${step1.classified_count} classified variants > ${AI_SKIP_THRESHOLD} — skipping AI, serving Step 1 text directly`)
+      step2 = await generateGenomeReportServer(step1, async () => { throw new Error('skipped: large upload') })
+    } else {
+      step2 = await generateGenomeReportServer(step1, callGenomeGenerateProvider)
+    }
     const legacy = adaptReportToLegacyShape(step2, step1)
-    // Preserve the older `_step1: true` marker + AI provider metadata for
-    // debuggability. `_aiFallback` flips true when the AI provider failed
-    // entirely and every card body is coming from Step 1 text.
+    // `_aiFallback` flips true when the AI provider failed entirely (or was
+    // skipped) and every card body is coming from Step 1 text.
     const aiFailed = !step2.ai_source || step2.ai_source === 'unavailable' || step2.ai_source === 'unknown'
     return NextResponse.json({
       ...legacy,

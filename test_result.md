@@ -1603,3 +1603,18 @@ agent_communication:
         variants) instead of AI-rewritten card bodies. Better than a 504.
 
         _aiFallback=false, 8 cards across 4 pillars in 13.9s. No regressions.
+
+
+    -agent: "main"
+      message: |
+        504 FIX — additional defensive layer added after user's real-file test.
+        - User uploaded Jesse Pringle 23andMe file (632k lines → 390 variants
+          → 92 classified). Even with timeout+cap fixes, AI cascade burned
+          the full 36s budget with no useful output — too close to 60s.
+        - Added AI_SKIP_THRESHOLD = 70 in handleInterpretGenome. If Step 1
+          classifies more than 70 variants, skip Step 2 entirely and let
+          Step 1 curated text carry every card body. Response drops from
+          36s → 778ms.
+        - Small uploads (≤70) still get full Together AI experience
+          (verified 8-variant upload = 7.9s via together_ai).
+        - Jesse's file now returns HTTP 200 in 778ms with 69 cards rendered.
