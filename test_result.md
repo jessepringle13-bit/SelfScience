@@ -1889,3 +1889,77 @@ agent_communication:
           • PubMed fetch happens server-side via /api/pubmed-search
           • No secret keys exposed client-side
           • No TypeScript files introduced
+
+
+    -agent: "main"
+      message: |
+        TIER 1 #6 — LAB BIOMARKER PANEL — Complete.
+
+        Files added:
+          • /app/lib/biomarkers.js — All 17 biomarker definitions with
+            the exact reference ranges provided by user (HbA1c, Testosterone
+            total + free, HDL, LDL, ApoB, hs-CRP, Vit D, Fasting Glucose,
+            Hemoglobin, Ferritin, TSH, Free T3, Free T4, SHBG, IGF-1,
+            Homocysteine). Sex-specific fields flagged with "male ref" chip.
+            Exports evaluateBiomarker() and evaluateAllBiomarkers() as
+            pure functions returning 'optimal' | 'caution' | 'flag' |
+            'unknown' per value.
+          • /app/lib/biomarkerCorrelations.js — 8 correlation rules
+            (6 original + 2 additional per user spec):
+              1) HbA1c × MTNR1B late-eating
+              2) Testosterone low (general nutrition-first framing)
+              3) HDL × CETP
+              4) Vitamin D above 80 ng/mL
+              5) Homocysteine × MTHFR (priority tier)
+              6) Hemoglobin × FUT2 non-secretor
+              7) Low testosterone × caloric restriction (priority — verbatim)
+              8) hs-CRP elevated × IL23R GG or NOD2 CT (priority — verbatim)
+            Uses flattenReportCards() from supplementProtocol.js and reads
+            genome from sessionStorage. All research-language, no medical
+            claims.
+          • /app/lib/biomarkersSession.js — localStorage helpers so users'
+            biomarker entries persist across sessions (contrasted with
+            genome data which is sessionStorage-only for privacy).
+          • /app/app/biomarkers/page.js — server shell
+          • /app/app/biomarkers/biomarkers-client.jsx — the full panel:
+              - Header + educational disclaimer callout
+              - "Your Bloodwork" 2-column form of all 17 fields
+              - Each field shows reference range copy BEFORE typing
+              - Live color dot after entry (optimal green / caution amber /
+                flag red / unknown gray)
+              - Sticky sidebar: Status Overview stat trio + Genetic
+                Context correlation cards + "See your full genome report" CTA
+              - "Clear all" button + confirm dialog
+
+        Files modified:
+          • /app/components/site-nav.jsx — added top-level "Biomarkers"
+            link between Reading List and About (both desktop and mobile
+            drawer)
+          • /app/components/MobileNav.jsx — replaced Books tab with
+            "Labs" (TestTube2 icon) → /biomarkers, per user's request to
+            treat Biomarkers as a core feature in the bottom tab bar
+
+        Verified via Playwright:
+          • /biomarkers loads with all 17 fields, reference notes visible
+            before any input
+          • Filling values triggers correct color dots (5 flag/3 caution/
+            2 optimal for the test payload)
+          • Status Overview updates in real time
+          • Without genome: Genetic Context sidebar shows "Upload your
+            genome" CTA
+          • With sample genome + high homocysteine + low testosterone:
+            three correlations fire — Testosterone below 500 (awareness),
+            Homocysteine × MTHFR (priority, teal border), Low testosterone
+            — caloric intake first (priority, verbatim per spec)
+          • Desktop nav shows "Biomarkers" link, mobile bottom nav shows
+            "Labs" tab with TestTube2 icon
+          • Values persist to localStorage; clearBiomarkerValues()
+            confirmed via "Clear all" button
+
+        Compliance:
+          • All research-language copy, no medical claims
+          • Reference ranges shown as small notes under each field BEFORE
+            typing (per user's explicit request)
+          • Genome data only ever loaded from sessionStorage (no leakage
+            to biomarker localStorage)
+          • Zero API calls, zero new env vars, zero key exposure

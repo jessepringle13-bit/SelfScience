@@ -6,13 +6,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, Dna, BookOpen } from 'lucide-react'
+import { Home, Search, Dna, TestTube2 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/',             label: 'Home',   Icon: Home },
-  { href: '/search',       label: 'Search', Icon: Search },
-  { href: '/genome',       label: 'Genome', Icon: Dna },
-  { href: '/reading-list', label: 'Books',  Icon: BookOpen },
+  { href: '/',             label: 'Home',    Icon: Home },
+  { href: '/search',       label: 'Search',  Icon: Search },
+  { href: '/genome',       label: 'Genome',  Icon: Dna },
+  { href: '/biomarkers',   label: 'Labs',    Icon: TestTube2 },
 ]
 
 export default function MobileNav() {
