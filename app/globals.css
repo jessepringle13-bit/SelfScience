@@ -91,3 +91,16 @@ html.ss-print-mode .ss-tab-hidden { display: block !important; }
   /* Ensure background colors and text colors print. Chromium respects this. */
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
+
+/* PWA: leave clearance below content so the MobileNav bottom bar (max-width
+ * 767px) doesn't cover footer / action buttons. `env(safe-area-inset-bottom)`
+ * handles the iPhone home-indicator strip in installed PWA mode. */
+@media (max-width: 767px) {
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+  /* Hide the bottom bar on print. */
+  @media print {
+    .ss-mobile-nav { display: none !important; }
+  }
+}

@@ -1,5 +1,7 @@
 import './globals.css'
 import Analytics from '@/components/analytics'
+import PWAInstallPrompt from '@/components/PWAInstallPrompt'
+import MobileNav from '@/components/MobileNav'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
 
@@ -49,8 +51,18 @@ export const metadata = {
       'Aggregated research search, AI reliability scoring, and personalised genome analysis. Not medical advice.',
   },
   alternates: { canonical: '/' },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'SelfScience',
+  },
   icons: {
-    icon: [{ url: '/favicon.ico' }],
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icons/favicon-32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
   },
 }
 
@@ -66,6 +78,8 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         {children}
+        <MobileNav />
+        <PWAInstallPrompt />
         <Analytics />
       </body>
     </html>

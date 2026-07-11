@@ -185,11 +185,13 @@ export function SiteNav({ variant = 'light' }) {
           Upload Genome
         </a>
 
-        {/* Mobile menu button */}
+        {/* Mobile menu button — hidden on small screens because MobileNav
+            provides a bottom tab bar (better PWA UX). Retained on desktop
+            widths as a fallback if the bottom nav ever gets disabled. */}
         <button
           type="button"
           onClick={() => setMobileOpen((v) => !v)}
-          className={`md:hidden ${isDark ? 'text-white' : 'text-ss-teal'}`}
+          className={`hidden ${isDark ? 'text-white' : 'text-ss-teal'}`}
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}

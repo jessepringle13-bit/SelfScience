@@ -1,3 +1,9 @@
+const withSerwist = require('@serwist/next').default({
+  swSrc: 'app/sw.js',
+  swDest: 'public/sw.js',
+  disable: process.env.NODE_ENV === 'development',
+})
+
 const nextConfig = {
   output: 'standalone',
   images: {
@@ -39,4 +45,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withSerwist(nextConfig);
