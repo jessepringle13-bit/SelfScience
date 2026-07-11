@@ -107,12 +107,15 @@ export default function ShareCardModal({ open, onClose, genomeResults }) {
         showToast('Shared successfully.', 'success')
       } else if (result.mode === 'native-text-only' && result.ok) {
         showToast('Shared text (image not supported on this device).', 'success')
-      } else if (result.mode === 'clipboard' && result.ok) {
+      } else if ((result.mode === 'clipboard' || result.mode === 'clipboard-legacy') && result.ok) {
         showToast('Copied to clipboard!', 'success')
       } else if (result.mode === 'cancelled') {
         // No toast on user-cancel — expected UX.
       } else {
-        showToast('Could not share. Try Download instead.', 'error')
+        // Neither share sheet nor any clipboard path was available (common in
+        // sandboxed preview iframes). Nudge the user toward the visible share
+        // text box and the Download PNG button as the workable options.
+        showToast('Sharing is blocked in this preview — copy the text below or use Download PNG.', 'error')
       }
     } catch (err) {
       console.error('[ShareCardModal] share failed:', err)
@@ -123,11 +126,19 @@ export default function ShareCardModal({ open, onClose, genomeResults }) {
   }, [shareText, showToast])
 
   const handleCopyText = useCallback(async () => {
-    try {
-      await navigator.clipboard?.writeText(shareText)
+    // Reuse the same fallback chain as the main Share button so this also
+    // works in sandboxed preview iframes where the async clipboard API is
+    // blocked. We pass an empty blob because file-sharing isn't needed here.
+    const result = await shareCardOrCopy({ blob: new Blob([], { type: 'text/plain' }), text: shareText })
+    if ((result.mode === 'clipboard' || result.mode === 'clipboard-legacy') && result.ok) {
       showToast('Text copied to clipboard!', 'success')
-    } catch {
-      showToast('Could not copy text.', 'error')
+    } else if (result.mode === 'native' || result.mode === 'native-text-only') {
+      // Native share was invoked — treat like success (user picked their target).
+      showToast('Shared.', 'success')
+    } else if (result.mode === 'cancelled') {
+      // no toast on user-cancel
+    } else {
+      showToast('Copy blocked — select the text below and copy manually.', 'error')
     }
   }, [shareText, showToast])
 
@@ -197,7 +208,20 @@ export default function ShareCardModal({ open, onClose, genomeResults }) {
             <div className="space-y-3">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-ss-muted">Share text</div>
-                <div className="mt-2 rounded-lg bg-ss-bg p-3 text-xs leading-relaxed text-ss-text">
+                {/* One-click selectable text box — if all clipboard APIs are
+                    blocked (e.g. sandboxed preview iframe), users can click
+                    the text to auto-select and then Ctrl/Cmd+C manually. */}
+                <div
+                  onClick={(e) => {
+                    const range = document.createRange()
+                    range.selectNodeContents(e.currentTarget)
+                    const sel = window.getSelection()
+                    sel?.removeAllRanges()
+                    sel?.addRange(range)
+                  }}
+                  className="mt-2 cursor-text select-all rounded-lg bg-ss-bg p-3 text-xs leading-relaxed text-ss-text"
+                  title="Click to select all, then Ctrl/Cmd+C to copy"
+                >
                   {shareText}
                 </div>
                 <button
