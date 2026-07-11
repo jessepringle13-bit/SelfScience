@@ -1530,3 +1530,36 @@ agent_communication:
           applyStep1Overrides() in /api/interpret-genome, so app is safe.
         - Frontend swap needs a coordinated UI refactor (~2-3h) — not done
           this session to keep production stable.
+
+
+    -agent: "main"
+      message: |
+        POLISH: Two optional cleanup tasks completed.
+        
+        1) Tightened AI response JSON extractor
+           /app/lib/genomeAIGenerator.js parseGenomeAiResponse():
+           - Replaced greedy /\[[\s\S]*\]/ regex with a proper bracket-counting
+             extractor (extractFirstJsonArray) that ignores brackets inside
+             string literals.
+           - Added trailing-comma stripper (stripTrailingCommas) — fixes
+             Llama's occasional `,]` and `,}` quirks.
+           - Added a salvage path (iterateTopLevelObjects) that pulls out
+             each top-level {...} object individually and parses them one at
+             a time. Recovers N-1 valid cards when the model's last object
+             was truncated by max_tokens (previously lost all N).
+           - Salvage log now shows counts instead of a single opaque error.
+           - Unit tested 9 edge cases (clean, preamble+trailing, trailing
+             comma before ] or }, truncated last object, brackets inside
+             string, empty, no array, nested objects) — all 9 pass.
+        
+        2) Retired dead code from the pre-two-step pipeline
+           - /app/lib/ai.js: `interpretGenome()` replaced by a throwing stub
+             with a clear "use generateGenomeReportServer" message; removed
+             MODELS.genome entry (~10 lines).
+           - /app/lib/prompts.js: removed GENOME_PROMPT (~110-line schema
+             template), AI_VARIANT_CAP, AI_PER_PILLAR_CAP, and
+             buildGenomePrompt(). Left a two-line note pointing to
+             genomeAIGenerator.js as the canonical Step 2 prompt builder.
+        
+        Verified: 10-variant end-to-end run returns aiProvider=together_ai,
+        _aiFallback=false, 8 cards across 4 pillars in 13.9s. No regressions.
