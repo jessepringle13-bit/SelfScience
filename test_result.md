@@ -1735,3 +1735,44 @@ agent_communication:
         no broken chips, no "undefined%".
 
         No new environment variables, no API calls, fully static data.
+
+
+    -agent: "main"
+      message: |
+        THREE FIXES applied after user's genome re-upload session:
+
+        FIX 1 — CRITICAL: MTHFR strand normalization.
+        User's 23andMe file reported rs1801131 heterozygous as "GT" instead
+        of the forward-strand "AC", causing classifyMTHFR() to fall through
+        to the "unknown" branch (classification: neutral). Same strand
+        quirk applies to rs1801133 (may appear as "AG" instead of "CT").
+        Fix: added generic `normalizeToForwardStrand(gt, forward)` helper in
+        /app/lib/haplotypeClassifiers.js that complements reverse-strand
+        alleles to forward-strand notation before comparison.
+        classifyMTHFR() now normalizes both inputs before matching branches.
+        Verified: rs1801133 AG + rs1801131 GT → compound_heterozygous
+        classification=Awareness, text="Compound heterozygous MTHFR — one
+        variant at each position. Estimated ~50% enzyme reduction..."
+        Also added 'mthfr' to HAPLOTYPE_PREFER_DETAIL in genomeClassifier.js
+        so the classifier's status-specific text wins over the generic
+        catalog `awareness` blurb (which doesn't distinguish 677_het vs
+        1298_het vs compound_het vs double_hom).
+
+        FIX 2 — MINOR: Neutral cards no longer in overview.areasToExplore.
+        /app/lib/genomeAIGenerator.js line 337 was filtering by
+        `classification !== 'Strength'` which included both Awareness AND
+        Neutral cards. Changed to strict `classification === 'Awareness'`.
+        Verified: APOE ε3/ε3 (neutral) now surfaces only in pillar sections,
+        not in "Top Awareness Areas".
+
+        FIX 3 — DPYD reassurance sentence appended.
+        /app/lib/variantClassifications.js rs1801265.awareness_text now
+        ends with: "This finding is relevant only if 5-fluorouracil,
+        capecitabine, or tegafur chemotherapy are ever prescribed — it has
+        no bearing on everyday medications."
+        Verified via API test with rs1801265 AG.
+
+        Verification: /tmp/verify_three_fixes_v2.mjs uses 100-variant
+        filler payloads to force the AI-skip path (>70 threshold) so we
+        test the deterministic Step 1 output the user actually sees on
+        their real 150+ variant upload. All 3 tests PASS.
