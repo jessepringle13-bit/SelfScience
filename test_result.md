@@ -1562,4 +1562,44 @@ agent_communication:
              genomeAIGenerator.js as the canonical Step 2 prompt builder.
         
         Verified: 10-variant end-to-end run returns aiProvider=together_ai,
+
+    -agent: "main"
+      message: |
+        BUG FIX: 504 Analysis Failure on production genome uploads.
+        
+        Root cause: when I swapped to the two-step architecture, I removed
+        two critical safeties from the AI path:
+          (a) no timeout on the fetch calls to Together AI / OpenRouter
+          (b) no variant cap on the AI prompt
+        Large uploads (150+ variants) produced huge prompts that both
+        providers took 30-45s to answer. Emergent's ingress caps at ~60s so
+        production returned 504.
+        
+        Fixes in /app/lib/genomeGenerateProvider.js:
+        - Added `withTimeout()` helper that runs each tier under BOTH
+          AbortController and Promise.race so the timeout fires even during
+          body streaming (res.json()). Previously the AbortController's
+          clearTimeout fired as soon as headers arrived, letting body reads
+          run unbounded.
+        - PER_TIER_TIMEOUT_MS = 18s (was 22s)
+        - TOTAL_BUDGET_MS = 38s (was 45s) — leaves ~22s headroom under the
+          60s ingress limit for network + serialization + fallback.
+        
+        Fixes in /app/lib/genomeAIGenerator.js:
+        - buildGenomePrompt now accepts `aiCap` (default 25). Only the top-N
+          most impactful variants (Awareness first → Positive → Neutral) go
+          into the AI prompt. Everything else still surfaces as a card via
+          mergeAiCardsWithStep1 using Step 1 text — nothing is dropped.
+        - generateGenomeReportServer accepts + threads aiCap through.
+        
+        Verified end-to-end:
+        - 160-variant upload: 36.4s (was 59.6s). Both AI tiers timeout, Step
+          1 text renders on all 26 filtered cards. HTTP 200, no 504.
+        - 8-variant upload: 7.7s via Together AI, _aiFallback=false, cards
+          have AI-written plain-language titles.
+        
+        Trade-off: on very large uploads, users now see Step 1 text (which
+        is still fact-checked, curated copy for the ~37 highest-priority
+        variants) instead of AI-rewritten card bodies. Better than a 504.
+
         _aiFallback=false, 8 cards across 4 pillars in 13.9s. No regressions.
