@@ -685,25 +685,101 @@ function summarizeDay(entries, activeRules) {
 // ---------------------------------------------------------------------------
 // TAB 3 — SCANNER (multi-product search + universal-quality analysis)
 // ---------------------------------------------------------------------------
+// Curated set of Open Food Facts category slugs. Keys match the API's
+// CATEGORY_MAP; adjust both together. Grouped visually for scannability.
 const QUICK_CATEGORIES = [
-  { key: 'protein-bars',   label: 'Protein Bars' },
-  { key: 'protein-powder', label: 'Protein Powder' },
-  { key: 'teas',           label: 'Teas' },
-  { key: 'cereals',        label: 'Cereals' },
-  { key: 'chips',          label: 'Chips' },
-  { key: 'yogurt',         label: 'Yogurt' },
-  { key: 'bread',          label: 'Bread' },
-  { key: 'oils',           label: 'Oils' },
+  // Protein & Fitness
+  { key: 'protein-bars',      label: 'Protein Bars',      group: 'Protein' },
+  { key: 'protein-powder',    label: 'Protein Powder',    group: 'Protein' },
+  { key: 'energy-drinks',     label: 'Energy Drinks',     group: 'Protein' },
+  { key: 'sports-drinks',     label: 'Sports Drinks',     group: 'Protein' },
+  { key: 'meal-replacement',  label: 'Meal Replacement',  group: 'Protein' },
+  // Beverages
+  { key: 'teas',              label: 'Teas',              group: 'Beverages' },
+  { key: 'coffees',           label: 'Coffees',           group: 'Beverages' },
+  { key: 'juices',            label: 'Juices',            group: 'Beverages' },
+  { key: 'sodas',             label: 'Sodas',             group: 'Beverages' },
+  { key: 'plant-based-milk',  label: 'Plant Milk',        group: 'Beverages' },
+  // Snacks
+  { key: 'snack-bars',        label: 'Snack Bars',        group: 'Snacks' },
+  { key: 'granola-bars',      label: 'Granola Bars',      group: 'Snacks' },
+  { key: 'chips',             label: 'Chips',             group: 'Snacks' },
+  { key: 'crackers',          label: 'Crackers',          group: 'Snacks' },
+  { key: 'popcorn',           label: 'Popcorn',           group: 'Snacks' },
+  { key: 'nuts',              label: 'Nuts',              group: 'Snacks' },
+  { key: 'nut-butters',       label: 'Nut Butters',       group: 'Snacks' },
+  { key: 'jerky',             label: 'Jerky',             group: 'Snacks' },
+  // Breakfast & Bakery
+  { key: 'breakfast-cereals', label: 'Cereals',           group: 'Breakfast' },
+  { key: 'breads',            label: 'Breads',            group: 'Breakfast' },
+  // Dairy & Alternatives
+  { key: 'yogurts',           label: 'Yogurts',           group: 'Dairy' },
+  { key: 'cheeses',           label: 'Cheeses',           group: 'Dairy' },
+  { key: 'milks',             label: 'Milks',             group: 'Dairy' },
+  { key: 'ice-cream',         label: 'Ice Cream',         group: 'Dairy' },
+  // Pantry
+  { key: 'pastas',            label: 'Pastas',            group: 'Pantry' },
+  { key: 'sauces',            label: 'Sauces',            group: 'Pantry' },
+  { key: 'condiments',        label: 'Condiments',        group: 'Pantry' },
+  { key: 'salad-dressings',   label: 'Dressings',         group: 'Pantry' },
+  { key: 'oils',              label: 'Oils',              group: 'Pantry' },
+  { key: 'peanut-butter',     label: 'Peanut Butter',     group: 'Pantry' },
+  { key: 'ketchup',           label: 'Ketchup',           group: 'Pantry' },
+  { key: 'mayonnaise',        label: 'Mayonnaise',        group: 'Pantry' },
+  { key: 'hot-sauce',         label: 'Hot Sauce',         group: 'Pantry' },
+  // Frozen & Canned
+  { key: 'frozen-meals',      label: 'Frozen Meals',      group: 'Frozen' },
+  { key: 'frozen-pizzas',     label: 'Frozen Pizza',      group: 'Frozen' },
+  { key: 'frozen-vegetables', label: 'Frozen Veg',        group: 'Frozen' },
+  { key: 'canned-beans',      label: 'Canned Beans',      group: 'Frozen' },
+  { key: 'canned-tuna',       label: 'Canned Tuna',       group: 'Frozen' },
+  { key: 'soups',             label: 'Soups',             group: 'Frozen' },
+  // Sweets
+  { key: 'chocolate',         label: 'Chocolate',         group: 'Sweets' },
+  { key: 'cookies',           label: 'Cookies',           group: 'Sweets' },
+  // Basics
+  { key: 'eggs',              label: 'Eggs',              group: 'Basics' },
+  { key: 'chicken',           label: 'Chicken',           group: 'Basics' },
+  { key: 'beef',              label: 'Beef',              group: 'Basics' },
+  { key: 'fish',              label: 'Fish',              group: 'Basics' },
+  { key: 'baby-food',         label: 'Baby Food',         group: 'Basics' },
+  { key: 'supplements',       label: 'Supplements',       group: 'Basics' },
+]
+
+// Popular US brands surfaced as quick-search chips when the results grid
+// is empty. Clicking a chip fires the same free-text search as typing.
+const POPULAR_US_BRANDS = [
+  'Quest', 'RXBAR', 'KIND', 'Clif Bar', 'Larabar',
+  'Chobani', "Siggi's", 'Fage', 'Kodiak Cakes',
+  'Chomps', 'Epic', 'Paleovalley',
+  'Simple Mills', 'Siete', 'Primal Kitchen',
+  'Fairlife', 'Organic Valley', 'Vital Farms',
+  "Bob's Red Mill", 'One Degree Organics',
+  "Barbella's", 'Atkins', 'Built Bar',
+  'Think!', 'ONE Bar', 'GoMacro',
+  'Orgain', 'Garden of Life', 'Vega',
+  'Nature Valley', 'Fiber One', 'Special K',
+  'Kashi', 'Cheerios', 'Quaker',
+  "Lay's", 'Doritos', 'Pringles',
+  'Starbucks', 'Celsius', 'GHOST',
+  'C4 Energy', 'Reign', 'Bang Energy',
+  'Liquid IV', 'Nuun', 'LMNT',
+  'Chosen Foods',
 ]
 
 function ScannerTab({ activeRules, hasGenome }) {
   const [showScanner, setShowScanner] = useState(false)
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(null)
+  const [notice, setNotice] = useState(null) // non-error informational notes ("Showing global results…")
   const [products, setProducts] = useState([])
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [openIngredient, setOpenIngredient] = useState(null)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [showAllBrands, setShowAllBrands] = useState(false)
   // Filter state
   const [minGrade, setMinGrade] = useState('all')   // all | ab | not_d
   const [onlyOrganic, setOnlyOrganic] = useState(false)
@@ -712,27 +788,96 @@ function ScannerTab({ activeRules, hasGenome }) {
 
   const [lastSearch, setLastSearch] = useState(null) // { barcode?, q?, category? }
 
-  const runSearch = async (params) => {
+  // ── search dispatcher ───────────────────────────────────────────────
+  // `append` mode is used for "Load more" — new products are added to the
+  // existing list instead of replacing it. First-page loads always reset.
+  const runSearch = useCallback(async (params, { append = false } = {}) => {
     const { barcode, q, category } = params
-    setLastSearch(params)
-    setLoading(true)
-    setError(null)
-    setProducts([])
-    setSelectedProduct(null)
+    const nextPage = append ? (page + 1) : 1
+    if (!append) {
+      setLastSearch(params)
+      setLoading(true)
+      setError(null)
+      setNotice(null)
+      setProducts([])
+      setSelectedProduct(null)
+      setPage(1)
+      setHasMore(false)
+    } else {
+      setLoadingMore(true)
+    }
     try {
       let url
-      if (barcode) url = `/api/nutrition/product?barcode=${encodeURIComponent(barcode)}`
-      else if (category) url = `/api/nutrition/product?category=${encodeURIComponent(category)}`
-      else url = `/api/nutrition/product?query=${encodeURIComponent(q)}`
+      if (barcode) {
+        url = `/api/nutrition/product?barcode=${encodeURIComponent(barcode)}`
+      } else if (category) {
+        url = `/api/nutrition/product?category=${encodeURIComponent(category)}&page=${nextPage}`
+      } else {
+        url = `/api/nutrition/product?query=${encodeURIComponent(q)}&page=${nextPage}`
+      }
       const res = await fetch(url)
-      if (!res.ok) { setError(res.status === 404 ? 'Product not found in Open Food Facts.' : 'Lookup failed.'); return }
-      const data = await res.json()
-      if (data.product) { setProducts([data.product]); setSelectedProduct(data.product) }
-      else if (data.products?.length) setProducts(data.products)
-      else setError('No results. Open Food Facts sometimes returns empty on the first request — click Try again below.')
-    } catch { setError('Network error — try again.') }
-    finally { setLoading(false) }
-  }
+      const data = await res.json().catch(() => ({}))
+
+      // OFF is temporarily degraded — surface a specific, actionable error.
+      if (res.status === 503 || data?.error === 'temporarily_unavailable') {
+        if (!append) setError(data?.message || 'Product database is temporarily unavailable. Please try again in a moment.')
+        setHasMore(false)
+        return
+      }
+
+      // Not-found (barcode) or unknown category etc.
+      if (!res.ok) {
+        if (!append) setError(res.status === 404 ? 'Product not found in Open Food Facts.' : (data?.error || 'Lookup failed.'))
+        return
+      }
+
+      // Informational note from server (e.g. category fell back to global feed).
+      if (data.note && !append) setNotice(data.note)
+
+      if (data.product) {
+        // Single-product barcode hit.
+        setProducts([data.product])
+        setSelectedProduct(data.product)
+        setHasMore(false)
+      } else if (Array.isArray(data.products) && data.products.length > 0) {
+        setProducts((prev) => (append ? [...prev, ...data.products] : data.products))
+        setPage(nextPage)
+        // If we got a full page back, more probably exist. 24 is a soft threshold.
+        setHasMore(data.products.length >= 24)
+      } else if (!append) {
+        // Empty results — leave error null; the UI renders a dedicated
+        // "no results" state with suggestions + category chips below.
+        setHasMore(false)
+      } else {
+        setHasMore(false)
+      }
+    } catch {
+      if (!append) setError('Network error — try again.')
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }, [page])
+
+  // ── Debounced type-ahead search ─────────────────────────────────────
+  // Fires 400ms after the user stops typing, only for queries of at least
+  // 3 characters. Skipped whenever the user has already dispatched an
+  // explicit search (Enter, chip, brand, category) via lastSearch.
+  const debounceRef = useRef(null)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    const trimmed = query.trim()
+    if (trimmed.length < 3) return
+    // Don't re-search what we just searched.
+    if (lastSearch?.q?.toLowerCase() === trimmed.toLowerCase()) return
+    debounceRef.current = setTimeout(() => {
+      runSearch({ q: trimmed })
+    }, 400)
+    return () => clearTimeout(debounceRef.current)
+  // Intentionally leave runSearch out of deps — including it re-triggers
+  // whenever page changes, which we don't want for the type-ahead.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -746,12 +891,15 @@ function ScannerTab({ activeRules, hasGenome }) {
     })
   }, [products, activeRules, minGrade, onlyOrganic, hideSeedOils, hideArtSweetener])
 
+  const brandChipsToShow = showAllBrands ? POPULAR_US_BRANDS : POPULAR_US_BRANDS.slice(0, 20)
+  const noResults = !loading && !error && !products.length && lastSearch && (lastSearch.q || lastSearch.category)
+
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr,340px]">
       <section>
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
           <h2 className="text-lg font-bold text-ss-teal">Scan a product</h2>
-          <p className="mt-1 text-sm text-ss-muted">Point your camera at a barcode, type a product / brand / UPC, or browse a category.</p>
+          <p className="mt-1 text-sm text-ss-muted">Point your camera at a barcode, type any food/brand/product, or browse a category.</p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button onClick={() => setShowScanner(true)} className="inline-flex items-center gap-2 rounded-full bg-ss-orange px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-ss-orange-dark">
@@ -763,22 +911,74 @@ function ScannerTab({ activeRules, hasGenome }) {
                 type="text" value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && query.trim()) runSearch({ q: query.trim() }) }}
-                placeholder="Brand, product name, or UPC"
+                placeholder="Search any food, brand, or product (e.g. Quest bar, almond milk, olive oil)"
                 className="flex-1 bg-transparent py-2 text-sm focus:outline-none"
               />
               <button onClick={() => { if (query.trim()) runSearch({ q: query.trim() }) }} disabled={!query.trim() || loading} className="rounded-full bg-ss-teal px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Search</button>
             </div>
           </div>
 
+          {/* Popular US brand chips — only when there's nothing on screen yet. */}
+          {!products.length && !loading && !error && (
+            <div className="mt-4">
+              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Popular US brands</div>
+              <div className="flex flex-wrap gap-1.5">
+                {brandChipsToShow.map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => { setQuery(b); runSearch({ q: b }) }}
+                    className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 text-[11px] font-semibold text-ss-teal transition hover:bg-ss-bg"
+                  >
+                    {b}
+                  </button>
+                ))}
+                {POPULAR_US_BRANDS.length > 20 && (
+                  <button
+                    onClick={() => setShowAllBrands((v) => !v)}
+                    className="rounded-full bg-ss-teal/10 px-2.5 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-teal/20"
+                  >
+                    {showAllBrands ? 'Show fewer' : `Show ${POPULAR_US_BRANDS.length - 20} more brands`}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Category quick-browse */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="font-semibold text-ss-muted">Browse:</span>
-            {QUICK_CATEGORIES.map((c) => (
-              <button key={c.key} onClick={() => runSearch({ category: c.key })} className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 font-semibold text-ss-teal hover:bg-ss-bg">{c.label}</button>
-            ))}
+          <div className="mt-4">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Browse by category</div>
+            <div className="flex flex-wrap gap-1.5">
+              {QUICK_CATEGORIES.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => runSearch({ category: c.key })}
+                  className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-bg"
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {loading && <div className="mt-4 flex items-center gap-2 text-sm text-ss-muted"><Loader2 size={14} className="animate-spin" /> Fetching from Open Food Facts…</div>}
+          {loading && (
+            <div className="mt-4">
+              <div className="mb-2 flex items-center gap-2 text-sm text-ss-muted">
+                <Loader2 size={14} className="animate-spin" /> Searching Open Food Facts…
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="animate-pulse overflow-hidden rounded-2xl bg-white ring-1 ring-ss-border-warm/60">
+                    <div className="h-32 w-full bg-ss-bg" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-2 w-1/3 rounded bg-ss-bg" />
+                      <div className="h-3 w-full rounded bg-ss-bg" />
+                      <div className="h-3 w-2/3 rounded bg-ss-bg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {error && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-ss-orange/10 p-3 text-sm text-ss-orange">
               <span>{error}</span>
@@ -792,7 +992,35 @@ function ScannerTab({ activeRules, hasGenome }) {
               )}
             </div>
           )}
+          {notice && !error && (
+            <div className="mt-4 rounded-lg bg-ss-teal/10 p-3 text-xs text-ss-teal">
+              {notice}
+            </div>
+          )}
         </div>
+
+        {/* No results state */}
+        {noResults && (
+          <div className="mt-6 rounded-2xl border border-dashed border-ss-border-warm bg-white p-6 text-center">
+            <div className="mb-1 text-lg font-bold text-ss-teal">
+              No results found{lastSearch?.q ? ` for "${lastSearch.q}"` : lastSearch?.category ? ` in this category` : ''}
+            </div>
+            <p className="text-sm text-ss-muted">
+              Try a different spelling, a broader term, or pick a category below.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+              {QUICK_CATEGORIES.slice(0, 12).map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => runSearch({ category: c.key })}
+                  className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-bg"
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filter bar + result grid */}
         {products.length > 0 && !selectedProduct && (
@@ -817,6 +1045,18 @@ function ScannerTab({ activeRules, hasGenome }) {
                 <div className="col-span-full rounded-2xl border border-dashed border-ss-border-warm p-6 text-center text-sm text-ss-muted">All products filtered out — loosen the filters above.</div>
               )}
             </div>
+            {/* Load more */}
+            {hasMore && lastSearch && !lastSearch.barcode && (
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={() => runSearch(lastSearch, { append: true })}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-2 rounded-full bg-ss-teal px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-40"
+                >
+                  {loadingMore ? <><Loader2 size={14} className="animate-spin" /> Loading…</> : <>Load more products</>}
+                </button>
+              </div>
+            )}
           </>
         )}
 
@@ -884,9 +1124,15 @@ function analyzeProduct(product, activeRules) {
 // -------- Small compact card used in the result grid --------
 function ProductGridCard({ product, activeRules, onSelect }) {
   const q = useMemo(() => analyzeProduct(product, activeRules), [product, activeRules])
-  const n = product.nutriments
-  const macros = `${n.protein_g_serving ?? n.protein_g ?? '–'}g P · ${n.carbs_g_serving ?? n.carbs_g ?? '–'}g C · ${n.fat_g_serving ?? n.fat_g ?? '–'}g F`
-  const kcal = n.energy_kcal_serving ?? n.energy_kcal
+  const n = product.nutriments || {}
+  // Prefer per-serving macros when the product reports them — that's what
+  // shoppers actually think in. Fall back to per-100g otherwise.
+  const useServing = n.protein_g_serving != null || n.energy_kcal_serving != null
+  const suffix = useServing ? '/serving' : '/100g'
+  const kcal    = useServing ? n.energy_kcal_serving : n.energy_kcal
+  const protein = useServing ? n.protein_g_serving   : n.protein_g
+  const carbs   = useServing ? n.carbs_g_serving     : n.carbs_g
+  const fat     = useServing ? n.fat_g_serving       : n.fat_g
   return (
     <button onClick={onSelect} className="flex flex-col overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative h-32 w-full overflow-hidden bg-ss-bg">
@@ -902,7 +1148,15 @@ function ProductGridCard({ product, activeRules, onSelect }) {
       <div className="p-3">
         <div className="text-[10px] font-bold uppercase tracking-widest text-ss-muted">{product.brand || 'Unknown brand'}</div>
         <div className="text-sm font-bold text-ss-teal line-clamp-2">{product.name}</div>
-        <div className="mt-1 text-[11px] text-ss-text">{macros}{kcal ? ` · ${kcal} kcal` : ''}</div>
+        {(kcal != null || protein != null || carbs != null || fat != null) && (
+          <div className="mt-1 text-[11px] text-ss-text">
+            {kcal != null && <>{kcal} kcal</>}
+            {protein != null && <> · {protein}g P</>}
+            {carbs != null && <> · {carbs}g C</>}
+            {fat != null && <> · {fat}g F</>}
+            <span className="text-ss-muted"> {suffix}</span>
+          </div>
+        )}
       </div>
     </button>
   )
