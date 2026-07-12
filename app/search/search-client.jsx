@@ -15,6 +15,8 @@ import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { getPillarQuery } from '@/lib/pillars'
+import { getGenomeResults } from '@/lib/genomeSession'
+import { flattenReportCards } from '@/lib/supplementProtocol'
 
 const SOURCE_TYPE_OPTIONS = [
   { key: 'all',       label: 'All' },
@@ -184,6 +186,41 @@ export default function SearchClient() {
   )
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
 
+  // Genome-loaded state — powers the "Your genes" chip row so a user can
+  // dispatch a search for any of their recognised variants without leaving
+  // the search page. Reads from sessionStorage and re-hydrates on the
+  // selfscience:genome-changed event fired by the genome page + RegenTools.
+  const [genomeReport, setGenomeReport] = useState(null)
+  useEffect(() => {
+    setGenomeReport(getGenomeResults())
+    const onChange = () => setGenomeReport(getGenomeResults())
+    if (typeof window !== 'undefined') {
+      window.addEventListener('selfscience:genome-changed', onChange)
+      return () => window.removeEventListener('selfscience:genome-changed', onChange)
+    }
+  }, [])
+
+  const yourGenes = useMemo(() => {
+    if (!genomeReport) return []
+    // De-duplicate gene symbols across all classified cards. We stable-sort
+    // "awareness > strengths > neutral" so the chip row leads with findings
+    // the user most likely wants to research first.
+    const rank = { awareness: 0, strength: 1, positive: 1, neutral: 2 }
+    const seen = new Map()
+    for (const c of flattenReportCards(genomeReport)) {
+      const g = (c.gene || '').trim()
+      if (!g || /^rs\d/i.test(g)) continue
+      // Split combined gene labels like "MTHFR (C677T)" or "APOE ε3/ε4" into
+      // just the primary gene symbol.
+      const symbol = g.split(/[\s(/·+,]/)[0].toUpperCase()
+      if (!symbol || symbol.length > 12) continue
+      const r = rank[c.classification] ?? 3
+      const prev = seen.get(symbol)
+      if (!prev || r < prev.rank) seen.set(symbol, { symbol, rank: r, classification: c.classification })
+    }
+    return [...seen.values()].sort((a, b) => a.rank - b.rank || a.symbol.localeCompare(b.symbol))
+  }, [genomeReport])
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
@@ -240,6 +277,23 @@ export default function SearchClient() {
     const usp = new URLSearchParams()
     usp.set('q', q)
     if (pillar) usp.set('pillar', pillar)
+    router.replace(`/search?${usp.toString()}`)
+  }
+
+  /** Kick off a search directly from a genome-loaded gene chip. Runs
+   *  immediately (no need to press Enter) and drops any active pillar
+   *  filter so the query stands on its own. */
+  const pickGene = (symbol) => {
+    if (!symbol) return
+    setQuery(symbol)
+    setSubmittedQ(symbol)
+    setPillar('')
+    trackEvent(EVENTS.SEARCH_PERFORMED, {
+      source: 'your_genes_chip',
+      gene: symbol,
+    })
+    const usp = new URLSearchParams()
+    usp.set('q', symbol)
     router.replace(`/search?${usp.toString()}`)
   }
 
@@ -454,6 +508,42 @@ export default function SearchClient() {
               </button>
             ))}
           </div>
+
+          {/* "Your genes" chip row — appears only when the user has an
+              analysed genome in sessionStorage. Clicking a chip dispatches
+              a search for that gene symbol. */}
+          {yourGenes.length > 0 && (
+            <div className="mx-auto mt-4 max-w-4xl">
+              <div className="flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-ss-orange" />
+                Your genome · search any of your recognised genes
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                {yourGenes.slice(0, 14).map(({ symbol, classification }) => {
+                  const ring =
+                    classification === 'awareness'
+                      ? 'border-ss-amber/70 text-ss-amber bg-white/5 hover:bg-ss-amber hover:text-white'
+                      : classification === 'strength' || classification === 'positive'
+                        ? 'border-ss-green/70 text-ss-green bg-white/5 hover:bg-ss-green hover:text-white'
+                        : 'border-white/25 bg-white/5 text-white/85 hover:bg-white/15'
+                  return (
+                    <button
+                      key={symbol}
+                      type="button"
+                      onClick={() => pickGene(symbol)}
+                      className={`rounded-full border px-3 py-1 font-mono text-xs font-semibold tracking-wider transition ${ring}`}
+                      title={`Search research for ${symbol}`}
+                    >
+                      {symbol}
+                    </button>
+                  )
+                })}
+                {yourGenes.length > 14 && (
+                  <span className="text-[11px] text-white/60">+{yourGenes.length - 14} more</span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

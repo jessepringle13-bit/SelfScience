@@ -40,6 +40,25 @@ const safeText = async (res) => {
   }
 }
 
+/**
+ * fetch() with a hard timeout. Any biomedical API that hasn't returned
+ * headers by the timeout is aborted, ensuring the parent /api/search call
+ * never runs past the ingress 60s cap because one provider (looking at you,
+ * Crossref) decided to hang.
+ *
+ * Callers should still wrap in try/catch and treat AbortError as "no
+ * results" — the existing per-provider handlers already do this.
+ */
+async function fetchWithTimeout(url, options = {}, ms = 12_000) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), ms)
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /* Extract PubMed abstracts from efetch XML for a batch of PMIDs.
  * Returns { [pmid]: abstractString } */
 const parsePubmedAbstracts = (xml) => {
@@ -90,7 +109,7 @@ async function searchPubmed(query, limit = 12) {
         query
       )}&retmax=${limit}&retmode=json&sort=relevance`
     )
-    const esearchRes = await fetch(esearchUrl, { cache: 'no-store' })
+    const esearchRes = await fetchWithTimeout(esearchUrl, { cache: 'no-store' }, 10_000)
     if (!esearchRes.ok) throw new Error(`PubMed esearch ${esearchRes.status}`)
     const esearch = await safeJson(esearchRes)
     const ids = esearch?.esearchresult?.idlist || []
@@ -99,15 +118,17 @@ async function searchPubmed(query, limit = 12) {
     // Fetch summaries + abstracts in parallel
     const idsJoined = ids.join(',')
     const [sumRes, absRes] = await Promise.all([
-      fetch(
+      fetchWithTimeout(
         withKey(`${PUBMED_BASE}/esummary.fcgi?db=pubmed&id=${idsJoined}&retmode=json`),
-        { cache: 'no-store' }
+        { cache: 'no-store' },
+        10_000
       ),
-      fetch(
+      fetchWithTimeout(
         withKey(
           `${PUBMED_BASE}/efetch.fcgi?db=pubmed&id=${idsJoined}&rettype=abstract&retmode=xml`
         ),
-        { cache: 'no-store' }
+        { cache: 'no-store' },
+        10_000
       ),
     ])
 
@@ -172,10 +193,10 @@ async function searchSemanticScholar(query, limit = 10) {
     const url = `${S2_BASE}/paper/search?query=${encodeURIComponent(
       query
     )}&limit=${limit}&fields=${fields}`
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       cache: 'no-store',
       headers: { Accept: 'application/json' },
-    })
+    }, 12_000)
     if (!res.ok) {
       // S2 often 429s; return empty rather than fail whole search
       console.warn('Semantic Scholar returned', res.status)
@@ -246,7 +267,7 @@ async function searchOpenAlex(query, limit = 10) {
       `&per-page=${limit}&mailto=${encodeURIComponent(OPENALEX_MAILTO)}` +
       `&filter=is_paratext:false,type:article|preprint|review|book-chapter|dataset` +
       `&select=id,doi,title,publication_year,authorships,primary_location,type,abstract_inverted_index,open_access,cited_by_count`
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 12_000)
     if (!res.ok) {
       console.warn('OpenAlex returned', res.status)
       return []
@@ -312,10 +333,10 @@ async function searchCrossref(query, limit = 10) {
       `https://api.crossref.org/works?query=${encodeURIComponent(query)}` +
       `&rows=${limit}` +
       `&mailto=${encodeURIComponent(OPENALEX_MAILTO)}`
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       cache: 'no-store',
       headers: { 'User-Agent': `SelfScience/0.4 (mailto:${OPENALEX_MAILTO})` },
-    })
+    }, 12_000)
     if (!res.ok) {
       console.warn('Crossref returned', res.status)
       return []
@@ -686,7 +707,7 @@ async function handleAutocomplete(request) {
 
   try {
     const url = `https://api.semanticscholar.org/graph/v1/paper/autocomplete?query=${encodeURIComponent(q)}`
-    const res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } })
+    const res = await fetchWithTimeout(url, { cache: 'no-store', headers: { Accept: 'application/json' } }, 6_000)
     if (!res.ok) return NextResponse.json({ suggestions: [] })
     const data = await safeJson(res)
     const matches = data?.matches || []

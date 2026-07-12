@@ -952,6 +952,40 @@ frontend:
                 depression, exact spec text) + SIGNIFICANT (additive CNS depr).
               • Empty state shows a helpful "tramadol + fluoxetine" hint.
 
+  - task: "BUG FIX — /api/search 502 timeouts + 'Your Genes' chip row on Search"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js, /app/app/search/search-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Root cause of the 502 the user hit when clicking a pillar
+            (Genomics) from the Dashboard: /api/search fans out to PubMed,
+            Semantic Scholar, OpenAlex, and Crossref in parallel, but no
+            individual fetch had a timeout. If any provider hung (Crossref
+            is the usual culprit), the whole /api/search request exceeded
+            the ingress 60s cap → 502.
+            Fix: new fetchWithTimeout(url, opts, ms) helper wraps each
+            provider call with an AbortController-backed hard deadline
+            (PubMed 10s, S2 12s, OpenAlex 12s, Crossref 12s, autocomplete 6s).
+            Each provider's existing try/catch already treats AbortError as
+            "no results", so a hung upstream now gracefully degrades instead
+            of taking down the whole search. Verified: /search?pillar=Genomics
+            now returns 20 results in ~4s consistently.
+
+            UX addition: new "Your genes · search any of your recognised
+            genes" chip row on /search. Reads report._variants from
+            sessionStorage, derives a de-duplicated gene-symbol list from
+            flattenReportCards() (sorted awareness → strengths → neutral),
+            and renders up to 14 clickable chips (colour-coded by
+            classification). Clicking a chip immediately dispatches a search
+            for that symbol — the user's variants are now globally
+            reachable from anywhere they'd normally search.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"
