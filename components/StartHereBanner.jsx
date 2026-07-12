@@ -58,16 +58,28 @@ export default function StartHereBanner() {
           I know my way around <X size={12} />
         </button>
 
-        <span className="inline-block rounded bg-ss-orange px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.2em] text-white">
+        {/* Top-left "Start Here" is now an interactive button that jumps to
+            the guided journey. Styled white-on-teal so it's clearly clickable
+            AND visually distinct from the orange "Take me through it" primary
+            CTA below (which lives in the same section). The two never compete:
+            the small white pill signals "quick shortcut", the big orange
+            button signals "primary action". */}
+        <Link
+          href="/start"
+          onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'start_here_top_badge' })}
+          aria-label="Open the guided Start Here journey"
+          className="group inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.2em] text-ss-teal shadow-sm ring-1 ring-white/30 transition hover:bg-white/95 hover:ring-white/80 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ss-orange"
+        >
           Start Here
-        </span>
+          <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
 
         <h2 className="mt-3 max-w-2xl text-2xl font-extrabold leading-tight md:text-3xl lg:text-[32px]">
-          Not sure where to begin? That's exactly where everyone starts.
+          Not sure where to begin? That&apos;s exactly where everyone starts.
         </h2>
 
         <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-white/85 md:text-base">
-          SelfScience can feel like a lot at first. We built a short guided journey that walks you through everything — from your first search to understanding what your genome actually tells you. Five minutes, and you'll know exactly what to do next.
+          SelfScience can feel like a lot at first. We built a short guided journey that walks you through everything — from your first search to understanding what your genome actually tells you. Five minutes, and you&apos;ll know exactly what to do next.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
