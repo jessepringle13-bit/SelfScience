@@ -16,25 +16,42 @@ import {
   STATUS_META,
   evaluateAllBiomarkers,
   BIOMARKERS_DISCLAIMER,
+  getBiomarkersForSex,
 } from '@/lib/biomarkers'
 import { deriveCorrelations } from '@/lib/biomarkerCorrelations'
 import { getBiomarkerValues, saveBiomarkerValues, clearBiomarkerValues } from '@/lib/biomarkersSession'
 import { getGenomeResults, hasGenomeResults } from '@/lib/genomeSession'
 
+const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
+
 export default function BiomarkersClient() {
   const [values, setValues] = useState({})
   const [ready, setReady] = useState(false)
   const [report, setReport] = useState(null)
+  // Biological sex controls reference ranges for testosterone (total &
+  // free), hemoglobin, ferritin, and SHBG. Default male; persisted to
+  // localStorage so it survives across visits.
+  const [sex, setSex] = useState('male')
 
-  // Hydrate localStorage (biomarker values) + sessionStorage (genome) on mount.
+  // Hydrate localStorage (biomarker values + sex) + sessionStorage (genome) on mount.
   useEffect(() => {
     setValues(getBiomarkerValues())
     setReport(getGenomeResults())
+    try {
+      const stored = localStorage.getItem(SEX_STORAGE_KEY)
+      if (stored === 'female' || stored === 'male') setSex(stored)
+    } catch { /* storage disabled */ }
     setReady(true)
     const onGenomeChange = () => setReport(getGenomeResults())
     window.addEventListener('selfscience:genome-changed', onGenomeChange)
     return () => window.removeEventListener('selfscience:genome-changed', onGenomeChange)
   }, [])
+
+  // Persist sex selection so subsequent visits keep the same reference ranges.
+  useEffect(() => {
+    if (!ready) return
+    try { localStorage.setItem(SEX_STORAGE_KEY, sex) } catch { /* noop */ }
+  }, [sex, ready])
 
   // Persist to localStorage on every change (with a tiny debounce).
   useEffect(() => {
@@ -43,13 +60,14 @@ export default function BiomarkersClient() {
     return () => clearTimeout(t)
   }, [values, ready])
 
-  const evaluated = useMemo(() => evaluateAllBiomarkers(values), [values])
+  const biomarkersForSex = useMemo(() => getBiomarkersForSex(sex), [sex])
+  const evaluated = useMemo(() => evaluateAllBiomarkers(values, sex), [values, sex])
   const summary = useMemo(() => {
     const c = { optimal: 0, caution: 0, flag: 0, unknown: 0 }
-    for (const b of BIOMARKERS) c[evaluated[b.id].status]++
-    const filled = BIOMARKERS.length - c.unknown
-    return { ...c, filled, total: BIOMARKERS.length }
-  }, [evaluated])
+    for (const b of biomarkersForSex) c[evaluated[b.id].status]++
+    const filled = biomarkersForSex.length - c.unknown
+    return { ...c, filled, total: biomarkersForSex.length }
+  }, [evaluated, biomarkersForSex])
 
   const correlations = useMemo(
     () => deriveCorrelations({ status: evaluated, report }),
@@ -104,6 +122,50 @@ export default function BiomarkersClient() {
           </p>
         </div>
 
+        {/* Biological sex toggle — controls reference ranges for
+            testosterone (total & free), hemoglobin, ferritin, and SHBG.
+            Persisted to localStorage so it sticks across visits. */}
+        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ss-border-warm/60">
+          <span className="text-xs font-bold uppercase tracking-wider text-ss-teal">
+            Biological sex
+          </span>
+          <div
+            role="radiogroup"
+            aria-label="Biological sex for biomarker reference ranges"
+            className="inline-flex overflow-hidden rounded-full ring-1 ring-ss-border-warm"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={sex === 'male'}
+              onClick={() => setSex('male')}
+              className={`px-4 py-1.5 text-sm font-semibold transition ${
+                sex === 'male'
+                  ? 'bg-ss-teal text-white'
+                  : 'bg-white text-ss-teal hover:bg-ss-bg'
+              }`}
+            >
+              Male
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={sex === 'female'}
+              onClick={() => setSex('female')}
+              className={`px-4 py-1.5 text-sm font-semibold transition ${
+                sex === 'female'
+                  ? 'bg-ss-teal text-white'
+                  : 'bg-white text-ss-teal hover:bg-ss-bg'
+              }`}
+            >
+              Female
+            </button>
+          </div>
+          <span className="text-xs text-ss-muted">
+            Adjusts testosterone, hemoglobin, ferritin &amp; SHBG reference ranges.
+          </span>
+        </div>
+
         <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[1fr,360px]">
           {/* ================= FORM ================= */}
           <section>
@@ -115,7 +177,7 @@ export default function BiomarkersClient() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {BIOMARKERS.map((b) => (
+              {biomarkersForSex.map((b) => (
                 <BiomarkerField
                   key={b.id}
                   field={b}

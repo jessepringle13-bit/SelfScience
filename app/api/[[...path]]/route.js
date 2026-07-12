@@ -627,6 +627,14 @@ async function handleSearch(request) {
     isPillarBrowse ? null : parsed
   )
 
+  // Quality filter: drop items whose abstract leaks database artifact IDs
+  // (UUIDs from OSF / Researka preprint pipelines that occasionally end up
+  // pasted into abstract text). Signature is a canonical UUID prefix like
+  // "0f1a2b3c-1d2e-3f4a-…". These records are almost always low-quality
+  // placeholder metadata and shouldn't rank in "Zone 2 training" etc.
+  const UUID_LEAK = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i
+  merged = merged.filter((r) => !UUID_LEAK.test(r?.abstract || ''))
+
   if (isPillarBrowse || isTextPillar) {
     // Pillar contexts (both pure-browse and text+pillar) bias to the last 5
     // years. For pillar-browse this is the whole pool; for text+pillar we

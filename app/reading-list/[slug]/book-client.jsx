@@ -18,12 +18,15 @@ const PILLAR_COLORS = {
 export default function BookClient({ slug }) {
   const router = useRouter()
   const book = BOOKS.find((b) => b.slug === slug)
-  const [cover, setCover] = useState(null)
+  const [cover, setCover] = useState(book?.coverUrl || null)
   const [related, setRelated] = useState({ loading: true, items: [] })
 
   useEffect(() => {
     if (!book) return
-    fetchOpenLibraryCover(book.title, book.author).then(setCover)
+    // Prefer explicit override; otherwise fall back to Open Library search.
+    if (!book.coverUrl) {
+      fetchOpenLibraryCover(book.title, book.author).then(setCover)
+    }
     // Auto-search for related research using searchQueries[0]
     fetch(`/api/search?q=${encodeURIComponent(book.searchQueries[0])}&limit=4`)
       .then((r) => r.ok ? r.json() : Promise.reject())

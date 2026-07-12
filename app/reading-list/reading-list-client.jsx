@@ -16,14 +16,18 @@ const PILLAR_COLORS = {
 }
 
 function BookCover({ book }) {
-  const [src, setSrc] = useState(null)
+  // Prefer an explicit `book.coverUrl` override when the data file
+  // supplies one (used when Open Library's title+author search doesn't
+  // resolve reliably, e.g. The Genome Factor).
+  const [src, setSrc] = useState(book.coverUrl || null)
   useEffect(() => {
+    if (book.coverUrl) return // explicit override — skip lookup
     let alive = true
     fetchOpenLibraryCover(book.title, book.author).then((url) => {
       if (alive) setSrc(url)
     })
     return () => { alive = false }
-  }, [book.title, book.author])
+  }, [book.title, book.author, book.coverUrl])
   const bg = PILLAR_COLORS[book.pillar[0]] || '#1B474D'
   return (
     <div className="relative flex h-40 items-center justify-center overflow-hidden bg-[#F9F8F5]">

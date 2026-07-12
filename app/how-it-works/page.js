@@ -32,7 +32,7 @@ export default function HowItWorksPage() {
           Type any health or genomics topic into the search bar. SelfScience searches two major scientific databases simultaneously:
         </p>
         <p>
-          <strong>PubMed</strong> &mdash; the National Library of Medicine&rsquo;s database of over 35 million peer-reviewed biomedical citations. The most comprehensive source of medical research in the world.
+          <strong>PubMed</strong> &mdash; the National Library of Medicine&rsquo;s database of over 37 million peer-reviewed biomedical citations. The most comprehensive source of medical research in the world.
         </p>
         <p>
           <strong>Semantic Scholar</strong> &mdash; a free academic search engine covering health, genomics, nutrition, and sports science research across millions of papers.

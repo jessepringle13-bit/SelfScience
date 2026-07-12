@@ -1,4 +1,5 @@
 import SiteNav from '@/components/site-nav'
+import SiteFooter from '@/components/SiteFooter'
 import Link from 'next/link'
 
 export const metadata = {
@@ -172,6 +173,7 @@ export default function APOEArticle() {
           </div>
         </article>
       </main>
+      <SiteFooter />
     </>
   )
 }
