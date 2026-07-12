@@ -986,6 +986,36 @@ frontend:
             for that symbol — the user's variants are now globally
             reachable from anywhere they'd normally search.
 
+  - task: "BUG FIX — Dashboard/Discover toggle disappears in Discover mode + missing SiteNav in Dashboard"
+    implemented: true
+    working: true
+    file: "/app/app/page.js, /app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Two related layout bugs:
+            1) The fixed floating toggle ("My Dashboard" | "Discover") was
+               z-40, same as SiteNav. In Discover mode the dark hero
+               SiteNav renders after the toggle in the DOM, so it won the
+               stacking contest → toggle disappeared. Fixed by:
+                 - Bumping toggle z-index to z-[60]
+                 - Moving toggle from top-4 to top-20 / md:top-[76px] so it
+                   sits BELOW the SiteNav header (never visually collides
+                   with the center nav links).
+            2) While auditing this we noticed Dashboard.jsx never rendered
+               SiteNav at all — so users on the personalized Dashboard had
+               no way to reach Search, Tools, Pillars, About, etc. Added
+               <SiteNav /> at the top of Dashboard.jsx and bumped the
+               container padding to pt-24 md:pt-28 to clear the absolute-
+               positioned header.
+            Verified: toggle visible + clickable in both Dashboard and
+            Discover modes; SiteNav consistently present in both modes;
+            no visual overlap.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

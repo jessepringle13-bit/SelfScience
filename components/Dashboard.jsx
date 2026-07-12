@@ -16,7 +16,7 @@ import Link from 'next/link'
 import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass, FileText } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants } from '@/lib/supplementProtocol'
-import { PILLARS } from '@/components/site-nav'
+import { PILLARS, default as SiteNav } from '@/components/site-nav'
 
 export default function Dashboard() {
   const [report, setReport] = useState(null)
@@ -58,8 +58,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-ss-bg pb-20">
-      {/* Header */}
-      <div className="container pt-10">
+      <SiteNav />
+      {/* Header — pt-24 clears the absolute-positioned SiteNav (~64px) + a
+          gap for the fixed dashboard/discover toggle beneath it. */}
+      <div className="container pt-24 md:pt-28">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">

@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-12T00:58:56.171Z",
+  "lastUpdated": "2026-07-12T00:59:54.949Z",
   "totals": {
-    "calls": 313,
-    "inTokens": 214159,
-    "outTokens": 97143,
-    "usd": 0.03408217000000001
+    "calls": 314,
+    "inTokens": 215344,
+    "outTokens": 97663,
+    "usd": 0.03412147000000001
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -81,13 +81,13 @@
       "last": "2026-07-11T00:58:31.879Z"
     },
     "openrouter|meta-llama/llama-3.1-8b-instruct|plain-language": {
-      "calls": 68,
-      "inTokens": 79272,
-      "outTokens": 30298,
-      "usd": 0.002494380000000001,
+      "calls": 69,
+      "inTokens": 80457,
+      "outTokens": 30818,
+      "usd": 0.002533680000000001,
       "unknownPrice": false,
       "first": "2026-07-11T00:59:02.106Z",
-      "last": "2026-07-12T00:58:53.981Z"
+      "last": "2026-07-12T00:59:24.949Z"
     },
     "openrouter|meta-llama/llama-3.3-70b-instruct:free|reliability": {
       "calls": 64,
@@ -122,25 +122,13 @@
       "usd": 0.017999649999999996
     },
     "2026-07-12": {
-      "calls": 52,
-      "inTokens": 36719,
-      "outTokens": 8348,
-      "usd": 0.00098482
+      "calls": 53,
+      "inTokens": 37904,
+      "outTokens": 8868,
+      "usd": 0.0010241199999999999
     }
   },
   "ring": [
-    {
-      "ts": "2026-07-11T02:27:20.750Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "reliability",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1622,
-      "outTokens": 116,
-      "usd": 0.00003592,
-      "latencyMs": 2125
-    },
     {
       "ts": "2026-07-11T02:27:21.482Z",
       "provider": "openrouter",
@@ -2528,6 +2516,18 @@
       "outTokens": 163,
       "usd": 0.00004021,
       "latencyMs": 23184
+    },
+    {
+      "ts": "2026-07-12T00:59:24.949Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "plain-language",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1185,
+      "outTokens": 520,
+      "usd": 0.000039300000000000007,
+      "latencyMs": 56223
     }
   ]
 }
