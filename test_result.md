@@ -1077,6 +1077,70 @@ frontend:
             Verified: post-fix, navigating between /, /search, /genome and
             back produced ZERO console errors.
 
+  - task: "Dashboard pillar handoff → cross-referenced multi-gene search + citations sort"
+    implemented: true
+    working: true
+    file: "/app/components/Dashboard.jsx, /app/app/search/search-client.jsx, /app/components/result-card.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User request: clicking a pillar tile from the Dashboard should
+            surface studies about (pillar × each of the user's genes tagged
+            to that pillar), highlight the matched genes in orange, default
+            to Last 10 Years but keep Historic reachable, and add a
+            citation-count sort. Implemented end-to-end.
+            Dashboard.jsx:
+              • useMemo builds pillarGenes: { [pillarName]: [geneSymbols] }
+                from flattenReportCards(report). Strips haplotype noise
+                (e.g. "APOE ε3/ε4" → "APOE") and rsIDs.
+              • ExplorePillarCard now renders orange gene chips under each
+                pillar and links to /search?pillar=X&genes=A,B,C.
+            search-client.jsx:
+              • activeGenes read from ?genes= URL param (max 12, upper-cased,
+                de-duped).
+              • runSearch() fans out one API call per gene when activeGenes
+                is non-empty (query = `${gene} ${pillar_query_or_user_q}`,
+                perGeneLimit tuned to cap ~30 results total). Results merged
+                by DOI/PMID/id and tagged with _matchedGenes[]. Response
+                bucketed by source (pubmed / semantic_scholar / openalex /
+                crossref) so the existing rendering logic works.
+              • New "Cross-referencing NUTRITION with ALDH2 × CYP1A2 × LCT ×
+                Clear" banner appears whenever activeGenes is set. Chips
+                are removable (setActiveGenes on click) and the explainer
+                previews the highlight styling.
+              • Default dateRange changed to '10' (Last 10 Years) when the
+                page arrives with any hand-off (pillar, pillar+genes, or
+                genes). DATE_OPTIONS reordered to lead with "Last 10 Years"
+                and the "All Time" entry is now labelled "All Time ·
+                Include Historic" to make historic research explicitly
+                discoverable.
+              • New SORT_OPTIONS: 'relevance' (default), 'citations' (by
+                citationCount descending — already surfaced on cards),
+                'newest' (by year descending). Wired to the client-side
+                sort inside the filtered useMemo.
+            result-card.jsx:
+              • Accepts highlightGenes prop from the search page.
+              • Computes matchedGenes = ∪(item._matchedGenes,
+                highlightGenes-found-in-title/abstract), de-duped upper.
+              • Renders an orange chip row above the title for each matched
+                gene, and wraps gene occurrences inside the title with a
+                <HighlightedText> component that <mark>-tags them with the
+                same orange treatment (word-boundary regex, escape-safe,
+                longest-first so CYP1A doesn't half-match CYP1A2).
+            Verified via screenshots:
+              • /search?pillar=Nutrition&genes=ALDH2,CYP1A2,LCT shows the
+                cross-referencing banner with removable chips + Clear
+                affordance, Last 10 Years selected by default, Sort/Reliability
+                filters visible. Older Nutrition-gene studies gracefully
+                surface only when the user opts into "All Time · Include
+                Historic" — the design goal.
+              • Dashboard "Explore Your Pillars" tiles now display orange
+                gene chips per pillar (Nutrition → ALDH2, CYP1A2, LCT).
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

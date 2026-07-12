@@ -32,6 +32,34 @@ const SOURCE_META = {
 
 const AMBER = '#964219'
 
+/**
+ * Render `text` with word-boundary matches of any string in `terms` wrapped
+ * in an orange <mark> tag. Case-insensitive; terms are escaped for regex
+ * safety. Returns React children so React handles the DOM.
+ */
+function HighlightedText({ text, terms }) {
+  if (!text || !terms?.length) return text
+  // Sort terms longest-first so we don't half-match "CYP1A" inside "CYP1A2".
+  const sorted = [...terms].sort((a, b) => b.length - a.length)
+  const escaped = sorted.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const re = new RegExp(`\\b(${escaped.join('|')})\\b`, 'gi')
+  const parts = String(text).split(re)
+  return parts.map((p, i) => {
+    if (i % 2 === 1) {
+      return (
+        <mark
+          key={i}
+          className="rounded bg-ss-orange/25 px-0.5 font-mono text-[0.92em] font-bold uppercase text-ss-orange"
+          style={{ background: 'transparent' }}
+        >
+          <span className="rounded bg-ss-orange/20 px-0.5 text-ss-orange">{p.toUpperCase()}</span>
+        </mark>
+      )
+    }
+    return p
+  })
+}
+
 export function SourceBadge({ type }) {
   const meta = SOURCE_META[type] || SOURCE_META['peer-reviewed']
   return (
@@ -233,7 +261,7 @@ export function FundingTrailPanel({ funding }) {
   )
 }
 
-export function ResultCard({ item, variant = 'stacked' }) {
+export function ResultCard({ item, variant = 'stacked', highlightGenes = [] }) {
   const [expanded, setExpanded] = useState(false)
   const router = useRouter()
 
@@ -241,6 +269,22 @@ export function ResultCard({ item, variant = 'stacked' }) {
   const hasReliability = typeof item.reliability === 'number' && item.reliability > 0
   const analysisError = item._analysisError === true
   const fundingWarn = item.funding && item.funding.score <= 2
+
+  // Genes to visually highlight in the title/abstract + surface as chips at
+  // the top of the card. Combines any gene the server-side fan-out flagged
+  // (item._matchedGenes) with a client-side scan of the title/abstract for
+  // the user's own gene list (highlightGenes). Both are de-duped uppercase.
+  const inTextGenes = (highlightGenes && highlightGenes.length)
+    ? highlightGenes.filter((g) => {
+        const re = new RegExp(`\\b${g}\\b`, 'i')
+        return re.test(item.title || '') || re.test(item.abstract || '') || re.test(item.summary || '')
+      })
+    : []
+  const matchedGenes = Array.from(new Set([
+    ...(item._matchedGenes || []),
+    ...inTextGenes,
+  ].map((g) => (g || '').toUpperCase())))
+    .filter(Boolean)
 
   // Border color: amber overrides when funding is a concern
   const leftBorderColor = fundingWarn ? AMBER : meta.color
@@ -299,13 +343,35 @@ export function ResultCard({ item, variant = 'stacked' }) {
         <span className="text-xs text-ss-muted">{item.year || '—'}</span>
       </div>
 
+      {/* Gene chips — only when a Dashboard pillar hand-off flagged this
+          study as relevant to one of the user's genes. Rendered in orange
+          to match the "your genes" motif elsewhere in the app. */}
+      {matchedGenes.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {matchedGenes.slice(0, 6).map((g) => (
+            <span
+              key={g}
+              className="rounded-full bg-ss-orange/15 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-ss-orange"
+              title={`Study relevant to your ${g} variant`}
+            >
+              {g}
+            </span>
+          ))}
+          {matchedGenes.length > 6 && (
+            <span className="text-[10px] text-ss-muted">+{matchedGenes.length - 6}</span>
+          )}
+        </div>
+      )}
+
       {/* Title now opens /study/[id] */}
       <button
         type="button"
         onClick={openStudy}
         className="mt-3 block text-left text-[17px] font-bold leading-snug text-ss-teal hover:underline"
       >
-        {item.title}
+        {matchedGenes.length > 0
+          ? <HighlightedText text={item.title} terms={matchedGenes} />
+          : item.title}
       </button>
       <p className="mt-1 text-xs text-ss-muted">
         {item.journal || '—'}

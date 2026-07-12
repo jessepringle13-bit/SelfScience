@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass, FileText } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
-import { matchProtocolToUserVariants } from '@/lib/supplementProtocol'
+import { matchProtocolToUserVariants, flattenReportCards } from '@/lib/supplementProtocol'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 
 export default function Dashboard() {
@@ -55,6 +55,31 @@ export default function Dashboard() {
   }, [report])
 
   const pillarSummary = report?.step1?.pillar_summary || {}
+
+  // Map each pillar name → the user's gene symbols associated with it via
+  // the classified variant cards. Used to build "pillar + your genes"
+  // hand-off links on the pillar tiles so clicking Genomics from the
+  // Dashboard searches for the pillar keyword AND the user's actual
+  // Genomics-tagged genes at once.
+  const pillarGenes = useMemo(() => {
+    if (!report) return {}
+    const map = {}
+    for (const c of flattenReportCards(report)) {
+      const pillar = (c.pillar || '').trim()
+      const gene = (c.gene || '').trim()
+      if (!pillar || !gene) continue
+      // Strip haplotype-style noise from combined labels like
+      // "MTHFR (C677T)" or "APOE ε3/ε4" — keep the primary gene symbol.
+      const symbol = gene.split(/[\s(/·+,]/)[0].toUpperCase()
+      if (!symbol || symbol.length > 12 || /^RS\d/i.test(symbol)) continue
+      if (!map[pillar]) map[pillar] = new Set()
+      map[pillar].add(symbol)
+    }
+    // Convert Sets to sorted arrays for stable URL params.
+    const out = {}
+    for (const [k, v] of Object.entries(map)) out[k] = [...v].sort()
+    return out
+  }, [report])
 
   return (
     <div className="min-h-screen bg-ss-bg pb-20">
@@ -180,7 +205,7 @@ export default function Dashboard() {
         <DashSection title="Explore Your Pillars" subtitle="Dive into the research grouped by pillar." toneClass="text-ss-teal">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {PILLARS.map((p) => (
-              <ExplorePillarCard key={p.key} pillar={p} />
+              <ExplorePillarCard key={p.key} pillar={p} genes={pillarGenes[p.name] || []} />
             ))}
           </div>
         </DashSection>
@@ -288,10 +313,14 @@ function PillarTile({ pillar, summary }) {
   )
 }
 
-function ExplorePillarCard({ pillar }) {
+function ExplorePillarCard({ pillar, genes = [] }) {
+  // Attach the user's genes for this pillar as a URL param so the search
+  // page can fan out to per-gene queries and highlight matches.
+  const params = new URLSearchParams({ pillar: pillar.name })
+  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
   return (
     <Link
-      href={`/search?pillar=${encodeURIComponent(pillar.name)}`}
+      href={`/search?${params.toString()}`}
       className="flex items-start gap-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
@@ -300,6 +329,18 @@ function ExplorePillarCard({ pillar }) {
       <div className="min-w-0 flex-1">
         <div className="font-bold text-ss-teal">{pillar.name}</div>
         <div className="mt-1 text-xs text-ss-muted line-clamp-2">{pillar.description}</div>
+        {genes.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {genes.slice(0, 6).map((g) => (
+              <span key={g} className="rounded-full bg-ss-orange/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-ss-orange">
+                {g}
+              </span>
+            ))}
+            {genes.length > 6 && (
+              <span className="text-[10px] text-ss-muted">+{genes.length - 6}</span>
+            )}
+          </div>
+        )}
       </div>
       <ArrowRight size={14} className="mt-2 flex-shrink-0 text-ss-muted" />
     </Link>

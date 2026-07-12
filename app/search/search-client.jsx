@@ -26,10 +26,19 @@ const SOURCE_TYPE_OPTIONS = [
 ]
 
 const DATE_OPTIONS = [
-  { key: 'any', label: 'All Time' },
-  { key: '2',  label: 'Last 2 Years' },
-  { key: '5',  label: 'Last 5 Years' },
+  // Order matters — the first entry is the visual anchor. We reorder so
+  // "Last 10 Years" leads (matches the new default) and "All Time / Historic"
+  // remains a clear opt-in for older research.
   { key: '10', label: 'Last 10 Years' },
+  { key: '5',  label: 'Last 5 Years' },
+  { key: '2',  label: 'Last 2 Years' },
+  { key: 'any',label: 'All Time · Include Historic' },
+]
+
+const SORT_OPTIONS = [
+  { key: 'relevance', label: 'Best match' },
+  { key: 'citations', label: 'Most cited' },
+  { key: 'newest',    label: 'Newest first' },
 ]
 
 const RELIABILITY_OPTIONS = [
@@ -172,6 +181,13 @@ export default function SearchClient() {
   const params = useSearchParams()
   const initialQ = params.get('q') || ''
   const initialPillar = params.get('pillar') || ''
+  // Pillar hand-off from Dashboard: /search?pillar=X&genes=A,B,C carries the
+  // user's classified genes for that pillar so we can fan out per-gene queries
+  // AND highlight the matches on each result card.
+  const initialGenes = useMemo(() => {
+    const raw = params.get('genes') || ''
+    return raw.split(',').map((g) => g.trim().toUpperCase()).filter(Boolean).slice(0, 12)
+  }, [params])
   const isInitialPillarBrowse = !initialQ && !!getPillarQuery(initialPillar)
   const isInitialTextPillar = !!initialQ && !!getPillarQuery(initialPillar)
 
@@ -179,12 +195,15 @@ export default function SearchClient() {
   const [submittedQ, setSubmittedQ] = useState(initialQ)
   const [sourceType, setSourceType] = useState('all')
   const [pillar, setPillar] = useState(initialPillar)
-  // Default to "Last 5 Years" whenever a pillar is in the URL (either pure
-  // browse or text+pillar filtered). Else All Time.
+  const [activeGenes, setActiveGenes] = useState(initialGenes)
+  // Default date filter: 10 years when any structured hand-off is active
+  // (pillar, or pillar+genes, or explicit gene set) — else All Time so
+  // "Historic" studies (>10 yrs) remain reachable via the filter.
   const [dateRange, setDateRange] = useState(
-    (isInitialPillarBrowse || isInitialTextPillar) ? '5' : 'any'
+    (isInitialPillarBrowse || isInitialTextPillar || initialGenes.length > 0) ? '10' : 'any'
   )
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
+  const [sortMode, setSortMode] = useState('relevance')
 
   // Genome-loaded state — powers the "Your genes" chip row so a user can
   // dispatch a search for any of their recognised variants without leaving
@@ -229,11 +248,11 @@ export default function SearchClient() {
   const [page, setPage] = useState(0)
   const analyzedRef = useRef(new Set()) // ids we've already sent to /analyze
 
-  const runSearch = useCallback(async (q, pill) => {
+  const runSearch = useCallback(async (q, pill, genes = []) => {
     const trimmed = (q || '').trim()
     const pillarQuery = getPillarQuery(pill)
     // Allow pillar-only browse: no user query, but pillar has a curated one.
-    if (!trimmed && !pillarQuery) {
+    if (!trimmed && !pillarQuery && genes.length === 0) {
       setData(null)
       return
     }
@@ -243,15 +262,54 @@ export default function SearchClient() {
     setPage(0)
     analyzedRef.current = new Set()
     try {
-      const url = new URL('/api/search', window.location.origin)
-      if (trimmed) url.searchParams.set('q', trimmed)
-      // In pillar-browse mode fetch fewer (20) since we don't paginate through them.
-      url.searchParams.set('limit', trimmed ? '40' : '20')
-      if (pill) url.searchParams.set('pillar', pill)
-      const res = await fetch(url.toString())
-      if (!res.ok) throw new Error(`Search failed (${res.status})`)
-      const json = await res.json()
-      setData(json)
+      let merged = { pubmed: [], semantic_scholar: [], openalex: [], crossref: [] }
+
+      if (genes.length > 0) {
+        const perGeneLimit = Math.max(6, Math.floor(30 / genes.length))
+        const anchor = trimmed || pillarQuery || ''
+        const requests = genes.map((g) => {
+          const url = new URL('/api/search', window.location.origin)
+          const qStr = anchor ? `${g} ${anchor}` : g
+          url.searchParams.set('q', qStr)
+          url.searchParams.set('limit', String(perGeneLimit))
+          return fetch(url.toString())
+            .then((r) => (r.ok ? r.json() : {}))
+            .then((j) => ({ gene: g, results: j }))
+            .catch(() => ({ gene: g, results: {} }))
+        })
+        const batches = await Promise.all(requests)
+        const byKey = new Map()
+        // Preserve every provider bucket the /api/search endpoint returns,
+        // not just pubmed + semantic_scholar. Anything with `.length` is a
+        // list of results.
+        const SOURCES = ['pubmed', 'semantic_scholar', 'openalex', 'crossref']
+        for (const { gene, results } of batches) {
+          for (const src of SOURCES) {
+            for (const item of (results[src] || [])) {
+              const key = item.doi || item.pmid || item.id || `${src}:${item.title}`
+              const prev = byKey.get(key)
+              if (prev) {
+                if (!prev._matchedGenes.includes(gene)) prev._matchedGenes.push(gene)
+              } else {
+                byKey.set(key, { ...item, _matchedGenes: [gene], _source: src })
+              }
+            }
+          }
+        }
+        const all = [...byKey.values()]
+        for (const src of SOURCES) merged[src] = all.filter((x) => x._source === src)
+        merged.isPillarBrowse = true
+      } else {
+        const url = new URL('/api/search', window.location.origin)
+        if (trimmed) url.searchParams.set('q', trimmed)
+        url.searchParams.set('limit', trimmed ? '40' : '20')
+        if (pill) url.searchParams.set('pillar', pill)
+        const res = await fetch(url.toString())
+        if (!res.ok) throw new Error(`Search failed (${res.status})`)
+        merged = await res.json()
+      }
+
+      setData(merged)
     } catch (e) {
       setError(e.message || 'Something went wrong')
       setData(null)
@@ -261,9 +319,12 @@ export default function SearchClient() {
   }, [])
 
   useEffect(() => {
-    // Fire search when we have either a submitted query OR a pillar-browse.
-    if (submittedQ || getPillarQuery(pillar)) runSearch(submittedQ, pillar)
-  }, [submittedQ, pillar, runSearch])
+    // Fire search when we have either a submitted query OR a pillar-browse
+    // OR a gene hand-off from the Dashboard.
+    if (submittedQ || getPillarQuery(pillar) || activeGenes.length > 0) {
+      runSearch(submittedQ, pillar, activeGenes)
+    }
+  }, [submittedQ, pillar, activeGenes, runSearch])
 
   const submit = (e) => {
     e?.preventDefault?.()
@@ -363,8 +424,15 @@ export default function SearchClient() {
       const min = reliabilityFilter === 'excellent' ? 5 : 4
       list = list.filter((r) => typeof r.reliability === 'number' && r.reliability >= min)
     }
+    // Sort — relevance keeps provider order, citations descends by
+    // citationCount (missing values treated as 0), newest descends by year.
+    if (sortMode === 'citations') {
+      list = [...list].sort((a, b) => (b.citationCount || 0) - (a.citationCount || 0))
+    } else if (sortMode === 'newest') {
+      list = [...list].sort((a, b) => (b.year || 0) - (a.year || 0))
+    }
     return list
-  }, [merged, sourceType, dateRange, reliabilityFilter])
+  }, [merged, sourceType, dateRange, reliabilityFilter, sortMode])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages - 1)
@@ -373,7 +441,7 @@ export default function SearchClient() {
   // Reset to page 0 when filters change
   useEffect(() => {
     setPage(0)
-  }, [sourceType, dateRange, reliabilityFilter, pillar, submittedQ])
+  }, [sourceType, dateRange, reliabilityFilter, sortMode, pillar, submittedQ])
 
   // Kick off AI analysis for the visible page (only items not yet analyzed)
   useEffect(() => {
@@ -555,6 +623,7 @@ export default function SearchClient() {
           </div>
           <FilterGroup label="Type" options={SOURCE_TYPE_OPTIONS} value={sourceType} onChange={setSourceType} />
           <FilterGroup label="Date" options={DATE_OPTIONS} value={dateRange} onChange={setDateRange} />
+          <FilterGroup label="Sort" options={SORT_OPTIONS} value={sortMode} onChange={setSortMode} />
           <FilterGroup label="Reliability" options={RELIABILITY_OPTIONS} value={reliabilityFilter} onChange={setReliabilityFilter} />
         </div>
       </section>
@@ -588,6 +657,44 @@ export default function SearchClient() {
           )}
         </div>
 
+        {/* Cross-referencing banner — visible when the search was launched
+            from a Dashboard pillar tile with the user's genes attached, or
+            any time activeGenes are set. Chips are removable so the user
+            can narrow the fan-out. */}
+        {activeGenes.length > 0 && (
+          <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ss-border-warm/60">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ss-orange">
+                Cross-referencing {pillar || 'your search'} with
+              </span>
+              {activeGenes.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setActiveGenes(activeGenes.filter((x) => x !== g))}
+                  className="group inline-flex items-center gap-1 rounded-full bg-ss-orange/15 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ss-orange transition hover:bg-ss-orange hover:text-white"
+                  title={`Remove ${g} from cross-reference`}
+                >
+                  {g}
+                  <span className="text-[10px] opacity-60 group-hover:opacity-100">×</span>
+                </button>
+              ))}
+              {activeGenes.length > 1 && (
+                <button
+                  onClick={() => setActiveGenes([])}
+                  className="ml-1 text-[11px] font-semibold text-ss-muted hover:text-ss-teal"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-ss-muted">
+              Each result is scored against these genes — matching genes are highlighted{' '}
+              <span className="rounded bg-ss-orange/20 px-1 font-mono font-bold text-ss-orange">like this</span>{' '}
+              in the title and shown as chips on the card.
+            </p>
+          </div>
+        )}
+
         {loading && <SkeletonList />}
         {!loading && error && (
           <div className="flex items-start gap-3 rounded-lg border border-ss-amber/40 bg-white p-4 text-sm text-ss-amber">
@@ -598,12 +705,12 @@ export default function SearchClient() {
             </div>
           </div>
         )}
-        {!loading && !error && (submittedQ || data?.isPillarBrowse) && filtered.length === 0 && (
+        {!loading && !error && (submittedQ || data?.isPillarBrowse || activeGenes.length > 0) && filtered.length === 0 && (
           <div className="rounded-lg border border-ss-border-warm bg-white p-6 text-sm text-ss-muted">
             No results matching your filters. Try loosening them or a different query.
           </div>
         )}
-        {!loading && !error && !submittedQ && !data?.isPillarBrowse && (
+        {!loading && !error && !submittedQ && !data?.isPillarBrowse && activeGenes.length === 0 && (
           <div className="rounded-lg border border-dashed border-ss-border-warm bg-white p-8 text-center text-sm text-ss-muted">
             Enter a topic, gene, molecule, or study above to search PubMed, Semantic Scholar, OpenAlex &amp; Crossref.
           </div>
@@ -613,7 +720,7 @@ export default function SearchClient() {
           <>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {paged.map((item) => (
-                <ResultCard key={item.id} item={item} />
+                <ResultCard key={item.id} item={item} highlightGenes={activeGenes} />
               ))}
             </div>
 
