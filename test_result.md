@@ -837,27 +837,72 @@ frontend:
         -working: true
           agent: "main"
           comment: |
-            Two ancestry-page improvements:
-            1. "Want higher accuracy?" card below the composition estimate,
-               linking three free full-genome ancestry services (DNA.land,
-               GEDmatch, Impute.me) with brief blurbs and an explicit
-               "no affiliation / no referral fees" disclaimer. Users manually
-               re-upload their same 23andMe / AncestryDNA file to these
-               services — nothing is proxied server-side.
-            2. Three new ancestry-informative markers (AIMs) added to
-               populationDetailFrequencies.js so the composition estimator has
-               real discriminatory power:
-               - rs4833103 (DARC / ACKR1 Duffy null): AFR 0.99, EUR/EAS ~0.001
-               - rs2814778 (same locus — commonly reported alternative rsID)
-               - rs1426654 (SLC24A5 European skin lightening): EUR ~0.999,
-                 AFR ~0.07, EAS ~0.005, bimodal SAS ~0.55
-               These are ancestry-only markers (not clinically actionable) —
-               labelled as such in the file so nobody grafts them onto the
-               research pillars. rs4988235 (LCT) was already in the panel.
-            Verified with a synthesised genome carrying Duffy null CC + SLC24A5
-            heterozygous: variant count jumped from 14 → 17, informative
-            markers from 6 → 9, and both new rsIDs appear in the contributions
-            table.
+            "Want higher accuracy?" card with DNA.land / GEDmatch / Impute.me
+            links. Three new AIMs added (rs4833103 / rs2814778 Duffy-null,
+            rs1426654 SLC24A5) so AFR/EUR discrimination is meaningful.
+
+  - task: "Drug Check v2 — multi-enzyme schema + recreational entries + 3-section UI"
+    implemented: true
+    working: true
+    file: "/app/lib/drugCatalog.js, /app/app/drug-check/drug-check-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Full overhaul of Drug Check.
+            Data (drugCatalog.js):
+              • New schema — each drug now carries pk_genes[] (metabolism),
+                pd_genes[] (receptor/target), and critical_interactions[] with
+                per-item {severity, text, match(ctx)} tuples. Severity tiers:
+                critical / significant / moderate / informational plus the
+                existing clear/notice/caution set (all mapped to shared UI
+                chips in SEVERITY_META).
+              • 10 recreational / harm-reduction entries added: Alcohol,
+                Cannabis (THC), MDMA, Nicotine, Cocaine, Opioids, Psychedelics
+                (LSD / Psilocybin), Benzodiazepines, Methamphetamine, plus
+                Caffeine as a stimulant. Every entry has personalised match
+                predicates so interactions filter to the user's actual variants;
+                match=always items surface under "Universal cautions".
+              • All existing prescription drugs migrated to the new schema
+                (pk_genes derived from primaryGene/extraGenes; legacy
+                guidance() functions preserved).
+              • personaliseInteractions(drug, ctx) helper splits critical_interactions
+                into { personalised, general } based on the user's phenotype +
+                raw variants.
+              • HARM_REDUCTION_DISCLAIMER + SAMHSA_HELPLINE constants exported.
+            UI (drug-check-client.jsx):
+              • Harm-reduction opt-in TOGGLE (off by default, persisted in
+                localStorage under selfscience_drug_harm_reduction_opt_in). When
+                off, suggestDrugs() excludes recreational entries entirely; the
+                "no matches" hint offers an inline "Enable harm-reduction
+                content" link.
+              • Recreational cards get a top harm-reduction disclaimer
+                (orange), the standard 3-section body, and a SAMHSA
+                helpline card at the bottom with phone number + link.
+              • 3-section layout: "Your metabolism profile" (pk_genes),
+                "Your receptor profile" (pd_genes), and "Key interactions
+                for you" (personalised + universal cautions, severity-coloured).
+              • Gene rows show the user's raw genotype call when the rsID is
+                specified, and their derived phenotype label when applicable.
+              • Phenotype snapshot at page bottom continues to link only to
+                prescription drugs (recreational entries filtered out).
+            Manual screenshot testing confirms:
+              • Clopidogrel (Rx) renders 3-section layout with no HR disclaimer
+                and no SAMHSA card.
+              • "Cannabis" search with HR toggle OFF shows the "no matches"
+                hint with an "Enable harm-reduction content" affordance.
+              • Toggling HR on immediately surfaces Cannabis in results with a
+                "HARM REDUCTION" pill tag.
+              • Cannabis card shows COMT/AKT1/BDNF pd_genes with per-user
+                raw calls ("Your call: AG"), correctly-filtered interactions
+                (BDNF Met carrier surfaced as MODERATE for the sample AG
+                genotype; COMT-GG interaction correctly HIDDEN for AG carrier),
+                and the SAMHSA helpline card at bottom.
+              • MDMA / Alcohol / other recreational entries follow the same
+                pattern.
 
 metadata:
   created_by: "main_agent"
