@@ -100,6 +100,7 @@ export function SiteNav({ variant = 'light' }) {
   // under a single "Tools" dropdown so the desktop nav stays scannable.
   // On mobile the drawer still lists them individually so nothing is hidden.
   const TOOL_ITEMS = [
+    { href: '/nutrition',           label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
     { href: '/biomarkers',         label: 'Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
     { href: '/training',           label: 'Training Protocol', Icon: Activity,  blurb: 'Zone-based training + sport affinity.' },
     { href: '/drug-check',         label: 'Drug Check',        Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },

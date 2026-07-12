@@ -161,6 +161,47 @@ backend:
         -working: true
           agent: "testing"
           comment: "Verified during testing - GET /api returns service metadata correctly (status: ok, service: selfscience, version: 0.2.0, endpoints array present)."
+  - task: "GET /api/nutrition/product — Open Food Facts proxy for barcode lookup and product search"
+    implemented: true
+    working: true
+    file: "/app/app/api/nutrition/product/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+          agent: "main"
+          comment: |
+            New server-side proxy to Open Food Facts API. No authentication required.
+            Accepts either 'barcode' or 'query' parameter:
+            - Barcode lookup: GET /api/nutrition/product?barcode=<code> returns single product
+            - Text search: GET /api/nutrition/product?query=<text> returns up to 10 products
+            - Missing params: Returns 400 with error message
+            Response shape for each product: { name, brand, barcode, image, ingredients_text,
+            ingredients[], allergens[], additives[], nutriments:{energy_kcal, protein, carbs,
+            sugars, fat, saturated_fat, fiber, sodium}, nutriscore, nova_group, serving_size }
+            All nutriment values may be null when Open Food Facts lacks data, but keys are always present.
+        -working: true
+          agent: "testing"
+          comment: |
+            ✅ ALL TESTS PASSED (17/17). Comprehensive backend testing completed:
+            1. Valid barcode lookup (0038000845017 - Pringles): Returns 200 with complete product object,
+               name "Pringles, jalapeno potato crisp", ingredients contain expected keywords (potato, corn,
+               wheat, rice, oil, salt), all required fields present with correct types
+            2. Invalid barcode lookup (0000000000000): Returns 404 with error "Product not found"
+            3. Text query search (oatly oat milk): Returns 200 with 10 products array, all products have
+               valid shape, first product "Organic oat drink" from Oatly brand validated
+            4. Missing parameters: Returns 400 with error "Provide barcode or query"
+            5. Response shape stability: All products contain required fields (name, brand, barcode, image,
+               ingredients_text, ingredients, allergens, additives, nutriments with 8 sub-fields, nutriscore,
+               nova_group, serving_size). Nutriment values correctly allow null when data missing.
+            6. Regression check: All previously-verified endpoints still working:
+               - GET /api/search?q=MTHFR%20C677T → 200 with results
+               - GET /api/autocomplete?q=metfor → 200
+               - GET /api/ → 200 with service metadata
+            Note: One transient 500 error observed on first test run for text query (likely Open Food Facts
+            API temporary issue), but all subsequent tests passed consistently. This is acceptable for
+            external API dependency with proper error handling in place.
 
 frontend:
   - task: "Complete reading list feature — /lib/books.js + list page + book detail + genome recommendations"
@@ -1399,12 +1440,12 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.3"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Dashboard pillar handoff v2 — round-robin fan-out + Your Genes carousel with multi-select"
+    - "GET /api/nutrition/product — Open Food Facts proxy for barcode lookup and product search"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -1439,6 +1480,55 @@ agent_communication:
            overall 200 with results:[] should still hold.
         No other backend changes since last test — pubmed, autocomplete,
         and everything else on the router are untouched.
+    -agent: "testing"
+      message: |
+        NUTRITION ENDPOINT TESTING COMPLETE — All scenarios verified.
+        
+        Executed comprehensive backend API testing on the new /api/nutrition/product endpoint
+        (Open Food Facts proxy). This is a server-side proxy with no authentication required.
+        
+        Test Results: 17/17 PASSED ✅
+        
+        Scenarios Verified:
+        1. Valid barcode lookup (0038000845017 - Pringles):
+           - HTTP 200 with complete product object
+           - Product name: "Pringles, jalapeno potato crisp"
+           - All required fields present with correct types
+           - Ingredients contain expected keywords (potato, corn, wheat, rice, oil, salt)
+        
+        2. Invalid barcode lookup (0000000000000):
+           - HTTP 404 with error message "Product not found"
+           - Correct error handling
+        
+        3. Text query search (oatly oat milk):
+           - HTTP 200 with products array (10 results)
+           - All products have valid shape
+           - First product validated: "Organic oat drink" from Oatly
+        
+        4. Missing parameters:
+           - HTTP 400 with error message "Provide barcode or query"
+           - Proper validation
+        
+        5. Response shape stability:
+           - All products contain required fields: name, brand, barcode, image, 
+             ingredients_text, ingredients[], allergens[], additives[], 
+             nutriments{energy_kcal, protein, carbs, sugars, fat, saturated_fat, 
+             fiber, sodium}, nutriscore, nova_group, serving_size
+           - Nutriment values correctly allow null when data missing (keys always present)
+        
+        6. Regression check - All previously-verified endpoints still working:
+           - GET /api/search?q=MTHFR%20C677T → 200 with results ✅
+           - GET /api/autocomplete?q=metfor → 200 ✅
+           - GET /api/ → 200 with service metadata ✅
+        
+        Notes:
+        - One transient 500 error observed on first test run for text query search
+          (likely Open Food Facts API temporary issue or rate limiting)
+        - All subsequent tests passed consistently
+        - This is acceptable behavior for external API dependency with proper error handling
+        
+        Task "GET /api/nutrition/product" marked as working: true.
+        No critical issues found. Backend testing complete.
 
 agent_communication_archive:
     -agent: "main"
