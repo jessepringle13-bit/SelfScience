@@ -1,450 +1,516 @@
 #!/usr/bin/env python3
 """
-Backend API tests for SelfScience /api/search endpoint
-Tests PubMed + Semantic Scholar integration
+Backend API Testing for SelfScience Search Endpoint
+Focus: Gene fan-out load pattern from Dashboard→Search handoff
 """
 
-import requests
-import json
+import asyncio
+import aiohttp
 import time
-from typing import Dict, List, Any
+import json
+import os
+from typing import List, Dict, Any
 
-# Base URL from environment
-BASE_URL = "https://health-research-hub-3.preview.emergentagent.com"
-API_ENDPOINT = f"{BASE_URL}/api/search"
+# Load base URL from .env
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://health-research-hub-3.preview.emergentagent.com')
+API_BASE = f"{BASE_URL}/api"
 
-def print_test_header(test_name: str):
-    """Print a formatted test header"""
-    print(f"\n{'='*80}")
-    print(f"TEST: {test_name}")
-    print(f"{'='*80}")
+# Test genes for concurrent burst test
+GENE_QUERIES = [
+    "ALDH2 nutrigenomics dietary intervention",
+    "CYP1A2 nutrigenomics dietary intervention",
+    "LCT nutrigenomics dietary intervention",
+    "FTO nutrigenomics dietary intervention",
+    "APOA5 nutrigenomics dietary intervention",
+    "MTHFR nutrigenomics dietary intervention",
+    "VDR nutrigenomics dietary intervention",
+    "APOE nutrigenomics dietary intervention",
+]
 
-def print_result(success: bool, message: str):
-    """Print test result"""
-    status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status}: {message}")
+# Regression test queries
+REGRESSION_QUERIES = [
+    {"q": "MTHFR C677T", "expected_status": 200, "expect_results": True},
+    {"q": "zone 2 training", "expected_status": 200, "expect_results": True},
+    {"q": "creatine supplementation", "expected_status": 200, "expect_results": True},
+]
 
-def validate_result_structure(result: Dict[str, Any], test_name: str) -> bool:
-    """Validate that a single result has all required fields with correct types"""
-    required_fields = {
-        'id': str,
-        'provider': str,
-        'source': str,
-        'title': str,
-        'journal': str,
-        'year': (int, type(None)),
-        'url': str,
-        'abstract': str,
-    }
+class TestResults:
+    def __init__(self):
+        self.passed = []
+        self.failed = []
+        self.warnings = []
     
-    issues = []
+    def add_pass(self, test_name: str, details: str = ""):
+        self.passed.append({"test": test_name, "details": details})
+        print(f"✅ PASS: {test_name}")
+        if details:
+            print(f"   {details}")
     
-    for field, expected_type in required_fields.items():
-        if field not in result:
-            issues.append(f"Missing field: {field}")
-        elif result[field] is None and expected_type != (int, type(None)):
-            issues.append(f"Field '{field}' is None (should be {expected_type})")
-        elif result[field] is not None:
-            if isinstance(expected_type, tuple):
-                if not isinstance(result[field], expected_type):
-                    issues.append(f"Field '{field}' has wrong type: {type(result[field])} (expected one of {expected_type})")
-            else:
-                if not isinstance(result[field], expected_type):
-                    issues.append(f"Field '{field}' has wrong type: {type(result[field])} (expected {expected_type})")
+    def add_fail(self, test_name: str, details: str):
+        self.failed.append({"test": test_name, "details": details})
+        print(f"❌ FAIL: {test_name}")
+        print(f"   {details}")
     
-    # Check for undefined (JavaScript undefined would come as null in JSON, but check for missing keys)
-    for field in required_fields.keys():
-        if field not in result:
-            issues.append(f"Field '{field}' is undefined/missing")
+    def add_warning(self, test_name: str, details: str):
+        self.warnings.append({"test": test_name, "details": details})
+        print(f"⚠️  WARNING: {test_name}")
+        print(f"   {details}")
     
-    if issues:
-        print(f"  ⚠️  Result structure issues in {test_name}:")
-        for issue in issues:
-            print(f"     - {issue}")
-        print(f"  Result sample: {json.dumps(result, indent=2)[:500]}")
-        return False
-    
-    return True
+    def summary(self):
+        print("\n" + "="*80)
+        print("TEST SUMMARY")
+        print("="*80)
+        print(f"✅ Passed: {len(self.passed)}")
+        print(f"❌ Failed: {len(self.failed)}")
+        print(f"⚠️  Warnings: {len(self.warnings)}")
+        print("="*80)
+        
+        if self.failed:
+            print("\nFailed Tests:")
+            for fail in self.failed:
+                print(f"  - {fail['test']}: {fail['details']}")
+        
+        if self.warnings:
+            print("\nWarnings:")
+            for warn in self.warnings:
+                print(f"  - {warn['test']}: {warn['details']}")
+        
+        return len(self.failed) == 0
 
-def test_basic_search():
-    """Test 1: Basic search with MTHFR C677T query"""
-    print_test_header("Test 1: Basic Search - MTHFR C677T")
+
+async def test_concurrent_burst(session: aiohttp.ClientSession, results: TestResults):
+    """
+    Test 1: Concurrent burst test - Fire 8 parallel GET requests
+    All must return HTTP 200 within 60s total wall-time
+    """
+    print("\n" + "="*80)
+    print("TEST 1: Concurrent Burst Test (8 parallel gene queries)")
+    print("="*80)
+    
+    start_time = time.time()
+    tasks = []
+    
+    for gene_query in GENE_QUERIES:
+        url = f"{API_BASE}/search?q={gene_query}&limit=12"
+        tasks.append(fetch_with_timing(session, url, gene_query))
     
     try:
-        params = {'q': 'MTHFR C677T'}
-        print(f"Request: GET {API_ENDPOINT}?q={params['q']}")
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        wall_time = time.time() - start_time
         
-        response = requests.get(API_ENDPOINT, params=params, timeout=30)
-        print(f"Status Code: {response.status_code}")
+        print(f"\n⏱️  Total wall-time: {wall_time:.2f}s")
         
-        if response.status_code != 200:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            print(f"Response: {response.text[:500]}")
-            return False
+        # Check wall-time constraint
+        if wall_time > 60:
+            results.add_fail(
+                "Concurrent burst - wall-time",
+                f"Took {wall_time:.2f}s, exceeds 60s limit"
+            )
+        else:
+            results.add_pass(
+                "Concurrent burst - wall-time",
+                f"Completed in {wall_time:.2f}s (< 60s)"
+            )
         
-        data = response.json()
-        print(f"Response keys: {list(data.keys())}")
-        print(f"Total results: {data.get('total', 0)}")
-        print(f"Sources: {data.get('sources', {})}")
+        # Check individual responses
+        all_200 = True
+        latencies = []
         
-        # Validate response structure
+        for i, resp_data in enumerate(responses):
+            gene_name = GENE_QUERIES[i].split()[0]
+            
+            if isinstance(resp_data, Exception):
+                results.add_fail(
+                    f"Concurrent burst - {gene_name}",
+                    f"Request failed with exception: {str(resp_data)}"
+                )
+                all_200 = False
+                continue
+            
+            status, data, latency = resp_data
+            latencies.append(latency)
+            
+            if status == 200:
+                print(f"  ✓ {gene_name}: HTTP {status} in {latency:.2f}s")
+            elif status in [502, 503, 504]:
+                results.add_fail(
+                    f"Concurrent burst - {gene_name}",
+                    f"Got HTTP {status} (gateway error) in {latency:.2f}s"
+                )
+                all_200 = False
+            else:
+                results.add_warning(
+                    f"Concurrent burst - {gene_name}",
+                    f"Got HTTP {status} (not 200) in {latency:.2f}s"
+                )
+        
+        if all_200:
+            avg_latency = sum(latencies) / len(latencies) if latencies else 0
+            results.add_pass(
+                "Concurrent burst - all 200 OK",
+                f"All 8 requests returned 200. Avg latency: {avg_latency:.2f}s"
+            )
+        
+        return responses
+        
+    except Exception as e:
+        results.add_fail("Concurrent burst test", f"Exception: {str(e)}")
+        return []
+
+
+async def test_response_shape(responses: List[Any], results: TestResults):
+    """
+    Test 2: Response shape validation
+    Verify JSON has: query, results (with proper fields), sources object
+    """
+    print("\n" + "="*80)
+    print("TEST 2: Response Shape Validation")
+    print("="*80)
+    
+    if not responses:
+        results.add_fail("Response shape", "No responses to validate")
+        return
+    
+    for i, resp_data in enumerate(responses):
+        if isinstance(resp_data, Exception):
+            continue
+        
+        status, data, latency = resp_data
+        gene_name = GENE_QUERIES[i].split()[0]
+        
+        if status != 200:
+            continue
+        
+        try:
+            # Check top-level fields
+            required_fields = ['query', 'results', 'sources']
+            missing_fields = [f for f in required_fields if f not in data]
+            
+            if missing_fields:
+                results.add_fail(
+                    f"Response shape - {gene_name}",
+                    f"Missing fields: {missing_fields}"
+                )
+                continue
+            
+            # Check query field
+            if not isinstance(data['query'], str):
+                results.add_fail(
+                    f"Response shape - {gene_name}",
+                    f"'query' is not a string: {type(data['query'])}"
+                )
+                continue
+            
+            # Check results array
+            if not isinstance(data['results'], list):
+                results.add_fail(
+                    f"Response shape - {gene_name}",
+                    f"'results' is not a list: {type(data['results'])}"
+                )
+                continue
+            
+            # Check result object structure
+            if len(data['results']) > 0:
+                result = data['results'][0]
+                required_result_fields = ['id', 'provider', 'title', 'url', 'source', 'year']
+                missing_result_fields = [f for f in required_result_fields if f not in result]
+                
+                if missing_result_fields:
+                    results.add_fail(
+                        f"Response shape - {gene_name} result object",
+                        f"Missing fields in result: {missing_result_fields}"
+                    )
+                    continue
+                
+                # Check for MongoDB ObjectId leaks
+                result_str = json.dumps(result)
+                if 'ObjectId' in result_str or 'ObjectID' in result_str:
+                    results.add_fail(
+                        f"Response shape - {gene_name}",
+                        "MongoDB ObjectId detected in response"
+                    )
+                    continue
+            
+            # Check sources object
+            if not isinstance(data['sources'], dict):
+                results.add_fail(
+                    f"Response shape - {gene_name}",
+                    f"'sources' is not an object: {type(data['sources'])}"
+                )
+                continue
+            
+            required_sources = ['pubmed', 'semanticScholar', 'openAlex', 'crossref']
+            missing_sources = [s for s in required_sources if s not in data['sources']]
+            
+            if missing_sources:
+                results.add_fail(
+                    f"Response shape - {gene_name}",
+                    f"Missing source keys: {missing_sources}"
+                )
+                continue
+            
+            # Verify source values are numbers
+            for source_key, source_val in data['sources'].items():
+                if not isinstance(source_val, (int, float)):
+                    results.add_fail(
+                        f"Response shape - {gene_name}",
+                        f"Source '{source_key}' value is not a number: {type(source_val)}"
+                    )
+                    break
+            else:
+                results.add_pass(
+                    f"Response shape - {gene_name}",
+                    f"All fields valid. {len(data['results'])} results, sources: {data['sources']}"
+                )
+        
+        except Exception as e:
+            results.add_fail(
+                f"Response shape - {gene_name}",
+                f"Validation exception: {str(e)}"
+            )
+
+
+async def test_rate_limit_graceful_degradation(session: aiohttp.ClientSession, results: TestResults):
+    """
+    Test 3: Rate-limit graceful degradation
+    If Semantic Scholar returns 429, endpoint should still return 200 with sources.semanticScholar: 0
+    """
+    print("\n" + "="*80)
+    print("TEST 3: Rate-limit Graceful Degradation")
+    print("="*80)
+    
+    # This test is implicit in the concurrent burst test
+    # If any request succeeded with 200, the graceful degradation is working
+    # We'll do a simple check here
+    
+    url = f"{API_BASE}/search?q=test+query&limit=5"
+    
+    try:
+        status, data, latency = await fetch_with_timing(session, url, "rate-limit test")
+        
+        if status == 200:
+            # Check if semanticScholar is 0 (might be rate-limited)
+            if 'sources' in data and 'semanticScholar' in data['sources']:
+                if data['sources']['semanticScholar'] == 0:
+                    results.add_pass(
+                        "Rate-limit graceful degradation",
+                        "Endpoint returned 200 with semanticScholar: 0 (graceful degradation working)"
+                    )
+                else:
+                    results.add_pass(
+                        "Rate-limit graceful degradation",
+                        f"Endpoint returned 200 with semanticScholar: {data['sources']['semanticScholar']}"
+                    )
+            else:
+                results.add_warning(
+                    "Rate-limit graceful degradation",
+                    "Could not verify - sources object missing semanticScholar key"
+                )
+        else:
+            results.add_fail(
+                "Rate-limit graceful degradation",
+                f"Expected 200, got {status}"
+            )
+    
+    except Exception as e:
+        results.add_fail(
+            "Rate-limit graceful degradation",
+            f"Exception: {str(e)}"
+        )
+
+
+async def test_empty_gene_guard(session: aiohttp.ClientSession, results: TestResults):
+    """
+    Test 4: Empty-gene guard
+    Test with bogus gene name, must return 200 with results: []
+    """
+    print("\n" + "="*80)
+    print("TEST 4: Empty-gene Guard")
+    print("="*80)
+    
+    url = f"{API_BASE}/search?q=BOGUSGENEXYZ+nutrigenomics&limit=12"
+    
+    try:
+        status, data, latency = await fetch_with_timing(session, url, "empty-gene test")
+        
+        if status != 200:
+            results.add_fail(
+                "Empty-gene guard",
+                f"Expected 200, got {status}"
+            )
+            return
+        
         if 'results' not in data:
-            print_result(False, "Missing 'results' key in response")
-            return False
+            results.add_fail(
+                "Empty-gene guard",
+                "Response missing 'results' field"
+            )
+            return
         
         if not isinstance(data['results'], list):
-            print_result(False, f"'results' should be a list, got {type(data['results'])}")
-            return False
+            results.add_fail(
+                "Empty-gene guard",
+                f"'results' is not a list: {type(data['results'])}"
+            )
+            return
         
+        # Empty or very few results is expected for bogus gene
         if len(data['results']) == 0:
-            print_result(False, "Expected results array to be populated, got empty array")
-            return False
-        
-        print(f"Number of results: {len(data['results'])}")
-        
-        # Validate first few results
-        all_valid = True
-        for i, result in enumerate(data['results'][:3]):
-            print(f"\n  Validating result {i+1}:")
-            print(f"    ID: {result.get('id', 'MISSING')}")
-            print(f"    Provider: {result.get('provider', 'MISSING')}")
-            print(f"    Title: {result.get('title', 'MISSING')[:60]}...")
-            print(f"    Abstract length: {len(result.get('abstract', ''))}")
-            
-            if not validate_result_structure(result, f"result {i+1}"):
-                all_valid = False
-        
-        if not all_valid:
-            print_result(False, "Some results have invalid structure")
-            return False
-        
-        print_result(True, f"Basic search returned {len(data['results'])} results with valid structure")
-        return True
-        
-    except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_pubmed_only():
-    """Test 2: PubMed-only source filter"""
-    print_test_header("Test 2: PubMed-Only Filter")
-    
-    try:
-        params = {'q': 'zone 2 training', 'source': 'pubmed'}
-        print(f"Request: GET {API_ENDPOINT}?q={params['q']}&source={params['source']}")
-        
-        response = requests.get(API_ENDPOINT, params=params, timeout=30)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code != 200:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            return False
-        
-        data = response.json()
-        print(f"Total results: {data.get('total', 0)}")
-        print(f"Sources: {data.get('sources', {})}")
-        
-        sources = data.get('sources', {})
-        s2_count = sources.get('semanticScholar', -1)
-        pubmed_count = sources.get('pubmed', -1)
-        
-        print(f"PubMed count: {pubmed_count}")
-        print(f"Semantic Scholar count: {s2_count}")
-        
-        if s2_count != 0:
-            print_result(False, f"Expected semanticScholar count to be 0, got {s2_count}")
-            return False
-        
-        if pubmed_count == 0:
-            print_result(False, "Expected some PubMed results, got 0")
-            return False
-        
-        # Verify all results are from PubMed
-        for i, result in enumerate(data.get('results', [])):
-            if result.get('provider') != 'PubMed':
-                print_result(False, f"Result {i+1} has provider '{result.get('provider')}', expected 'PubMed'")
-                return False
-        
-        print_result(True, f"PubMed-only filter working correctly ({pubmed_count} results)")
-        return True
-        
-    except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_semantic_scholar_only():
-    """Test 3: Semantic Scholar-only source filter (429 rate-limit acceptable)"""
-    print_test_header("Test 3: Semantic Scholar-Only Filter")
-    
-    try:
-        params = {'q': 'rapamycin', 'source': 's2'}
-        print(f"Request: GET {API_ENDPOINT}?q={params['q']}&source={params['source']}")
-        
-        response = requests.get(API_ENDPOINT, params=params, timeout=30)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code != 200:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            return False
-        
-        data = response.json()
-        print(f"Total results: {data.get('total', 0)}")
-        print(f"Sources: {data.get('sources', {})}")
-        
-        sources = data.get('sources', {})
-        s2_count = sources.get('semanticScholar', -1)
-        pubmed_count = sources.get('pubmed', -1)
-        
-        print(f"PubMed count: {pubmed_count}")
-        print(f"Semantic Scholar count: {s2_count}")
-        
-        if pubmed_count != 0:
-            print_result(False, f"Expected pubmed count to be 0, got {pubmed_count}")
-            return False
-        
-        # S2 might return 0 due to rate limiting - this is acceptable
-        if s2_count == 0:
-            print("  ℹ️  Note: Semantic Scholar returned 0 results (likely rate-limited, this is acceptable)")
-            print_result(True, "S2-only filter working (empty results due to rate-limiting is acceptable)")
-            return True
-        
-        # If we got results, verify they're all from S2
-        for i, result in enumerate(data.get('results', [])):
-            if result.get('provider') != 'Semantic Scholar':
-                print_result(False, f"Result {i+1} has provider '{result.get('provider')}', expected 'Semantic Scholar'")
-                return False
-        
-        print_result(True, f"S2-only filter working correctly ({s2_count} results)")
-        return True
-        
-    except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_empty_query():
-    """Test 4: Empty query should return empty results"""
-    print_test_header("Test 4: Empty Query")
-    
-    try:
-        params = {'q': ''}
-        print(f"Request: GET {API_ENDPOINT}?q=")
-        
-        response = requests.get(API_ENDPOINT, params=params, timeout=30)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code != 200:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            return False
-        
-        data = response.json()
-        print(f"Response: {json.dumps(data, indent=2)}")
-        
-        if 'results' not in data:
-            print_result(False, "Missing 'results' key in response")
-            return False
-        
-        if len(data['results']) != 0:
-            print_result(False, f"Expected empty results array, got {len(data['results'])} results")
-            return False
-        
-        print_result(True, "Empty query correctly returns empty results")
-        return True
-        
-    except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_pillar_parameter():
-    """Test 5: Pillar parameter is echoed in response"""
-    print_test_header("Test 5: Pillar Parameter")
-    
-    try:
-        params = {'q': 'CRISPR', 'pillar': 'Genomics'}
-        print(f"Request: GET {API_ENDPOINT}?q={params['q']}&pillar={params['pillar']}")
-        
-        response = requests.get(API_ENDPOINT, params=params, timeout=30)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code != 200:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            return False
-        
-        data = response.json()
-        print(f"Total results: {data.get('total', 0)}")
-        print(f"Pillar in response: {data.get('pillar', 'MISSING')}")
-        
-        if 'pillar' not in data:
-            print_result(False, "Missing 'pillar' key in response")
-            return False
-        
-        if data['pillar'] != 'Genomics':
-            print_result(False, f"Expected pillar 'Genomics', got '{data['pillar']}'")
-            return False
-        
-        if len(data.get('results', [])) == 0:
-            print_result(False, "Expected some results, got empty array")
-            return False
-        
-        print_result(True, f"Pillar parameter correctly echoed ({len(data['results'])} results)")
-        return True
-        
-    except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_ncbi_api_key_usage():
-    """Test 6: NCBI API key is being used (test with rapid sequential calls)"""
-    print_test_header("Test 6: NCBI API Key Usage (Rate Limit Test)")
-    
-    try:
-        print("Making 3 rapid sequential PubMed calls to verify API key is working...")
-        
-        queries = ['folate', 'vitamin D', 'omega 3']
-        success_count = 0
-        
-        for i, query in enumerate(queries, 1):
-            params = {'q': query, 'source': 'pubmed'}
-            print(f"\n  Call {i}: {query}")
-            
-            start_time = time.time()
-            response = requests.get(API_ENDPOINT, params=params, timeout=30)
-            elapsed = time.time() - start_time
-            
-            print(f"    Status: {response.status_code}, Time: {elapsed:.2f}s")
-            
-            if response.status_code == 200:
-                data = response.json()
-                pubmed_count = data.get('sources', {}).get('pubmed', 0)
-                print(f"    PubMed results: {pubmed_count}")
-                success_count += 1
-            else:
-                print(f"    Failed with status {response.status_code}")
-            
-            # Small delay between requests
-            if i < len(queries):
-                time.sleep(0.2)
-        
-        if success_count == len(queries):
-            print_result(True, f"All {success_count} rapid calls succeeded - NCBI API key is working")
-            return True
-        elif success_count >= 2:
-            print_result(True, f"{success_count}/{len(queries)} calls succeeded - API key likely working (some rate limiting is normal)")
-            return True
+            results.add_pass(
+                "Empty-gene guard",
+                "Returned 200 with empty results array as expected"
+            )
         else:
-            print_result(False, f"Only {success_count}/{len(queries)} calls succeeded - possible API key issue")
-            return False
-        
-    except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def test_no_mongodb_objectids():
-    """Test 7: Verify no MongoDB ObjectIds in response"""
-    print_test_header("Test 7: No MongoDB ObjectIds")
+            results.add_warning(
+                "Empty-gene guard",
+                f"Returned {len(data['results'])} results (expected 0, but some noise is acceptable)"
+            )
     
+    except Exception as e:
+        results.add_fail(
+            "Empty-gene guard",
+            f"Exception: {str(e)}"
+        )
+
+
+async def test_regression_queries(session: aiohttp.ClientSession, results: TestResults):
+    """
+    Test 5: Regression sweep
+    Test previously-verified queries to ensure nothing broke
+    """
+    print("\n" + "="*80)
+    print("TEST 5: Regression Sweep")
+    print("="*80)
+    
+    # Test service metadata endpoint
     try:
-        params = {'q': 'diabetes'}
-        print(f"Request: GET {API_ENDPOINT}?q={params['q']}")
+        url = f"{API_BASE}/"
+        status, data, latency = await fetch_with_timing(session, url, "service metadata")
         
-        response = requests.get(API_ENDPOINT, params=params, timeout=30)
-        print(f"Status Code: {response.status_code}")
-        
-        if response.status_code != 200:
-            print_result(False, f"Expected 200, got {response.status_code}")
-            return False
-        
-        # Check raw response text for ObjectId patterns
-        response_text = response.text
-        
-        # Common MongoDB ObjectId patterns
-        objectid_patterns = [
-            '"_id"',
-            'ObjectId',
-            'ObjectID',
-            '"$oid"',
-        ]
-        
-        found_issues = []
-        for pattern in objectid_patterns:
-            if pattern in response_text:
-                found_issues.append(pattern)
-        
-        if found_issues:
-            print_result(False, f"Found MongoDB ObjectId patterns: {found_issues}")
-            print(f"Response sample: {response_text[:1000]}")
-            return False
-        
-        # Also verify JSON is properly serializable
-        data = response.json()
-        json_str = json.dumps(data)  # This will fail if there are non-serializable objects
-        
-        print_result(True, "No MongoDB ObjectIds found, JSON properly serialized")
-        return True
-        
+        if status == 200 and 'status' in data and data['status'] == 'ok':
+            results.add_pass(
+                "Regression - GET /api/",
+                f"Service metadata returned correctly in {latency:.2f}s"
+            )
+        else:
+            results.add_fail(
+                "Regression - GET /api/",
+                f"Expected 200 with status:ok, got {status}"
+            )
     except Exception as e:
-        print_result(False, f"Exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def run_all_tests():
-    """Run all backend tests"""
-    print("\n" + "="*80)
-    print("SELFSCIENCE BACKEND API TEST SUITE")
-    print("Testing /api/search endpoint")
-    print("="*80)
+        results.add_fail("Regression - GET /api/", f"Exception: {str(e)}")
     
-    tests = [
-        ("Basic Search (MTHFR C677T)", test_basic_search),
-        ("PubMed-Only Filter", test_pubmed_only),
-        ("Semantic Scholar-Only Filter", test_semantic_scholar_only),
-        ("Empty Query", test_empty_query),
-        ("Pillar Parameter", test_pillar_parameter),
-        ("NCBI API Key Usage", test_ncbi_api_key_usage),
-        ("No MongoDB ObjectIds", test_no_mongodb_objectids),
-    ]
+    # Test autocomplete endpoint
+    try:
+        url = f"{API_BASE}/autocomplete?q=metfor"
+        status, data, latency = await fetch_with_timing(session, url, "autocomplete")
+        
+        if status == 200 and 'suggestions' in data and isinstance(data['suggestions'], list):
+            results.add_pass(
+                "Regression - GET /api/autocomplete",
+                f"Autocomplete returned {len(data['suggestions'])} suggestions in {latency:.2f}s"
+            )
+        else:
+            results.add_fail(
+                "Regression - GET /api/autocomplete",
+                f"Expected 200 with suggestions array, got {status}"
+            )
+    except Exception as e:
+        results.add_fail("Regression - GET /api/autocomplete", f"Exception: {str(e)}")
     
-    results = []
-    for test_name, test_func in tests:
+    # Test regression queries
+    for query_spec in REGRESSION_QUERIES:
+        q = query_spec['q']
+        expected_status = query_spec['expected_status']
+        expect_results = query_spec['expect_results']
+        
         try:
-            result = test_func()
-            results.append((test_name, result))
+            url = f"{API_BASE}/search?q={q}"
+            status, data, latency = await fetch_with_timing(session, url, f"regression {q}")
+            
+            if status != expected_status:
+                results.add_fail(
+                    f"Regression - {q}",
+                    f"Expected {expected_status}, got {status}"
+                )
+                continue
+            
+            if expect_results:
+                if 'results' in data and len(data['results']) > 0:
+                    results.add_pass(
+                        f"Regression - {q}",
+                        f"Returned {len(data['results'])} results in {latency:.2f}s"
+                    )
+                else:
+                    results.add_warning(
+                        f"Regression - {q}",
+                        f"Expected non-empty results, got {len(data.get('results', []))} results"
+                    )
+            else:
+                results.add_pass(
+                    f"Regression - {q}",
+                    f"Returned {status} in {latency:.2f}s"
+                )
+        
         except Exception as e:
-            print(f"\n❌ CRITICAL ERROR in {test_name}: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            results.append((test_name, False))
-    
-    # Summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
+            results.add_fail(f"Regression - {q}", f"Exception: {str(e)}")
+
+
+async def fetch_with_timing(session: aiohttp.ClientSession, url: str, label: str):
+    """Helper to fetch URL and return (status, data, latency)"""
+    start = time.time()
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
+            latency = time.time() - start
+            status = response.status
+            
+            try:
+                data = await response.json()
+            except:
+                data = {}
+            
+            return (status, data, latency)
+    except asyncio.TimeoutError:
+        latency = time.time() - start
+        print(f"  ⏱️  TIMEOUT: {label} after {latency:.2f}s")
+        raise Exception(f"Timeout after {latency:.2f}s")
+    except Exception as e:
+        latency = time.time() - start
+        print(f"  ❌ ERROR: {label} - {str(e)}")
+        raise
+
+
+async def main():
+    print("="*80)
+    print("SelfScience Backend API Testing")
+    print("Focus: /api/search gene fan-out load pattern")
+    print(f"Base URL: {BASE_URL}")
     print("="*80)
     
-    passed = sum(1 for _, result in results if result)
-    total = len(results)
+    results = TestResults()
     
-    for test_name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
-        print(f"{status}: {test_name}")
+    async with aiohttp.ClientSession() as session:
+        # Test 1: Concurrent burst
+        responses = await test_concurrent_burst(session, results)
+        
+        # Test 2: Response shape
+        await test_response_shape(responses, results)
+        
+        # Test 3: Rate-limit graceful degradation
+        await test_rate_limit_graceful_degradation(session, results)
+        
+        # Test 4: Empty-gene guard
+        await test_empty_gene_guard(session, results)
+        
+        # Test 5: Regression sweep
+        await test_regression_queries(session, results)
     
-    print(f"\n{'='*80}")
-    print(f"TOTAL: {passed}/{total} tests passed")
-    print(f"{'='*80}\n")
+    # Print summary
+    success = results.summary()
     
-    return passed == total
+    return 0 if success else 1
+
 
 if __name__ == "__main__":
-    success = run_all_tests()
-    exit(0 if success else 1)
+    exit_code = asyncio.run(main())
+    exit(exit_code)

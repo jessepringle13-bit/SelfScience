@@ -199,11 +199,22 @@ export default function SearchClient() {
   // Default date filter: 10 years when any structured hand-off is active
   // (pillar, or pillar+genes, or explicit gene set) — else All Time so
   // "Historic" studies (>10 yrs) remain reachable via the filter.
+  // Default date filter behaviour:
+  //  · pillar-only or pillar+text search → Last 10 Years (recent focus)
+  //  · gene fan-out (activeGenes present) → All Time (narrow queries
+  //    surface classic mechanistic papers older than 10 years)
+  //  · nothing hand-off → All Time
   const [dateRange, setDateRange] = useState(
-    (isInitialPillarBrowse || isInitialTextPillar || initialGenes.length > 0) ? '10' : 'any'
+    initialGenes.length > 0
+      ? 'any'
+      : (isInitialPillarBrowse || isInitialTextPillar) ? '10' : 'any'
   )
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
-  const [sortMode, setSortMode] = useState('relevance')
+  // For pillar+gene fan-outs we default to Most-Cited so the strongest
+  // signals surface first across a mixed round-robin merge.
+  const [sortMode, setSortMode] = useState(
+    initialGenes.length > 0 ? 'citations' : 'relevance'
+  )
 
   // Genome-loaded state — powers the "Your genes" chip row so a user can
   // dispatch a search for any of their recognised variants without leaving
@@ -265,7 +276,12 @@ export default function SearchClient() {
       let merged = { pubmed: [], semantic_scholar: [], openalex: [], crossref: [] }
 
       if (genes.length > 0) {
-        const perGeneLimit = Math.max(6, Math.floor(30 / genes.length))
+        // Fan-out: fire one /api/search per gene, then round-robin
+        // interleave the results across genes for a "healthy mix" instead
+        // of grouping all Gene-A hits before Gene-B hits.
+        // Cap per-gene fetch so heavy sets (8+ genes) don't overwhelm
+        // upstream APIs while still surfacing enough breadth.
+        const perGeneLimit = Math.max(5, Math.min(15, Math.floor(60 / genes.length)))
         const anchor = trimmed || pillarQuery || ''
         const requests = genes.map((g) => {
           const url = new URL('/api/search', window.location.origin)
@@ -274,31 +290,55 @@ export default function SearchClient() {
           url.searchParams.set('limit', String(perGeneLimit))
           return fetch(url.toString())
             .then((r) => (r.ok ? r.json() : {}))
-            .then((j) => ({ gene: g, results: j }))
-            .catch(() => ({ gene: g, results: {} }))
+            .then((j) => ({ gene: g, results: (j?.results || []), sources: j?.sources || {} }))
+            .catch(() => ({ gene: g, results: [], sources: {} }))
         })
         const batches = await Promise.all(requests)
-        const byKey = new Map()
-        // Preserve every provider bucket the /api/search endpoint returns,
-        // not just pubmed + semantic_scholar. Anything with `.length` is a
-        // list of results.
-        const SOURCES = ['pubmed', 'semantic_scholar', 'openalex', 'crossref']
-        for (const { gene, results } of batches) {
-          for (const src of SOURCES) {
-            for (const item of (results[src] || [])) {
-              const key = item.doi || item.pmid || item.id || `${src}:${item.title}`
-              const prev = byKey.get(key)
-              if (prev) {
-                if (!prev._matchedGenes.includes(gene)) prev._matchedGenes.push(gene)
-              } else {
-                byKey.set(key, { ...item, _matchedGenes: [gene], _source: src })
-              }
+
+        // Round-robin merge with cross-gene dedupe.
+        const seen = new Map() // key -> item (already pushed to interleaved)
+        const geneQueues = batches.map(({ gene, results }) => ({
+          gene,
+          queue: results.map((r) => ({ ...r, _matchedGenes: [gene] })),
+        }))
+        const interleaved = []
+        let progressed = true
+        while (progressed) {
+          progressed = false
+          for (const gq of geneQueues) {
+            if (gq.queue.length === 0) continue
+            const item = gq.queue.shift()
+            progressed = true
+            const key = item.doi || item.pmid || item.id || `${item.provider || ''}:${(item.title || '').toLowerCase()}`
+            const prev = seen.get(key)
+            if (prev) {
+              if (!prev._matchedGenes.includes(gq.gene)) prev._matchedGenes.push(gq.gene)
+            } else {
+              seen.set(key, item)
+              interleaved.push(item)
             }
           }
         }
-        const all = [...byKey.values()]
-        for (const src of SOURCES) merged[src] = all.filter((x) => x._source === src)
-        merged.isPillarBrowse = true
+
+        // Aggregate source counts for the info chips.
+        const aggSources = { pubmed: 0, semanticScholar: 0, openAlex: 0, crossref: 0 }
+        for (const b of batches) {
+          aggSources.pubmed         += b.sources?.pubmed || 0
+          aggSources.semanticScholar+= b.sources?.semanticScholar || 0
+          aggSources.openAlex       += b.sources?.openAlex || 0
+          aggSources.crossref       += b.sources?.crossref || 0
+        }
+
+        merged = {
+          query: anchor,
+          pillar: pill,
+          isPillarBrowse: !!pillarQuery,
+          isFanout: true,
+          total: interleaved.length,
+          sources: aggSources,
+          results: interleaved,
+          _fanoutGenes: genes,
+        }
       } else {
         const url = new URL('/api/search', window.location.origin)
         if (trimmed) url.searchParams.set('q', trimmed)
@@ -341,21 +381,36 @@ export default function SearchClient() {
     router.replace(`/search?${usp.toString()}`)
   }
 
-  /** Kick off a search directly from a genome-loaded gene chip. Runs
-   *  immediately (no need to press Enter) and drops any active pillar
-   *  filter so the query stands on its own. */
-  const pickGene = (symbol) => {
+  /** Toggle a gene in/out of the active cross-reference set. Preserves any
+   *  active pillar or query, so users can layer multiple genes and refine
+   *  a single fan-out search. When both pillar/query are empty and no
+   *  active genes remain after toggling, the results panel clears. */
+  const toggleGene = (symbol) => {
     if (!symbol) return
-    setQuery(symbol)
-    setSubmittedQ(symbol)
-    setPillar('')
+    const upper = symbol.toUpperCase()
+    const nextGenes = activeGenes.includes(upper)
+      ? activeGenes.filter((g) => g !== upper)
+      : [...activeGenes, upper].slice(0, 12)
+    setActiveGenes(nextGenes)
     trackEvent(EVENTS.SEARCH_PERFORMED, {
       source: 'your_genes_chip',
-      gene: symbol,
+      gene: upper,
     })
+    // Sync URL so state is bookmark-/shareable.
     const usp = new URLSearchParams()
-    usp.set('q', symbol)
-    router.replace(`/search?${usp.toString()}`)
+    if (submittedQ) usp.set('q', submittedQ)
+    if (pillar) usp.set('pillar', pillar)
+    if (nextGenes.length) usp.set('genes', nextGenes.join(','))
+    router.replace(usp.toString() ? `/search?${usp.toString()}` : '/search')
+  }
+
+  // Horizontal-scroll carousel plumbing for the "Your Genes" chip row.
+  const chipScrollerRef = useRef(null)
+  const scrollChips = (dir) => {
+    const el = chipScrollerRef.current
+    if (!el) return
+    const delta = dir === 'left' ? -220 : 220
+    el.scrollBy({ left: delta, behavior: 'smooth' })
   }
 
   /* --------------------------- Autocomplete ----------------------------- */
@@ -577,38 +632,85 @@ export default function SearchClient() {
             ))}
           </div>
 
-          {/* "Your genes" chip row — appears only when the user has an
-              analysed genome in sessionStorage. Clicking a chip dispatches
-              a search for that gene symbol. */}
+          {/* "Your genes" chip carousel — appears only when the user has
+              an analysed genome in sessionStorage. Chips are toggleable
+              (multi-select) and drive the fan-out cross-reference search.
+              Horizontal-scroll carousel keeps 40+ genes accessible without
+              eating vertical real estate. */}
           {yourGenes.length > 0 && (
             <div className="mx-auto mt-4 max-w-4xl">
-              <div className="flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-ss-orange" />
-                Your genome · search any of your recognised genes
+              <div className="flex items-center justify-between gap-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-ss-orange" />
+                  <span>
+                    Your genome · tap to cross-reference
+                    {activeGenes.length > 0 && (
+                      <span className="ml-2 rounded-full bg-ss-orange px-2 py-0.5 text-[9px] font-bold tracking-widest text-white">
+                        {activeGenes.length} selected
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <span className="text-[10px] normal-case tracking-normal text-white/50">
+                  {yourGenes.length} recognised
+                </span>
               </div>
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                {yourGenes.slice(0, 14).map(({ symbol, classification }) => {
-                  const ring =
-                    classification === 'awareness'
-                      ? 'border-ss-amber/70 text-ss-amber bg-white/5 hover:bg-ss-amber hover:text-white'
-                      : classification === 'strength' || classification === 'positive'
-                        ? 'border-ss-green/70 text-ss-green bg-white/5 hover:bg-ss-green hover:text-white'
-                        : 'border-white/25 bg-white/5 text-white/85 hover:bg-white/15'
-                  return (
-                    <button
-                      key={symbol}
-                      type="button"
-                      onClick={() => pickGene(symbol)}
-                      className={`rounded-full border px-3 py-1 font-mono text-xs font-semibold tracking-wider transition ${ring}`}
-                      title={`Search research for ${symbol}`}
-                    >
-                      {symbol}
-                    </button>
-                  )
-                })}
-                {yourGenes.length > 14 && (
-                  <span className="text-[11px] text-white/60">+{yourGenes.length - 14} more</span>
-                )}
+              <div className="relative mt-2">
+                {/* Left / right scroll affordances (desktop only) */}
+                <button
+                  type="button"
+                  onClick={() => scrollChips('left')}
+                  aria-label="Scroll gene chips left"
+                  className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/90 p-1.5 text-ss-teal shadow-md ring-1 ring-black/10 transition hover:bg-white md:inline-flex"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => scrollChips('right')}
+                  aria-label="Scroll gene chips right"
+                  className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/90 p-1.5 text-ss-teal shadow-md ring-1 ring-black/10 transition hover:bg-white md:inline-flex"
+                >
+                  <ChevronRight size={14} />
+                </button>
+
+                <div
+                  ref={chipScrollerRef}
+                  className="flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth px-1 pb-2 [&::-webkit-scrollbar]:hidden"
+                  style={{ scrollbarWidth: 'none' }}
+                >
+                  {yourGenes.map(({ symbol, classification }) => {
+                    const isSelected = activeGenes.includes(symbol)
+                    const base = 'shrink-0 snap-start rounded-full border px-3 py-1 font-mono text-xs font-semibold tracking-wider transition'
+                    let cls
+                    if (isSelected) {
+                      // Selected → solid orange highlight regardless of classification
+                      cls = 'border-ss-orange bg-ss-orange text-white shadow-md ring-2 ring-white/40'
+                    } else if (classification === 'awareness') {
+                      cls = 'border-ss-amber/70 bg-white/5 text-ss-amber hover:bg-ss-amber hover:text-white'
+                    } else if (classification === 'strength' || classification === 'positive') {
+                      cls = 'border-ss-green/70 bg-white/5 text-ss-green hover:bg-ss-green hover:text-white'
+                    } else {
+                      cls = 'border-white/25 bg-white/5 text-white/85 hover:bg-white/15'
+                    }
+                    return (
+                      <button
+                        key={symbol}
+                        type="button"
+                        onClick={() => toggleGene(symbol)}
+                        className={`${base} ${cls}`}
+                        title={
+                          isSelected
+                            ? `Remove ${symbol} from cross-reference`
+                            : `Add ${symbol} to cross-reference`
+                        }
+                        aria-pressed={isSelected}
+                      >
+                        {symbol}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -670,7 +772,7 @@ export default function SearchClient() {
               {activeGenes.map((g) => (
                 <button
                   key={g}
-                  onClick={() => setActiveGenes(activeGenes.filter((x) => x !== g))}
+                  onClick={() => toggleGene(g)}
                   className="group inline-flex items-center gap-1 rounded-full bg-ss-orange/15 px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ss-orange transition hover:bg-ss-orange hover:text-white"
                   title={`Remove ${g} from cross-reference`}
                 >
@@ -680,7 +782,13 @@ export default function SearchClient() {
               ))}
               {activeGenes.length > 1 && (
                 <button
-                  onClick={() => setActiveGenes([])}
+                  onClick={() => {
+                    setActiveGenes([])
+                    const usp = new URLSearchParams()
+                    if (submittedQ) usp.set('q', submittedQ)
+                    if (pillar) usp.set('pillar', pillar)
+                    router.replace(usp.toString() ? `/search?${usp.toString()}` : '/search')
+                  }}
                   className="ml-1 text-[11px] font-semibold text-ss-muted hover:text-ss-teal"
                 >
                   Clear
