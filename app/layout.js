@@ -1,6 +1,7 @@
 import './globals.css'
 import Analytics from '@/components/analytics'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
+import PWAUpdater from '@/components/PWAUpdater'
 import MobileNav from '@/components/MobileNav'
 import ChunkReloader from '@/components/ChunkReloader'
 
@@ -81,6 +82,7 @@ export default function RootLayout({ children }) {
         {children}
         <MobileNav />
         <PWAInstallPrompt />
+        <PWAUpdater />
         <Analytics />
         <ChunkReloader />
       </body>
