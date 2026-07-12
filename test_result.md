@@ -1040,6 +1040,43 @@ frontend:
             Wellness) uncovered; the toggle disappears behind the menu
             while it's open and reappears on close.
 
+  - task: "BUG FIX — ChunkLoadError + Clipboard NotAllowedError in preview iframe"
+    implemented: true
+    working: true
+    file: "/app/components/ChunkReloader.jsx, /app/app/error.js, /app/app/layout.js, /app/lib/shareCard.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Two console errors reported by the user:
+            1) `ChunkLoadError: Loading chunk app/search/page failed` —
+               classic Next.js dev-server race: the server rebuilds and
+               invalidates chunk hashes while the browser still holds
+               stale references. Fix:
+                 - New /app/components/ChunkReloader.jsx client component
+                   listens on window `error` + `unhandledrejection` for any
+                   ChunkLoadError / "Loading chunk … failed" / dynamic-import
+                   rejection and force-reloads the page (once-per-session
+                   guard prevents reload loops).
+                 - Mounted globally in /app/app/layout.js.
+                 - /app/app/error.js updated to detect ChunkLoadError and
+                   auto-reload with a friendly "Refreshing…" screen instead
+                   of the generic "Something went wrong".
+            2) `NotAllowedError: writeText blocked by permissions policy` —
+               Chrome blocks navigator.clipboard.writeText inside cross-
+               origin iframes (Emergent preview) via Permissions Policy AND
+               logs the DOMException to console even when caught. Fix:
+               in /app/lib/shareCard.js the shareCardOrCopy() flow now
+               detects cross-origin iframe context (window.self !== window.top,
+               or throws on access) and skips the modern Clipboard API
+               entirely — going straight to the execCommand fallback which
+               works without permissions.
+            Verified: post-fix, navigating between /, /search, /genome and
+            back produced ZERO console errors.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

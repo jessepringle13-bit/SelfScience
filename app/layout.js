@@ -2,6 +2,7 @@ import './globals.css'
 import Analytics from '@/components/analytics'
 import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import MobileNav from '@/components/MobileNav'
+import ChunkReloader from '@/components/ChunkReloader'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
 
@@ -81,6 +82,7 @@ export default function RootLayout({ children }) {
         <MobileNav />
         <PWAInstallPrompt />
         <Analytics />
+        <ChunkReloader />
       </body>
     </html>
   )
