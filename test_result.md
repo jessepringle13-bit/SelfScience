@@ -1016,6 +1016,30 @@ frontend:
             Discover modes; SiteNav consistently present in both modes;
             no visual overlap.
 
+  - task: "BUG FIX — Dashboard/Discover toggle blocked Pillars dropdown"
+    implemented: true
+    working: true
+    file: "/app/app/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            After the previous fix raised the toggle to z-[60] to keep it
+            above the SiteNav header in Discover mode, it ended up sitting
+            ABOVE the Pillars/Tools/About dropdown menus (z-50), blocking
+            clicks on the top row (e.g., Genomics was covered).
+            Correct layering: toggle at z-30 — below dropdowns (z-50) so
+            open menus cleanly cover it, but positional non-overlap with the
+            SiteNav bar (toggle at top-20, SiteNav bar at y=0..~64px) means
+            the toggle stays visible in normal state.
+            Verified: opening the Pillars dropdown from the Dashboard now
+            shows all 10 pillars (Genomics through Pediatric & Youth
+            Wellness) uncovered; the toggle disappears behind the menu
+            while it's open and reappears on close.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"

@@ -216,11 +216,13 @@ function App() {
 
   return (
     <>
-      {/* View toggle — only shown when genome data exists. z-[60] keeps it
-          above the SiteNav header (z-40) in Discover mode. Positioned below
-          the SiteNav bar so it never overlaps the center nav links. */}
+      {/* View toggle — only shown when genome data exists. Positioned below
+          the SiteNav bar (top-20) so it never overlaps the center nav links,
+          and z-30 keeps it BELOW the SiteNav dropdowns (z-50) so an open
+          Pillars/Tools/About menu properly covers the toggle instead of the
+          toggle blocking the menu's top entries. */}
       {hasGenome && (
-        <div className="fixed left-1/2 top-20 z-[60] -translate-x-1/2 md:top-[76px]">
+        <div className="fixed left-1/2 top-20 z-30 -translate-x-1/2 md:top-[76px]">
           <div className="flex items-center gap-1 rounded-full border border-ss-border-warm bg-white/95 p-1 shadow-md backdrop-blur">
             <button
               onClick={() => setView('dashboard')}
