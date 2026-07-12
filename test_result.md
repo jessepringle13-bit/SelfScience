@@ -1077,6 +1077,78 @@ frontend:
             Verified: post-fix, navigating between /, /search, /genome and
             back produced ZERO console errors.
 
+  - task: "BUG FIX — Dashboard pillar tiles were orphaning genes due to classifier↔UI pillar name mismatch"
+    implemented: true
+    working: true
+    file: "/app/lib/pillars.js, /app/lib/supplementProtocol.js, /app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User reported: "clicking Environmental Sensitivity on the
+            dashboard gives only environmental results — I have 4 genes
+            there and none of them come through". Same class of bug
+            affected Mental Health (BDNF) and any pillar that only
+            appeared under a non-canonical name.
+            Root cause: two independent flaws:
+              1. flattenReportCards() iterated report.fullReport groups
+                 but only pushed the inner variant objects — the pillar
+                 name lived on the parent group, NOT on the variant. So
+                 downstream reads of c.pillar were always empty for
+                 fullReport-sourced cards, and pillarGenes[pillar] was
+                 ALWAYS an empty set on the Dashboard.
+              2. Classifier emits pillar names that don't match the
+                 canonical PILLARS list from site-nav.jsx. Examples:
+                   Classifier            UI PILLARS
+                   ---------             -----------
+                   Brain & Neurochemistry   Mental Health & Neurochemistry
+                   Sleep & Circadian        General Wellness
+                   Hormones & Endocrine     Hormones & Endocrine Health
+                   Immune & Gut Health      General Wellness
+                   Physical Traits          Genomics
+                 Even when c.pillar was populated, the Dashboard bucket
+                 name never matched a p.name in PILLARS, so the tile's
+                 pillarGenes[p.name] lookup returned undefined.
+            Fix:
+              • /app/lib/supplementProtocol.js flattenReportCards():
+                  - When walking report.fullReport, attach the parent
+                    pillar name to each variant when the variant doesn't
+                    already carry one.
+                  - Also merge in report.variants_recognized (each carries
+                    pillar+gene+classification) so any legacy report shape
+                    still tags every variant with its pillar.
+                  - De-dupe now prefers keeping a pillar-tagged copy over
+                    an untagged one when duplicates collide.
+              • /app/lib/pillars.js:
+                  - New PILLAR_ALIASES map (classifier → UI).
+                  - New normalizePillarName(name) helper.
+                  - getPillarQuery(name) now normalises first so pillar
+                    look-ups from any codepath resolve to the canonical
+                    curated query.
+              • /app/components/Dashboard.jsx pillarGenes useMemo now
+                normalises c.pillar via normalizePillarName() before
+                bucketing. Result: Mental Health tile gets BDNF chips;
+                General Wellness tile gets PER3 chips; Environmental
+                Sensitivity tile lights up for users who have NFE2L2 /
+                EPHX1 / HMOX1 / GPX1 / GPX4 / AHR / CYP1B1 variants.
+            Verified via Playwright screenshots:
+              • Sample genome Dashboard tiles now correctly display:
+                  Nutrition          → ALDH2, APOA5, CYP1A2, FTO, LCT, MC4R
+                  Sports Performance → NOS3
+                  Longevity          → FOXO3
+                  General Wellness   → PER3    (previously orphaned)
+                  Mental Health & N. → BDNF    (previously orphaned)
+                  Pharmacogenomics   → GSTP1, SLCO1B1
+              • Clicking Mental Health tile navigates to
+                /search?pillar=Mental+Health+%26+Neurochemistry&genes=BDNF,
+                the "Your Genome" carousel shows "1 SELECTED" with BDNF
+                filled orange, the cross-reference banner is active, and
+                the top result is a BDNF-tagged depression paper with
+                BDNF highlighted orange in the title.
+
   - task: "Dashboard pillar handoff v2 — round-robin fan-out + Your Genes carousel with multi-select"
     implemented: true
     working: true

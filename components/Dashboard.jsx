@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass, FileText } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants, flattenReportCards } from '@/lib/supplementProtocol'
+import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 
 export default function Dashboard() {
@@ -58,14 +59,20 @@ export default function Dashboard() {
 
   // Map each pillar name → the user's gene symbols associated with it via
   // the classified variant cards. Used to build "pillar + your genes"
-  // hand-off links on the pillar tiles so clicking Genomics from the
-  // Dashboard searches for the pillar keyword AND the user's actual
-  // Genomics-tagged genes at once.
+  // hand-off links on the pillar tiles so clicking Environmental Sensitivity
+  // from the Dashboard searches for the pillar keyword AND the user's actual
+  // Environmental-Sensitivity-tagged genes at once.
+  //
+  // Names emitted by the classifier ("Brain & Neurochemistry", "Sleep &
+  // Circadian", …) don't always match the canonical UI PILLARS
+  // ("Mental Health & Neurochemistry", "General Wellness"). We route every
+  // classifier pillar through normalizePillarName() before bucketing so no
+  // gene-set gets orphaned.
   const pillarGenes = useMemo(() => {
     if (!report) return {}
     const map = {}
     for (const c of flattenReportCards(report)) {
-      const pillar = (c.pillar || '').trim()
+      const pillar = normalizePillarName((c.pillar || '').trim())
       const gene = (c.gene || '').trim()
       if (!pillar || !gene) continue
       // Strip haplotype-style noise from combined labels like
