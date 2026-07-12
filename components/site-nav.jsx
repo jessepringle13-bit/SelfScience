@@ -130,6 +130,17 @@ export function SiteNav({ variant = 'light' }) {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+          {/* Start Here \u2014 first item, orange accent, drives first-time visitors
+              into the guided journey. Uses a subtle background so it's warm
+              rather than shouty. */}
+          <a
+            href="/start"
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-bold text-ss-orange transition hover:bg-ss-orange/10 ${
+              pathname === '/start' ? 'bg-ss-orange/10' : ''
+            }`}
+          >
+            Start Here
+          </a>
           <a href="/search" className={linkClass('/search')}>Search</a>
 
           {/* Pillars dropdown — click to open, click outside/Escape to close */}
@@ -314,6 +325,13 @@ export function SiteNav({ variant = 'light' }) {
       {mobileOpen && (
         <div className="border-t border-white/10 bg-ss-teal text-white md:hidden">
           <nav className="container flex flex-col gap-3 py-4 text-sm">
+            <a
+              href="/start"
+              onClick={() => setMobileOpen(false)}
+              className="inline-flex w-fit items-center gap-1.5 rounded-full bg-ss-orange px-3 py-1 font-bold text-white shadow-sm"
+            >
+              ✨ Start Here
+            </a>
             <a href="/search" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Search</a>
             <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
 

@@ -12,6 +12,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
+import StartHereBanner from '@/components/StartHereBanner'
 import { ResultCard } from '@/components/result-card'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { hasGenomeResults } from '@/lib/genomeSession'
@@ -297,6 +298,9 @@ function DiscoverHome() {
 
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
+      {/* First-visit onboarding entry point \u2014 auto-hides via localStorage. */}
+      <StartHereBanner />
+
       {/* ============================= HERO ============================= */}
       <section className="relative flex min-h-[100vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
         <SiteNav variant="dark" />
