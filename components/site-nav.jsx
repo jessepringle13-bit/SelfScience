@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { Coffee } from 'lucide-react'
+import { Coffee, DollarSign } from 'lucide-react'
 import {
   Menu,
   X,
@@ -61,8 +61,10 @@ export function SiteNav({ variant = 'light' }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // The bottom-nav "Tools" tab on mobile dispatches this event so the
-  // full drawer of tools opens without navigating to a placeholder page.
+  // The bottom-nav "Tools" tab used to dispatch this event to open the full
+  // drawer. We now scope the bottom "Tools" tab to a dedicated Tools sheet
+  // (see MobileNav.jsx), so this listener is kept only as a defensive
+  // fallback for any legacy caller that still expects the drawer to open.
   useEffect(() => {
     const onOpen = () => setMobileOpen(true)
     window.addEventListener('selfscience:open-mobile-menu', onOpen)
@@ -254,24 +256,58 @@ export function SiteNav({ variant = 'light' }) {
           <SupportLink pathname={pathname} />
         </nav>
 
-        <a
-          href="/genome"
-          className="hidden rounded-full bg-ss-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark md:inline-flex"
-        >
-          Upload Genome
-        </a>
+        <div className="flex items-center gap-2">
+          {/* Donate — desktop: icon + label pill. Links straight to Buy Me a
+              Coffee so donors don't need an intermediate hop through /support.
+              This is deliberately distinct from the "Support" nav link, which
+              still points to the internal /support page (roadmap, ways to help
+              beyond money, etc.). Yellow/amber to match the "coin" ask and
+              differentiate from the orange "Upload Genome" primary CTA. */}
+          <a
+            href="https://buymeacoffee.com/selfscience"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_donate_desktop' })}
+            className="hidden items-center gap-1.5 rounded-full bg-amber-400 px-3 py-1.5 text-xs font-bold text-amber-950 shadow-sm ring-1 ring-amber-500/40 transition hover:bg-amber-300 md:inline-flex"
+            aria-label="Donate on Buy Me a Coffee"
+          >
+            <DollarSign size={13} strokeWidth={2.5} />
+            Donate
+          </a>
 
-        {/* Mobile menu button — visible on <md. Complements the bottom
-            tab bar so mobile users can reach the full Tools + About +
-            Pillars menu without leaving the top of the page. */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen((v) => !v)}
-          className={`md:hidden ${isDark ? 'text-white' : 'text-ss-teal'}`}
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
+          <a
+            href="/genome"
+            className="hidden rounded-full bg-ss-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark md:inline-flex"
+          >
+            Upload Genome
+          </a>
+
+          {/* Mobile-only Donate icon button — placed next to the hamburger per
+              the user's request. Icon-only to keep the header uncluttered on
+              small viewports. Yellow "coin" for scannability. */}
+          <a
+            href="https://buymeacoffee.com/selfscience"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_donate_mobile' })}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-sm ring-1 ring-amber-500/40 transition hover:bg-amber-300 md:hidden"
+            aria-label="Donate on Buy Me a Coffee"
+          >
+            <DollarSign size={16} strokeWidth={2.75} />
+          </a>
+
+          {/* Mobile menu button — visible on <md. Complements the bottom
+              tab bar so mobile users can reach the full Tools + About +
+              Pillars menu without leaving the top of the page. */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            className={`md:hidden ${isDark ? 'text-white' : 'text-ss-teal'}`}
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
