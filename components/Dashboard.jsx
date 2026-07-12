@@ -89,7 +89,7 @@ export default function Dashboard() {
   }, [report])
 
   return (
-    <div className="min-h-screen bg-ss-bg pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-[#DCEDED] via-[#EAF5F5] to-[#F5FAFA] pb-20">
       <SiteNav />
       {/* Header — pt-24 clears the absolute-positioned SiteNav (~64px) + a
           gap for the fixed dashboard/discover toggle beneath it. */}
