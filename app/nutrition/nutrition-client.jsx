@@ -42,6 +42,13 @@ import {
   SCANNER_DISCLAIMER,
   ALLERGEN_DISCLAIMER,
 } from '@/lib/nutritionGenomics'
+import {
+  scanUniversalFlags,
+  scanBeneficial,
+  lookupIngredient,
+  INGREDIENT_DICTIONARY,
+} from '@/lib/ingredientDictionary'
+import { getAlternatives } from '@/lib/productAlternatives'
 
 const LOG_KEY = 'selfscience_food_log_v1'
 
@@ -675,201 +682,353 @@ function summarizeDay(entries, activeRules) {
 }
 
 // ---------------------------------------------------------------------------
-// TAB 3 — SCANNER
+// TAB 3 — SCANNER (multi-product search + universal-quality analysis)
 // ---------------------------------------------------------------------------
+const QUICK_CATEGORIES = [
+  { key: 'protein-bars',   label: 'Protein Bars' },
+  { key: 'protein-powder', label: 'Protein Powder' },
+  { key: 'teas',           label: 'Teas' },
+  { key: 'cereals',        label: 'Cereals' },
+  { key: 'chips',          label: 'Chips' },
+  { key: 'yogurt',         label: 'Yogurt' },
+  { key: 'bread',          label: 'Bread' },
+  { key: 'oils',           label: 'Oils' },
+]
+
 function ScannerTab({ activeRules, hasGenome }) {
   const [showScanner, setShowScanner] = useState(false)
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [product, setProduct] = useState(null)
+  const [products, setProducts] = useState([])
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [openIngredient, setOpenIngredient] = useState(null)
+  // Filter state
+  const [minGrade, setMinGrade] = useState('all')   // all | ab | not_d
+  const [onlyOrganic, setOnlyOrganic] = useState(false)
+  const [hideSeedOils, setHideSeedOils] = useState(false)
+  const [hideArtSweetener, setHideArtSweetener] = useState(false)
 
-  const fetchProduct = async ({ barcode, q }) => {
+  const runSearch = async ({ barcode, q, category }) => {
     setLoading(true)
     setError(null)
-    setProduct(null)
+    setProducts([])
+    setSelectedProduct(null)
     try {
-      const url = barcode
-        ? `/api/nutrition/product?barcode=${encodeURIComponent(barcode)}`
-        : `/api/nutrition/product?query=${encodeURIComponent(q)}`
+      let url
+      if (barcode) url = `/api/nutrition/product?barcode=${encodeURIComponent(barcode)}`
+      else if (category) url = `/api/nutrition/product?category=${encodeURIComponent(category)}`
+      else url = `/api/nutrition/product?query=${encodeURIComponent(q)}`
       const res = await fetch(url)
-      if (!res.ok) {
-        setError(res.status === 404 ? 'Product not found in Open Food Facts.' : 'Lookup failed.')
-        return
-      }
+      if (!res.ok) { setError(res.status === 404 ? 'Product not found in Open Food Facts.' : 'Lookup failed.'); return }
       const data = await res.json()
-      if (data.product) setProduct(data.product)
-      else if (data.products?.length) setProduct(data.products[0])
+      if (data.product) { setProducts([data.product]); setSelectedProduct(data.product) }
+      else if (data.products?.length) setProducts(data.products)
       else setError('No results.')
-    } catch {
-      setError('Network error — try again.')
-    } finally {
-      setLoading(false)
-    }
+    } catch { setError('Network error — try again.') }
+    finally { setLoading(false) }
   }
 
-  const analysis = useMemo(() => {
-    if (!product) return null
-    const { flags, severityCounts } = scanIngredients(`${product.name} ${product.ingredients_text || ''}`, activeRules)
-    const grade = gradeCompatibility(severityCounts)
-    return { flags, severityCounts, grade }
-  }, [product, activeRules])
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const q = analyzeProduct(p, activeRules)
+      if (minGrade === 'ab' && !['A', 'B'].includes(q.universal.grade)) return false
+      if (minGrade === 'not_d' && q.universal.grade === 'D') return false
+      if (onlyOrganic && !q.universal.positives.some((x) => /organic/.test(x.ingredient))) return false
+      if (hideSeedOils && q.universal.flags.some((f) => f.category === 'seed_oil')) return false
+      if (hideArtSweetener && q.universal.flags.some((f) => f.category === 'sweetener' && /sucralose|aspartame|acesulfame|saccharin/.test(f.ingredient))) return false
+      return true
+    })
+  }, [products, activeRules, minGrade, onlyOrganic, hideSeedOils, hideArtSweetener])
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr,360px]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr,340px]">
       <section>
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
           <h2 className="text-lg font-bold text-ss-teal">Scan a product</h2>
-          <p className="mt-1 text-sm text-ss-muted">Point your camera at a barcode, or type a product name / UPC.</p>
+          <p className="mt-1 text-sm text-ss-muted">Point your camera at a barcode, type a product / brand / UPC, or browse a category.</p>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setShowScanner(true)}
-              className="inline-flex items-center gap-2 rounded-full bg-ss-orange px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-ss-orange-dark"
-            >
+            <button onClick={() => setShowScanner(true)} className="inline-flex items-center gap-2 rounded-full bg-ss-orange px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-ss-orange-dark">
               <Camera size={15} /> Scan barcode
             </button>
             <div className="flex flex-1 min-w-[240px] items-center gap-2 rounded-full border border-ss-border-warm bg-ss-bg px-3">
               <Search size={14} className="text-ss-muted" />
               <input
-                type="text"
-                value={query}
+                type="text" value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && query.trim()) fetchProduct({ q: query.trim() }) }}
-                placeholder="Product name or UPC code"
+                onKeyDown={(e) => { if (e.key === 'Enter' && query.trim()) runSearch({ q: query.trim() }) }}
+                placeholder="Brand, product name, or UPC"
                 className="flex-1 bg-transparent py-2 text-sm focus:outline-none"
               />
-              <button
-                onClick={() => { if (query.trim()) fetchProduct({ q: query.trim() }) }}
-                disabled={!query.trim() || loading}
-                className="rounded-full bg-ss-teal px-3 py-1 text-xs font-semibold text-white transition hover:brightness-110 disabled:opacity-40"
-              >
-                Search
-              </button>
+              <button onClick={() => { if (query.trim()) runSearch({ q: query.trim() }) }} disabled={!query.trim() || loading} className="rounded-full bg-ss-teal px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">Search</button>
             </div>
           </div>
 
-          {loading && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-ss-muted">
-              <Loader2 size={14} className="animate-spin" /> Fetching from Open Food Facts…
-            </div>
-          )}
-          {error && (
-            <div className="mt-4 rounded-lg bg-ss-orange/10 p-3 text-sm text-ss-orange">{error}</div>
-          )}
+          {/* Category quick-browse */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="font-semibold text-ss-muted">Browse:</span>
+            {QUICK_CATEGORIES.map((c) => (
+              <button key={c.key} onClick={() => runSearch({ category: c.key })} className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 font-semibold text-ss-teal hover:bg-ss-bg">{c.label}</button>
+            ))}
+          </div>
+
+          {loading && <div className="mt-4 flex items-center gap-2 text-sm text-ss-muted"><Loader2 size={14} className="animate-spin" /> Fetching from Open Food Facts…</div>}
+          {error && <div className="mt-4 rounded-lg bg-ss-orange/10 p-3 text-sm text-ss-orange">{error}</div>}
         </div>
 
-        {product && (
+        {/* Filter bar + result grid */}
+        {products.length > 0 && !selectedProduct && (
+          <>
+            <div className="mt-6 flex flex-wrap items-center gap-3 text-xs">
+              <span className="font-semibold text-ss-muted">Filter:</span>
+              <select value={minGrade} onChange={(e) => setMinGrade(e.target.value)} className="rounded-full border border-ss-border-warm bg-white px-3 py-1 font-semibold text-ss-teal">
+                <option value="all">All grades</option>
+                <option value="ab">A &amp; B only</option>
+                <option value="not_d">Hide D</option>
+              </select>
+              <label className="inline-flex items-center gap-1 font-semibold text-ss-teal"><input type="checkbox" checked={onlyOrganic}     onChange={(e) => setOnlyOrganic(e.target.checked)}     /> Organic only</label>
+              <label className="inline-flex items-center gap-1 font-semibold text-ss-teal"><input type="checkbox" checked={hideSeedOils}    onChange={(e) => setHideSeedOils(e.target.checked)}    /> No seed oils</label>
+              <label className="inline-flex items-center gap-1 font-semibold text-ss-teal"><input type="checkbox" checked={hideArtSweetener} onChange={(e) => setHideArtSweetener(e.target.checked)} /> No artificial sweeteners</label>
+              <span className="ml-auto text-ss-muted">{filteredProducts.length} of {products.length} shown</span>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredProducts.map((p, i) => (
+                <ProductGridCard key={p.barcode || i} product={p} activeRules={activeRules} onSelect={() => setSelectedProduct(p)} />
+              ))}
+              {filteredProducts.length === 0 && (
+                <div className="col-span-full rounded-2xl border border-dashed border-ss-border-warm p-6 text-center text-sm text-ss-muted">All products filtered out — loosen the filters above.</div>
+              )}
+            </div>
+          </>
+        )}
+
+        {selectedProduct && (
           <div className="mt-6">
-            <ProductCard product={product} analysis={analysis} hasGenome={hasGenome} />
+            <button onClick={() => setSelectedProduct(null)} className="mb-3 inline-flex items-center gap-1 text-xs font-semibold text-ss-teal hover:underline">
+              ← Back to results ({filteredProducts.length})
+            </button>
+            <ProductCard product={selectedProduct} activeRules={activeRules} hasGenome={hasGenome} onIngredientClick={setOpenIngredient} onSearchAlternative={(term) => { setQuery(term); runSearch({ q: term }) }} />
           </div>
         )}
       </section>
 
       <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ss-teal">
-            <Info size={13} /> How this works
-          </div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ss-teal"><Info size={13} /> How this works</div>
           <p className="mt-2 text-xs text-ss-text">
-            Every scanned product’s ingredient list is checked against the flag rules for your active genomic variants — MTHFR, BCMO1, FADS, LCT, CYP1A2, PPARA, MTNR1B, NOD2/FUT2, TCF7L2.
-            No genome data leaves your device; only the product barcode goes to Open Food Facts.
+            Every product is checked against TWO scoring layers:
           </p>
+          <ol className="mt-2 space-y-1 text-xs text-ss-text">
+            <li><b>Genomic fit</b> — flags against your active variants (MTHFR, LCT, CYP1A2 …)</li>
+            <li><b>Universal quality</b> — seed oils, HFCS, emulsifiers, artificial colors, glyphosate-risk grains, ultra-processing (NOVA)</li>
+          </ol>
+          <p className="mt-2 text-xs text-ss-muted">Tap any ingredient in a product to see what it is and what the research says.</p>
         </div>
         <p className="text-[11px] italic text-ss-muted">{SCANNER_DISCLAIMER}</p>
       </aside>
 
       {showScanner && (
-        <BarcodeScanner
-          onScan={(code) => { setShowScanner(false); fetchProduct({ barcode: code }) }}
-          onClose={() => setShowScanner(false)}
-        />
+        <BarcodeScanner onScan={(code) => { setShowScanner(false); runSearch({ barcode: code }) }} onClose={() => setShowScanner(false)} />
+      )}
+      {openIngredient && (
+        <IngredientDrawer name={openIngredient} onClose={() => setOpenIngredient(null)} />
       )}
     </div>
   )
 }
 
-function ProductCard({ product, analysis, hasGenome }) {
-  const grade = analysis?.grade || 'A'
-  const flags = analysis?.flags || []
-  const g = GRADE_STYLES[grade]
+// -------- Universal quality scoring helper --------
+function analyzeProduct(product, activeRules) {
+  const text = `${product?.name || ''} ${product?.ingredients_text || ''} ${(product?.additives || []).join(' ')} ${(product?.labels || []).join(' ')}`.toLowerCase()
+  const universalFlags = scanUniversalFlags(text)
+  const positives = scanBeneficial(text)
+  // Universal grade: bucket by severity penalty count + NOVA group.
+  const highN = universalFlags.filter((f) => f.severity === 'universal_avoid').length
+  const modN  = universalFlags.filter((f) => f.severity === 'universal_limit').length
+  const cauN  = universalFlags.filter((f) => f.severity === 'caution').length
+  const posN  = positives.length + ((product?.labels || []).some((l) => /organic/.test(l)) ? 2 : 0)
+  const nova = Number(product?.nova_group) || 0
+  let penalty = highN * 3 + modN * 2 + cauN + (nova >= 4 ? 3 : nova === 3 ? 1 : 0)
+  penalty -= Math.min(posN, 4) // bonus caps at 4
+  let uGrade = 'A'
+  if (penalty >= 7) uGrade = 'D'
+  else if (penalty >= 4) uGrade = 'C'
+  else if (penalty >= 1) uGrade = 'B'
+  // Genomic scoring (existing)
+  const { flags: gFlags, severityCounts } = scanIngredients(text, activeRules)
+  const gGrade = gradeCompatibility(severityCounts)
+  return {
+    universal: { grade: uGrade, flags: universalFlags, positives, penalty, nova },
+    genomic:   { grade: gGrade, flags: gFlags },
+  }
+}
+
+// -------- Small compact card used in the result grid --------
+function ProductGridCard({ product, activeRules, onSelect }) {
+  const q = useMemo(() => analyzeProduct(product, activeRules), [product, activeRules])
+  const n = product.nutriments
+  const macros = `${n.protein_g_serving ?? n.protein_g ?? '–'}g P · ${n.carbs_g_serving ?? n.carbs_g ?? '–'}g C · ${n.fat_g_serving ?? n.fat_g ?? '–'}g F`
+  const kcal = n.energy_kcal_serving ?? n.energy_kcal
+  return (
+    <button onClick={onSelect} className="flex flex-col overflow-hidden rounded-2xl bg-white text-left shadow-sm ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="relative h-32 w-full overflow-hidden bg-ss-bg">
+        {product.image
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+          : <div className="flex h-full w-full items-center justify-center text-ss-muted"><Apple size={28} /></div>}
+        <div className="absolute right-2 top-2 flex gap-1">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-extrabold text-white shadow ${GRADE_STYLES[q.universal.grade].bg}`} title={`Universal quality: ${q.universal.grade}`}>{q.universal.grade}</span>
+          <span className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-extrabold text-white shadow ${GRADE_STYLES[q.genomic.grade].bg}`} title={`Genomic fit: ${q.genomic.grade}`}>{q.genomic.grade}</span>
+        </div>
+      </div>
+      <div className="p-3">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-ss-muted">{product.brand || 'Unknown brand'}</div>
+        <div className="text-sm font-bold text-ss-teal line-clamp-2">{product.name}</div>
+        <div className="mt-1 text-[11px] text-ss-text">{macros}{kcal ? ` · ${kcal} kcal` : ''}</div>
+      </div>
+    </button>
+  )
+}
+
+// -------- Big detailed product card with two scores + ingredient chips --------
+function ProductCard({ product, activeRules, hasGenome, onIngredientClick, onSearchAlternative }) {
+  const q = useMemo(() => analyzeProduct(product, activeRules), [product, activeRules])
+  const n = product.nutriments
+  const perServing = n.protein_g_serving != null || n.energy_kcal_serving != null
+  const macros = perServing
+    ? `${n.protein_g_serving ?? '–'}g protein · ${n.carbs_g_serving ?? '–'}g carbs · ${n.fat_g_serving ?? '–'}g fat · ${n.energy_kcal_serving ?? '–'} kcal`
+    : `${n.protein_g ?? '–'}g protein · ${n.carbs_g ?? '–'}g carbs · ${n.fat_g ?? '–'}g fat · ${n.energy_kcal ?? '–'} kcal`
+  const alt = getAlternatives(product)
+  const showAlternatives = (q.universal.grade === 'C' || q.universal.grade === 'D' || q.genomic.grade === 'C' || q.genomic.grade === 'D') && alt.items.length > 0
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ss-border-warm/60">
-      <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[128px,1fr,auto]">
-        {product.image ? (
+      <div className="grid grid-cols-1 gap-4 p-6 md:grid-cols-[128px,1fr]">
+        {product.image
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.image} alt={product.name} className="h-32 w-32 rounded-lg object-cover ring-1 ring-ss-border-warm" />
-        ) : (
-          <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-ss-bg text-ss-muted ring-1 ring-ss-border-warm">
-            <Apple size={28} />
-          </div>
-        )}
+          ? <img src={product.image} alt={product.name} className="h-32 w-32 rounded-lg object-cover ring-1 ring-ss-border-warm" />
+          : <div className="flex h-32 w-32 items-center justify-center rounded-lg bg-ss-bg text-ss-muted ring-1 ring-ss-border-warm"><Apple size={28} /></div>}
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-widest text-ss-muted">{product.brand || 'Unknown brand'}</div>
           <h3 className="text-xl font-extrabold text-ss-teal">{product.name}</h3>
           {product.barcode && <div className="text-[11px] text-ss-muted">UPC/EAN {product.barcode}</div>}
-          <div className="mt-2 flex flex-wrap gap-2">
-            {product.nutriscore && (
-              <span className="rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ss-teal">Nutri-Score {product.nutriscore.toUpperCase()}</span>
-            )}
-            {product.nova_group && (
-              <span className="rounded-full bg-ss-amber/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ss-amber">NOVA {product.nova_group}</span>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-center gap-1">
-          <div className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl font-extrabold text-white shadow ${g.bg}`}>{grade}</div>
-          <div className="text-center text-[10px] font-bold uppercase tracking-wider text-ss-muted">Genomic fit</div>
+          {product.serving_size && <div className="text-[11px] text-ss-muted">Serving: {product.serving_size}</div>}
         </div>
       </div>
 
+      {/* Two score cards side by side */}
+      <div className="grid grid-cols-1 gap-3 border-t border-ss-border-warm/60 bg-ss-surface p-6 md:grid-cols-2">
+        <ScoreCard grade={q.genomic.grade}  title="Genomic fit"        subtitle={hasGenome ? `${q.genomic.flags.length} flag${q.genomic.flags.length === 1 ? '' : 's'} against your variants` : 'Upload genome for personalized score'} />
+        <ScoreCard grade={q.universal.grade} title="Universal quality" subtitle={`${q.universal.flags.length} concerning ingredient${q.universal.flags.length === 1 ? '' : 's'}${q.universal.nova ? ` · NOVA ${q.universal.nova}` : ''}`} />
+      </div>
+
       <div className="border-t border-ss-border-warm/60 bg-ss-surface px-6 py-5">
-        {!hasGenome && (
-          <div className="mb-4 rounded-lg border border-dashed border-ss-border-warm p-3 text-xs text-ss-muted">
-            No genome uploaded — grade defaults to A since we can’t check personalized flags.{' '}
-            <Link href="/genome" className="font-semibold text-ss-teal underline">Upload genome</Link> for personalized analysis.
+        {/* Macros */}
+        <div className="text-xs font-bold uppercase tracking-wider text-ss-teal">{perServing ? 'Per serving' : 'Per 100g'}</div>
+        <div className="mt-1 text-base font-semibold text-ss-text">{macros}</div>
+        {(n.fiber_g != null || n.sodium_mg != null || n.sugars_g_serving != null || n.sugars_g != null) && (
+          <div className="mt-1 text-xs text-ss-muted">
+            {(n.sugars_g_serving ?? n.sugars_g) != null && <>Sugars {n.sugars_g_serving ?? n.sugars_g}g · </>}
+            {n.fiber_g != null && <>Fiber {n.fiber_g}g · </>}
+            {n.sodium_mg != null && <>Sodium {n.sodium_mg}mg</>}
           </div>
         )}
+        {perServing && n.energy_kcal != null && (
+          <div className="mt-1 text-[11px] text-ss-muted">Per 100g reference: {n.protein_g ?? '–'}g P · {n.carbs_g ?? '–'}g C · {n.fat_g ?? '–'}g F · {n.energy_kcal} kcal</div>
+        )}
 
-        <div className="text-sm font-semibold text-ss-text">{gradeToLabel(grade)}</div>
-
-        {flags.length > 0 ? (
-          <div className="mt-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-ss-orange">Flagged ingredients ({flags.length})</div>
+        {/* Genomic flags */}
+        {q.genomic.flags.length > 0 && (
+          <div className="mt-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-ss-orange">Genomic flags ({q.genomic.flags.length})</div>
             <ul className="mt-2 space-y-2">
-              {flags.map((f, i) => (
+              {q.genomic.flags.map((f, i) => (
                 <li key={i} className={`rounded-lg border-l-4 p-3 ${SEVERITY_STYLES[f.severity] || SEVERITY_STYLES.low}`}>
-                  <div className="text-xs font-bold uppercase tracking-wider">{f.ingredient} · {f.rule_title}</div>
+                  <button className="text-xs font-bold uppercase tracking-wider underline-offset-2 hover:underline" onClick={() => onIngredientClick(f.ingredient)}>
+                    {f.ingredient}
+                  </button>
+                  <span className="text-xs font-bold uppercase tracking-wider"> · {f.rule_title}</span>
                   <p className="mt-1 text-xs text-ss-text">{f.flag}</p>
                 </li>
               ))}
             </ul>
           </div>
-        ) : (
-          <p className="mt-4 text-sm text-ss-muted">No genomic ingredient flags detected in this label.</p>
         )}
 
+        {/* Universal quality flags */}
+        {q.universal.flags.length > 0 && (
+          <div className="mt-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-ss-orange">Ingredients to know ({q.universal.flags.length})</div>
+            <p className="mt-1 text-[11px] text-ss-muted">Tap any chip for a definition and research context.</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {q.universal.flags.map((f, i) => {
+                const cls = f.severity === 'universal_avoid'
+                  ? 'bg-ss-orange text-white border-ss-orange'
+                  : f.severity === 'universal_limit'
+                    ? 'bg-ss-amber/20 text-ss-amber border-ss-amber/50'
+                    : 'bg-ss-bg text-ss-muted border-ss-border-warm'
+                return (
+                  <button key={i} onClick={() => onIngredientClick(f.ingredient)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80 ${cls}`}>
+                    {f.ingredient}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Clean label positives */}
+        {q.universal.positives.length > 0 && (
+          <div className="mt-5">
+            <div className="text-xs font-bold uppercase tracking-wider text-ss-green">Clean-label positives</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {q.universal.positives.map((p, i) => (
+                <button key={i} onClick={() => onIngredientClick(p.ingredient)} className="rounded-full border border-ss-green bg-ss-green/15 px-2.5 py-1 text-[11px] font-semibold text-ss-green hover:bg-ss-green/25">
+                  {p.ingredient}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Full ingredient list — every word clickable */}
         {product.ingredients_text && (
-          <details className="mt-4 rounded-lg bg-white p-3 text-xs ring-1 ring-ss-border-warm">
-            <summary className="cursor-pointer font-bold text-ss-teal">Full ingredient list</summary>
-            <p className="mt-2 leading-relaxed text-ss-text">{product.ingredients_text}</p>
+          <details className="mt-5 rounded-lg bg-white p-3 ring-1 ring-ss-border-warm" open>
+            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-ss-teal">Full ingredient list</summary>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {product.ingredients_text.split(/[,;]/).map((rawStr, i) => {
+                const raw = rawStr.trim().replace(/[()]/g, '').replace(/[.:]$/, '')
+                if (!raw) return null
+                const entry = lookupIngredient(raw)
+                let cls = 'bg-ss-bg text-ss-muted border-ss-border-warm'
+                if (entry?.severity === 'universal_avoid') cls = 'bg-ss-orange/20 text-ss-orange border-ss-orange/50 font-semibold'
+                else if (entry?.severity === 'universal_limit') cls = 'bg-ss-amber/15 text-ss-amber border-ss-amber/40'
+                else if (entry?.severity === 'caution') cls = 'bg-ss-bg text-ss-text border-ss-border-warm'
+                else if (entry?.severity === 'beneficial') cls = 'bg-ss-green/15 text-ss-green border-ss-green/40 font-semibold'
+                return (
+                  <button key={i} onClick={() => onIngredientClick(raw)} className={`rounded-full border px-2 py-0.5 text-[11px] transition hover:opacity-80 ${cls}`}>{raw}</button>
+                )
+              })}
+            </div>
           </details>
         )}
 
-        {/* Nutrition facts */}
-        {product.nutriments && (product.nutriments.energy_kcal || product.nutriments.protein) && (
-          <div className="mt-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-ss-teal">Per 100g</div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-              {product.nutriments.energy_kcal != null && <NutriPill label="Energy" value={`${Math.round(product.nutriments.energy_kcal)} kcal`} />}
-              {product.nutriments.protein != null && <NutriPill label="Protein" value={`${product.nutriments.protein}g`} />}
-              {product.nutriments.carbs != null && <NutriPill label="Carbs" value={`${product.nutriments.carbs}g`} />}
-              {product.nutriments.sugars != null && <NutriPill label="Sugars" value={`${product.nutriments.sugars}g`} />}
-              {product.nutriments.fat != null && <NutriPill label="Fat" value={`${product.nutriments.fat}g`} />}
-              {product.nutriments.saturated_fat != null && <NutriPill label="Sat fat" value={`${product.nutriments.saturated_fat}g`} />}
-              {product.nutriments.fiber != null && <NutriPill label="Fiber" value={`${product.nutriments.fiber}g`} />}
-              {product.nutriments.sodium != null && <NutriPill label="Sodium" value={`${product.nutriments.sodium}g`} />}
+        {/* Better alternatives (grade C/D on either axis) */}
+        {showAlternatives && (
+          <div className="mt-6 rounded-2xl border-l-4 border-ss-teal bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ss-teal"><Sparkles size={14} /> Better options for your profile</div>
+            <p className="mt-1 text-[11px] text-ss-muted">Curated cleaner alternatives in the same category ({alt.key.replace('-', ' ')}).</p>
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              {alt.items.slice(0, 6).map((a, i) => (
+                <div key={i} className="rounded-lg bg-ss-bg p-3 ring-1 ring-ss-border-warm/40">
+                  <div className="text-sm font-bold text-ss-teal">{a.name}</div>
+                  <p className="mt-1 text-xs text-ss-text">{a.why}</p>
+                  <button onClick={() => onSearchAlternative(a.search_term)} className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-ss-orange hover:underline">
+                    Search this product <ArrowRight size={11} />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -880,11 +1039,81 @@ function ProductCard({ product, analysis, hasGenome }) {
   )
 }
 
-function NutriPill({ label, value }) {
+function ScoreCard({ grade, title, subtitle }) {
+  const g = GRADE_STYLES[grade]
   return (
-    <div className="rounded-lg bg-white p-2 ring-1 ring-ss-border-warm/60">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-ss-muted">{label}</div>
-      <div className="text-sm font-bold text-ss-teal">{value}</div>
+    <div className="flex items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-ss-border-warm/60">
+      <div className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full text-2xl font-extrabold text-white shadow ${g.bg}`}>{grade}</div>
+      <div>
+        <div className="text-xs font-bold uppercase tracking-wider text-ss-muted">{title}</div>
+        <div className="text-sm font-semibold text-ss-text">{subtitle}</div>
+      </div>
+    </div>
+  )
+}
+
+// -------- Slide-over drawer with the ingredient definition --------
+function IngredientDrawer({ name, onClose }) {
+  const entry = useMemo(() => lookupIngredient(name), [name])
+  const isKnown = !!entry
+  const sevMeta = {
+    universal_avoid: { label: 'High concern',  color: 'bg-ss-orange text-white' },
+    universal_limit: { label: 'Limit / caution', color: 'bg-ss-amber text-white' },
+    caution:         { label: 'Some concern', color: 'bg-ss-bg text-ss-text ring-1 ring-ss-border-warm' },
+    beneficial:      { label: 'Beneficial',   color: 'bg-ss-green text-white' },
+    neutral:         { label: 'Neutral',      color: 'bg-ss-bg text-ss-text ring-1 ring-ss-border-warm' },
+  }
+  return (
+    <div className="fixed inset-0 z-[80] flex justify-end bg-black/40" onClick={onClose}>
+      <aside onClick={(e) => e.stopPropagation()} className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl">
+        <header className="flex items-center justify-between border-b border-ss-border-warm px-6 py-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-ss-muted">Ingredient</div>
+            <h3 className="text-lg font-extrabold text-ss-teal">{name}</h3>
+          </div>
+          <button onClick={onClose} className="rounded-full p-2 text-ss-muted hover:bg-ss-bg"><X size={16} /></button>
+        </header>
+        <div className="flex-1 space-y-4 p-6 text-sm text-ss-text">
+          {!isKnown ? (
+            <div className="rounded-lg bg-ss-bg p-4 text-xs text-ss-muted">
+              <p><b>Not in our curated ingredient database yet.</b></p>
+              <p className="mt-2">This ingredient isn&apos;t flagged as a universal red flag or clean-label positive. That usually means it&apos;s a whole-food, spice, or a specific brand-name that doesn&apos;t raise research concerns.</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-ss-teal">{entry.category?.replace('_', ' ')}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${sevMeta[entry.severity]?.color || sevMeta.neutral.color}`}>{sevMeta[entry.severity]?.label || 'Neutral'}</span>
+              </div>
+              <section>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-ss-muted">What it is</div>
+                <p className="mt-1 leading-relaxed">{entry.what_it_is}</p>
+              </section>
+              {entry.purpose && (
+                <section>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-ss-muted">Why it&apos;s in food</div>
+                  <p className="mt-1 leading-relaxed">{entry.purpose}</p>
+                </section>
+              )}
+              {entry.concern && (
+                <section>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-ss-orange">Research context</div>
+                  <p className="mt-1 leading-relaxed">{entry.concern}</p>
+                </section>
+              )}
+              {entry.better_options?.length > 0 && (
+                <section>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-ss-teal">Better options</div>
+                  <ul className="mt-1 space-y-1 text-xs">
+                    {entry.better_options.map((o, i) => <li key={i}>• {o}</li>)}
+                  </ul>
+                </section>
+              )}
+            </>
+          )}
+          <p className="text-[11px] italic text-ss-muted">Ingredient notes summarize published research. Not medical advice. Regulatory status and formulations change — check current sources for specific decisions.</p>
+        </div>
+      </aside>
     </div>
   )
 }
