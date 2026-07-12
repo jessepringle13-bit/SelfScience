@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { BookOpen, Search, ArrowRight } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import SiteFooter from '@/components/site-footer'
@@ -13,6 +13,7 @@ const PILLAR_COLORS = {
   genomics: '#1B474D', nutrition: '#2E7D32', performance: '#C45820',
   longevity: '#5E4B8B', wellness: '#0F6B6B', pharmacogenomics: '#8A2C6E',
   'mental-health': '#3B5BA5', environment: '#556B2F', hormones: '#B45309',
+  youth: '#F5B840',
 }
 
 function BookCover({ book }) {
@@ -45,7 +46,10 @@ function BookCover({ book }) {
 
 export default function ReadingListClient() {
   const router = useRouter()
-  const [filter, setFilter] = useState('all')
+  const params = useSearchParams()
+  // Deep-link support: /reading-list?filter=youth lands on that pillar filter.
+  const initialFilter = params?.get('filter') || 'all'
+  const [filter, setFilter] = useState(initialFilter)
 
   useEffect(() => { trackEvent(EVENTS.READING_LIST_VIEWED) }, [])
 

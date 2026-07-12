@@ -15,7 +15,7 @@ import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
 import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { trackEvent, EVENTS } from '@/lib/analytics'
-import { getPillarQuery } from '@/lib/pillars'
+import { getPillarQuery, isYouthQuery } from '@/lib/pillars'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 
@@ -181,7 +181,11 @@ export default function SearchClient() {
   const router = useRouter()
   const params = useSearchParams()
   const initialQ = params.get('q') || ''
-  const initialPillar = params.get('pillar') || ''
+  // Auto-apply the Youth pillar when the URL query looks pediatric and no
+  // pillar was explicitly requested. Same behaviour as `submit()` \u2014 keeps
+  // the user's typed text as the search term and layers the pillar on top.
+  const rawInitialPillar = params.get('pillar') || ''
+  const initialPillar = rawInitialPillar || (isYouthQuery(initialQ) ? 'Pediatric & Youth Wellness' : '')
   // Pillar hand-off from Dashboard: /search?pillar=X&genes=A,B,C carries the
   // user's classified genes for that pillar so we can fan out per-gene queries
   // AND highlight the matches on each result card.
@@ -372,13 +376,23 @@ export default function SearchClient() {
     const q = query.trim()
     if (!q) return
     setSubmittedQ(q)
+    // Auto-apply the Youth pillar when the free-text query looks pediatric
+    // (e.g. "children MTHFR", "ADHD genetics", "pediatric nutrition"). We
+    // KEEP the user's typed text as the search term and layer the pillar on
+    // top so results still match what they actually asked for.
+    let effectivePillar = pillar
+    if (!effectivePillar && isYouthQuery(q)) {
+      effectivePillar = 'Pediatric & Youth Wellness'
+      setPillar(effectivePillar)
+    }
     trackEvent(EVENTS.SEARCH_PERFORMED, {
       source: 'search_bar',
-      has_pillar: !!pillar,
+      has_pillar: !!effectivePillar,
+      auto_pillar: !!effectivePillar && !pillar,
     })
     const usp = new URLSearchParams()
     usp.set('q', q)
-    if (pillar) usp.set('pillar', pillar)
+    if (effectivePillar) usp.set('pillar', effectivePillar)
     router.replace(`/search?${usp.toString()}`)
   }
 

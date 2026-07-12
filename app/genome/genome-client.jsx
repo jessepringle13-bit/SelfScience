@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dna,
@@ -36,6 +36,7 @@ import { getEvidenceStrength } from '@/lib/evidenceStrength'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 import YourProtocolTab from '@/components/YourProtocolTab'
 import { saveGenomeResults, clearGenomeResults, notifyGenomeResultsChanged } from '@/lib/genomeSession'
+import { YOUTH_VARIANT_CROSSREFS } from '@/lib/youth-content'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -667,6 +668,68 @@ function applyClassificationFilter(cards, filterKey) {
   return cards
 }
 
+// -------- Youth & Family cross-reference panel --------
+// Shown at the top of the Overview tab when any of the report's cards contain
+// a variant that has been documented as particularly relevant in pediatric
+// research (MTHFR, FKBP5, FUT2, COL5A1, COMT). Each matched variant deep-links
+// to the specific domain anchor on /pillars/youth so the reader can jump
+// straight to the research and what-parents-can-do guidance.
+function YouthCrossRefPanel({ cards }) {
+  const matches = useMemo(() => {
+    if (!Array.isArray(cards) || cards.length === 0) return []
+    const seen = new Set()
+    const out = []
+    for (const c of cards) {
+      const key = `${(c?.gene || '').toUpperCase()}_${(c?.rsid || '').toLowerCase()}`
+      for (const ref of YOUTH_VARIANT_CROSSREFS) {
+        if (ref.match(key) || ref.match(c?.gene || '') || ref.match(c?.rsid || '')) {
+          if (seen.has(ref.label)) break
+          seen.add(ref.label)
+          out.push(ref)
+          break
+        }
+      }
+    }
+    return out
+  }, [cards])
+
+  if (matches.length === 0) return null
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-ss-teal to-[#0F3336] p-5 text-white shadow-sm md:p-6">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
+          <Sparkles size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-white/70">Youth &amp; Family</div>
+          <h3 className="mt-0.5 text-lg font-extrabold">
+            {matches.length === 1 ? '1 variant' : `${matches.length} variants`} in your report are highly relevant for children
+          </h3>
+          <p className="mt-1 text-sm text-white/80">
+            These findings are inheritable and have well-documented pediatric research. If you have children, are planning, or are pregnant, the Youth pillar has variant-specific research and what-parents-can-do guidance.
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 md:grid-cols-2">
+        {matches.map((m) => (
+          <a
+            key={m.label}
+            href={`/pillars/youth#${m.anchor}`}
+            className="group flex items-start gap-3 rounded-lg bg-white/5 p-3 ring-1 ring-white/10 transition hover:bg-white/10"
+          >
+            <span className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-widest text-white">
+              {m.label}
+            </span>
+            <span className="min-w-0 flex-1 text-[13px] leading-snug text-white/85">{m.blurb}</span>
+            <ArrowRight size={14} className="mt-0.5 shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function OverviewTab({ report, onSearch }) {
   const s = report?.overview?.strengths || []
   const a = report?.overview?.areasToExplore || []
@@ -688,6 +751,7 @@ function OverviewTab({ report, onSearch }) {
 
   return (
     <div className="space-y-10">
+      <YouthCrossRefPanel cards={allCards} />
       <ClassificationFilter value={filter} onChange={setFilter} counts={counts} />
 
       {showUnified ? (

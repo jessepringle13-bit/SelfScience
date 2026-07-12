@@ -34,7 +34,7 @@ export const PILLARS = [
   { key: 'mental-health',      name: 'Mental Health & Neurochemistry',  short: 'Mental Health',     Icon: Brain,     description: 'The genetics of mood, stress response, dopamine, serotonin, and brain chemistry.' },
   { key: 'environment',        name: 'Environmental Sensitivity',       short: 'Environment',       Icon: Leaf,      description: 'How your genes influence your response to environmental exposures, toxins, and chemical sensitivity.' },
   { key: 'hormones',           name: 'Hormones & Endocrine Health',     short: 'Hormones',          Icon: Droplet,   description: 'Testosterone, estrogen, thyroid, cortisol, leptin, and the genetics of hormonal health.' },
-  { key: 'pediatric',          name: 'Pediatric & Youth Wellness',      short: 'Youth Wellness',    Icon: Baby,      description: 'Growth, development, nutrition, sleep, ADHD, allergies, and the research shaping children\u2019s health from infancy through adolescence.' },
+  { key: 'pediatric',          name: 'Pediatric & Youth Wellness',      short: 'Youth Wellness',    Icon: Baby,      description: 'Growth, development, nutrition, sleep, ADHD, allergies, and the research shaping children\u2019s health from infancy through adolescence.', route: '/pillars/youth' },
 ]
 
 export function SiteNav({ variant = 'light' }) {
@@ -153,10 +153,10 @@ export function SiteNav({ variant = 'light' }) {
                 className="absolute left-1/2 top-full z-50 mt-2 w-[640px] -translate-x-1/2 rounded-xl bg-white p-4 shadow-2xl ring-1 ring-black/10"
               >
                 <div className="grid grid-cols-3 gap-1">
-                  {PILLARS.map(({ key, name, Icon, description }) => (
+                  {PILLARS.map(({ key, name, Icon, description, route }) => (
                     <a
                       key={key}
-                      href={`/search?pillar=${encodeURIComponent(name)}`}
+                      href={route || `/search?pillar=${encodeURIComponent(name)}`}
                       onClick={() => setPillarsOpen(false)}
                       className="group flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg"
                     >
@@ -334,7 +334,7 @@ export function SiteNav({ variant = 'light' }) {
               </summary>
               <div className="mt-2 grid grid-cols-2 gap-1 pl-3 text-[13px]">
                 {PILLARS.map((p) => (
-                  <a key={p.key} href={`/search?pillar=${encodeURIComponent(p.name)}`} onClick={() => setMobileOpen(false)} className="py-1 hover:opacity-80">
+                  <a key={p.key} href={p.route || `/search?pillar=${encodeURIComponent(p.name)}`} onClick={() => setMobileOpen(false)} className="py-1 hover:opacity-80">
                     {p.short}
                   </a>
                 ))}
