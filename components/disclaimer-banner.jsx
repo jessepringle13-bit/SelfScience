@@ -34,7 +34,7 @@ export default function DisclaimerBanner({
   }
 
   return (
-    <div className="sticky top-0 z-50 bg-[#EEF7F7] text-[#1B474D] ring-1 ring-[#1B474D]/10">
+    <div className="sticky top-16 z-40 bg-[#EEF7F7] text-[#1B474D] ring-1 ring-[#1B474D]/10">
       <div className="mx-auto flex max-w-[1100px] items-center gap-3 px-6 py-2.5 text-[13px] font-medium md:text-sm">
         <span className="flex-1">{message}</span>
         <button

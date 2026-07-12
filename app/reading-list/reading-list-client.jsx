@@ -136,7 +136,7 @@ export default function ReadingListClient() {
       </section>
 
       {/* Filter pills */}
-      <section className="sticky top-0 z-20 border-b border-ss-border-warm bg-white">
+      <section className="sticky top-16 z-20 border-b border-ss-border-warm bg-white">
         <div className="container flex flex-wrap items-center gap-2 py-4">
           {['all', ...PILLARS_ORDERED].map((key) => {
             const active = filter === key && !topic

@@ -298,9 +298,6 @@ function DiscoverHome() {
 
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
-      {/* First-visit onboarding entry point \u2014 auto-hides via localStorage. */}
-      <StartHereBanner />
-
       {/* ============================= HERO ============================= */}
       <section className="relative flex min-h-[100vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
         <SiteNav variant="dark" />
@@ -403,6 +400,13 @@ function DiscoverHome() {
           </a>
         </div>
       </section>
+
+      {/* Start Here banner — placed directly under the hero (below the
+          "Explore ↓" prompt) so returning visitors see the full hero first,
+          and first-time visitors are met with the onboarding banner as
+          their reward for scrolling. Auto-hides via localStorage after
+          dismissal. */}
+      <StartHereBanner />
 
       {/* ======================= GENOME UPLOAD CARD ====================== */}
       <section id="genome-upload" className="bg-white py-20">
