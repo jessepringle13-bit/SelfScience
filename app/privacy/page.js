@@ -54,7 +54,7 @@ export default function PrivacyPage() {
           <strong>Page views and navigation:</strong> We collect standard analytics data including which pages are visited, how long users spend on the platform, and general geographic region (country and state level only). This data is anonymous and aggregated.
         </p>
         <p>
-          <strong>Genome data:</strong> We do not collect genome data. When you upload a genome file, it is processed entirely within your browser. No raw file data, no variant calls, and no genome information of any kind is transmitted to or stored on SelfScience servers. Your genetic information never touches our infrastructure.
+          <strong>Genome data:</strong> SelfScience does not store or retain genome data. When you upload a genome file, the raw file is read entirely within your browser and is never transmitted to SelfScience servers. Anonymous variant calls (rsID + genotype pairs only) are sent to a third-party AI processing service to generate interpretation text; these transmissions contain no name, no date of birth, and no personal identifier. Nothing is stored or retained after your session. See Section 4 for details on the third-party AI service.
         </p>
         <p>
           <strong>Account data:</strong> SelfScience does not currently require account creation. If you create an account in the future, we will update this policy to describe what account data is collected and how it is used.
@@ -160,6 +160,9 @@ export default function PrivacyPage() {
       </LegalSection>
 
       <LegalSection number={10} id="s-contact" heading="Contact" alt>
+        <p>
+          This platform is operated by an independent creator based in Sun Prairie, Wisconsin, United States.
+        </p>
         <p>
           Privacy questions:{' '}
           <a href="mailto:privacy@selfscience.io" className="text-[#C45820] underline hover:text-[#A5471A]">privacy@selfscience.io</a>

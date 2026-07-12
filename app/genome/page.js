@@ -10,7 +10,7 @@ export const metadata = {
   openGraph: {
     title: 'Upload your genome | SelfScience',
     description:
-      'Browser-only genome parsing across ~185 well-studied variants, plus AI-generated research roadmap. Your file never leaves your device.',
+      'Browser-only genome parsing across ~500 well-studied variants, plus AI-generated research roadmap. Your file never leaves your device.',
     url: '/genome',
     type: 'website',
   },

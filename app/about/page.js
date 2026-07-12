@@ -48,7 +48,7 @@ export default function AboutPage() {
           Each discovery led to research. Each piece of research led to more questions. What I found was that the science existed &mdash; thousands of peer-reviewed studies on these exact variants &mdash; but it was inaccessible. Dense. Jargon-heavy. Buried behind paywalls or written for researchers, not people.
         </p>
         <p>
-          I also went through something harder during this period. I navigated coming off an antidepressant &mdash; not impulsively, but deliberately, using my genomic data as a guide. Understanding that my MTHFR variant affects neurotransmitter synthesis, that my BDNF Val66Met variant means exercise is literal neurological medicine for me, that my FKBP5 CT variant means cortisol management is non-negotiable &mdash; all of this informed how I approached that transition. It gave me a framework when most people in that situation have none.
+          I also went through something harder during this period. I navigated coming off an antidepressant &mdash; not impulsively, but deliberately, using my genomic data as a guide. Understanding that my MTHFR variant affects neurotransmitter synthesis, that my BDNF Val66Met variant means exercise is literal neurological medicine for me, that my FKBP5 CT variant means cortisol management is non-negotiable &mdash; all of this informed how I approached that transition. It gave me a framework when most people in that situation have none. That decision was made in conversation with my physician &mdash; not based on any platform alone, and not something anyone should navigate without qualified medical supervision.
         </p>
         <p>
           I started training for Hyrox. I built a 12-month program around my specific genetic profile &mdash; Zone 2 heart rate calibrated to my Whoop data, connective tissue prehab built around my COL5A1 variant, nutrition timing built around my MTNR1B GG genotype. I got my bloodwork done and started tracking the markers most relevant to my specific variants.
@@ -67,7 +67,7 @@ export default function AboutPage() {
           It is a search engine for peer-reviewed health and genomics research, with AI-powered reliability scoring that tells you what kind of evidence you are looking at and who funded it. It translates dense academic language into plain English. It surfaces the funding trail behind studies so you can see who paid for the research and what interest they had in the outcome.
         </p>
         <p>
-          And it gives you a way to upload your raw genome file &mdash; processed entirely in your browser, never stored &mdash; and receive a personalized research roadmap built around your specific genetic variants. Not a medical report. Not a diagnosis. A starting point for understanding yourself through the lens of what the science actually shows.
+          And it gives you a way to upload your raw genome file &mdash; read entirely in your browser, with only anonymous variant calls used to generate your results &mdash; and receive a personalized research roadmap built around your specific genetic variants. Not a medical report. Not a diagnosis. A starting point for understanding yourself through the lens of what the science actually shows.
         </p>
       </Section>
 

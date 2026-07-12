@@ -31,6 +31,7 @@ import { buildGenomeMarkdown, downloadTextFile, buildVariantsCsv, reportFilename
 import ShareCardModal from '@/components/ShareCardModal'
 import { buildGenomeResultsForShare } from '@/lib/shareCard'
 import EvidenceBadge from '@/components/EvidenceBadge'
+import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { getEvidenceStrength } from '@/lib/evidenceStrength'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 import YourProtocolTab from '@/components/YourProtocolTab'
@@ -260,8 +261,9 @@ export default function GenomeClient() {
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-white/85 md:text-lg">
               Upload your raw DNA data from 23andMe, AncestryDNA, or a whole-genome service.
-              SelfScience identifies your key genetic variants and builds a personalized research roadmap —
-              processed entirely in your browser, never stored or transmitted.
+              SelfScience identifies your key genetic variants and builds a personalized research
+              roadmap. Your raw file is read entirely in your browser — only anonymous variant
+              calls are used to generate your results, and nothing is ever stored or retained.
             </p>
           </div>
         </div>
@@ -271,9 +273,9 @@ export default function GenomeClient() {
       <section className="border-b border-ss-border-warm bg-ss-privacy-tint">
         <div className="container flex flex-col items-center justify-center gap-2 py-4 text-center text-sm text-ss-teal md:flex-row md:gap-3">
           <Lock size={16} />
-          <span className="font-semibold">Your file never leaves your device.</span>
+          <span className="font-semibold">Your raw file never leaves your device.</span>
           <span className="text-ss-teal/80">
-            No names. No storage. No exposure. Your session clears when you close this page.
+            Anonymous variant calls are processed by AI to generate your research roadmap — no raw file, no name, and no identifier is ever stored or retained.
           </span>
         </div>
       </section>
@@ -856,6 +858,11 @@ function FullReportTab({ report, onSearch }) {
             </button>
             {isOpen && (
               <div className="space-y-4 border-t border-ss-border-warm/60 bg-ss-surface p-6">
+                {/* Pillar-specific safety disclaimer above pharmacogenomics
+                    variant cards — mirrors the same banner shown on search
+                    results and the drug checker so users see it wherever
+                    PGx content is surfaced. */}
+                {g.pillar === 'Pharmacogenomics' && <PgxDisclaimer />}
                 {g.variants?.map((v, i) => (
                   <VariantCard key={i} variant={v} pillar={g.pillar} onSearch={onSearch} />
                 ))}

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
+import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { getPillarQuery } from '@/lib/pillars'
 import { getGenomeResults } from '@/lib/genomeSession'
@@ -732,6 +733,11 @@ export default function SearchClient() {
 
       {/* Results */}
       <section className="container py-8">
+        {/* PGx-specific safety disclaimer when the active pillar filter is
+            Pharmacogenomics — mirrors the same banner on the genome results
+            and drug checker pages so users see it wherever PGx content
+            surfaces. */}
+        {pillar === 'Pharmacogenomics' && <PgxDisclaimer />}
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-2xl font-extrabold text-ss-teal">
             {data?.isPillarBrowse && pillar

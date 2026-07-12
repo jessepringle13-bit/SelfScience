@@ -26,6 +26,7 @@ import Link from 'next/link'
 import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
+import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { getGenomeResults } from '@/lib/genomeSession'
 import {
   DRUG_CATALOG,
@@ -127,8 +128,15 @@ export default function DrugCheckClient() {
           {report && <RegenTools />}
         </div>
 
+        {/* Pharmacogenomics-specific safety disclaimer — consistent
+            banner shown wherever PGx content surfaces (search results,
+            genome results, this page). */}
+        <div className="mt-6">
+          <PgxDisclaimer />
+        </div>
+
         {/* Top disclaimer */}
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
+        <div className="mt-2 flex items-start gap-3 rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
           <ShieldAlert size={20} className="mt-0.5 flex-shrink-0 text-ss-amber" />
           <p className="text-sm leading-relaxed text-ss-text">
             <span className="font-semibold">Educational only.</span> {DRUG_CHECKER_DISCLAIMER}

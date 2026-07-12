@@ -415,12 +415,12 @@ function DiscoverHome() {
                 Your Genome. Your Research Starting Point.
               </h2>
               <p className="mt-4 max-w-xl text-ss-text">
-                Upload your raw DNA data file from 23andMe, AncestryDNA, or a whole genome service. Get a personalized research roadmap built around your specific genetic variants — processed entirely in your browser, never stored.
+                Upload your raw DNA data file from 23andMe, AncestryDNA, or a whole genome service. Get a personalized research roadmap built around your specific genetic variants. Your raw file is read entirely in your browser — only anonymous variant calls are used to generate your results, and nothing is ever stored or retained.
               </p>
               <div className="mt-5 flex items-start gap-2 text-sm text-ss-muted">
                 <Lock size={16} className="mt-0.5 shrink-0 text-ss-teal" />
                 <span>
-                  <b className="text-ss-teal">Your file never leaves your device.</b> No storage. No exposure.
+                  <b className="text-ss-teal">Your raw file never leaves your device.</b> Anonymous variant calls are processed by AI — no raw file, no name, no identifier is ever stored.
                 </span>
               </div>
               <div className="mt-6 flex flex-wrap items-center gap-3">

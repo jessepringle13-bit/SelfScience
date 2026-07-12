@@ -102,7 +102,7 @@ export default function HowItWorksPage() {
           Your file is read entirely in your browser. Nothing is transmitted to a server. Nothing is stored. The raw file data is cleared from memory immediately after your variant calls are extracted. Your session ends when you close the page.
         </p>
         <p>
-          SelfScience checks for approximately 200 genetic variants across nine research pillars &mdash; Genomics, Nutrition, Sports Performance, Longevity, General Wellness, Pharmacogenomics, Mental Health and Neurochemistry, Environmental Sensitivity, and Hormones and Endocrine Health.
+          SelfScience checks for approximately 500 genetic variants across nine research pillars &mdash; Genomics, Nutrition, Sports Performance, Longevity, General Wellness, Pharmacogenomics, Mental Health and Neurochemistry, Environmental Sensitivity, and Hormones and Endocrine Health.
         </p>
         <p>
           Each recognized variant is classified as a Strength, an Area to Explore, or Neutral based on what population studies have found for that genotype.

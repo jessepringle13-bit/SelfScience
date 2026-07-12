@@ -78,6 +78,7 @@ export default function TermsPage() {
           <li>Only extracted variant calls (rsID and genotype pairs) are temporarily used to generate your research roadmap.</li>
           <li>All data is cleared when your session ends or you close the page.</li>
           <li>SelfScience does not sell, share, or disclose any genetic information.</li>
+          <li>Anonymous variant calls extracted from your file are processed by a third-party AI service to generate interpretation text. No raw file, no name, and no personal identifier is transmitted. See our Privacy Policy for full details.</li>
         </ul>
         <p>
           SelfScience complies with the Genetic Information Nondiscrimination Act (GINA). We do not use genetic information for employment, insurance, or any discriminatory purpose. We collect no genetic information &mdash; your data never reaches our servers.
@@ -136,6 +137,12 @@ export default function TermsPage() {
       <LegalSection number={10} id="s-law" heading="Governing Law" alt>
         <p>
           These terms are governed by the laws of the State of Wisconsin, United States, without regard to conflict of law principles.
+        </p>
+        <p>
+          SelfScience is an independent educational platform operated by an individual creator based in Sun Prairie, Wisconsin, United States. For legal notices and formal correspondence:{' '}
+          <a href="mailto:contact@selfscience.io" className="text-[#C45820] underline hover:text-[#A5471A]">
+            contact@selfscience.io
+          </a>
         </p>
       </LegalSection>
 
