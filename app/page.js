@@ -14,6 +14,7 @@ import {
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import StartHereBanner from '@/components/StartHereBanner'
 import { ResultCard } from '@/components/result-card'
+import { EditorialFeatured } from '@/components/editorial-featured'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { hasGenomeResults } from '@/lib/genomeSession'
 import Dashboard from '@/components/Dashboard'
@@ -479,6 +480,9 @@ function DiscoverHome() {
           </div>
 
           <div className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4">
+            {/* Supabase editorial featured articles (hidden if none). Rendered
+                first so curated content leads the section. */}
+            <EditorialFeatured limit={6} />
             {FEATURED.map((item) => (
               <div key={item.id} className="snap-start">
                 <ResultCard item={item} variant="carousel" />

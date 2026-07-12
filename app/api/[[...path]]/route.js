@@ -15,6 +15,11 @@ import { callGenomeGenerateProvider } from '@/lib/genomeGenerateProvider'
 import { getPillarQuery } from '@/lib/pillars'
 import { searchCache, makeCacheKey } from '@/lib/cache'
 import { getUsageSnapshot, fetchOpenRouterCredit } from '@/lib/ai-usage'
+import {
+  searchArticles as supabaseSearchArticles,
+  getFeaturedArticles as supabaseGetFeaturedArticles,
+  pingArticlesTable as supabasePingArticles,
+} from '@/lib/supabase/articles'
 
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -693,6 +698,11 @@ export async function GET(request, { params }) {
   if (route === 'search') return handleSearch(request)
   if (route === 'autocomplete') return handleAutocomplete(request)
   if (route === 'admin' && subRoute === 'ai-usage') return handleAdminAiUsage(request)
+  if (route === 'editorial') {
+    if (subRoute === 'health')   return handleEditorialHealth(request)
+    if (subRoute === 'search')   return handleEditorialSearch(request)
+    if (subRoute === 'featured') return handleEditorialFeatured(request)
+  }
 
   return NextResponse.json({
     status: 'ok',
@@ -734,6 +744,60 @@ async function handleAutocomplete(request) {
     return NextResponse.json({ suggestions: [] })
   }
 }
+
+/* --------------------------- /api/editorial/* ---------------------------- */
+/**
+ * Read-side endpoints for the Supabase `articles` table.
+ *
+ * All queries use the anon key + RLS, which enforces that only published
+ * rows are visible. Endpoints are designed to fail SILENTLY (returning an
+ * empty result set) if Supabase is misconfigured or unreachable, so the
+ * main search never breaks because of an editorial-side outage.
+ */
+
+async function handleEditorialHealth() {
+  try {
+    const res = await supabasePingArticles()
+    return NextResponse.json({
+      ok: !!res.ok,
+      publishedArticlesVisibleToPublic: res.count,
+      reason: res.ok ? null : res.reason,
+    })
+  } catch (err) {
+    return NextResponse.json({ ok: false, reason: err?.message || 'unknown' })
+  }
+}
+
+async function handleEditorialSearch(request) {
+  const { searchParams } = new URL(request.url)
+  const q = (searchParams.get('q') || '').trim()
+  const pillar = (searchParams.get('pillar') || '').trim()
+  const limitRaw = parseInt(searchParams.get('limit') || '12', 10)
+  const limit = Math.max(1, Math.min(50, Number.isFinite(limitRaw) ? limitRaw : 12))
+
+  try {
+    const results = await supabaseSearchArticles({ query: q, pillar, limit })
+    return NextResponse.json({ results, total: results.length, source: 'supabase' })
+  } catch (err) {
+    console.warn('[editorial/search] error:', err?.message)
+    return NextResponse.json({ results: [], total: 0, source: 'supabase', error: err?.message })
+  }
+}
+
+async function handleEditorialFeatured(request) {
+  const { searchParams } = new URL(request.url)
+  const limitRaw = parseInt(searchParams.get('limit') || '6', 10)
+  const limit = Math.max(1, Math.min(24, Number.isFinite(limitRaw) ? limitRaw : 6))
+
+  try {
+    const results = await supabaseGetFeaturedArticles(limit)
+    return NextResponse.json({ results, total: results.length, source: 'supabase' })
+  } catch (err) {
+    console.warn('[editorial/featured] error:', err?.message)
+    return NextResponse.json({ results: [], total: 0, source: 'supabase', error: err?.message })
+  }
+}
+
 
 /* ----------------------------- /api/analyze ------------------------------- */
 /* Simple in-memory cache keyed by id / doi / title to avoid burning Gemini quota

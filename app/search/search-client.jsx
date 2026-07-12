@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
+import { EditorialPicks } from '@/components/editorial-picks'
 import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { getPillarQuery, isYouthQuery } from '@/lib/pillars'
@@ -846,6 +847,9 @@ export default function SearchClient() {
 
         {!loading && !error && paged.length > 0 && (
           <>
+            {/* Editorial Picks (Supabase) \u2014 above external results.
+                Fetches in parallel; hides itself if there are no matches. */}
+            <EditorialPicks query={submittedQ} pillar={pillar} />
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {paged.map((item) => (
                 <ResultCard key={item.id} item={item} highlightGenes={activeGenes} />
