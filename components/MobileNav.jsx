@@ -1,18 +1,22 @@
 'use client'
 // /app/components/MobileNav.jsx
-// Bottom tab-bar navigation for mobile viewports. Replaces the hamburger menu
-// on <768px screens (PWA users are almost always mobile). env(safe-area-inset
-// -bottom) handles iPhone notch/home-indicator spacing.
+// Bottom tab-bar navigation for mobile viewports. Complements the top
+// hamburger menu — the "Tools" tab dispatches an event that opens the
+// full drawer from SiteNav so users can reach every tool without the
+// bottom bar becoming a scroll-bar. env(safe-area-inset-bottom) handles
+// iPhone notch/home-indicator spacing.
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Search, Dna, TestTube2 } from 'lucide-react'
+import { Home, Search, Dna, Wrench } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/',             label: 'Home',    Icon: Home },
-  { href: '/search',       label: 'Search',  Icon: Search },
-  { href: '/genome',       label: 'Genome',  Icon: Dna },
-  { href: '/biomarkers',   label: 'Labs',    Icon: TestTube2 },
+  { href: '/',       label: 'Home',   Icon: Home },
+  { href: '/search', label: 'Search', Icon: Search },
+  { href: '/genome', label: 'Genome', Icon: Dna },
+  // "Tools" is not a route — tapping it opens the site-wide mobile drawer
+  // where users can pick Nutrition, Biomarkers, Drug Check, Ancestry, etc.
+  { key: 'tools',    label: 'Tools',  Icon: Wrench, action: 'open-tools' },
 ]
 
 export default function MobileNav() {
@@ -24,19 +28,29 @@ export default function MobileNav() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className="flex">
-        {NAV_ITEMS.map(({ href, label, Icon }) => {
-          const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')
+        {NAV_ITEMS.map(({ href, key, label, Icon, action }) => {
+          const active = href ? (href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/')) : false
+          const commonCls = `flex flex-col items-center gap-1 py-2 text-[10px] font-medium transition w-full ${
+            active ? 'text-ss-teal font-bold' : 'text-ss-muted hover:text-ss-teal'
+          }`
           return (
-            <li key={href} className="flex-1">
-              <Link
-                href={href}
-                className={`flex flex-col items-center gap-1 py-2 text-[10px] font-medium transition ${
-                  active ? 'text-ss-teal font-bold' : 'text-ss-muted hover:text-ss-teal'
-                }`}
-              >
-                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-                {label}
-              </Link>
+            <li key={href || key} className="flex-1">
+              {action === 'open-tools' ? (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('selfscience:open-mobile-menu'))}
+                  className={commonCls}
+                  aria-label="Open tools menu"
+                >
+                  <Icon size={20} strokeWidth={2} />
+                  {label}
+                </button>
+              ) : (
+                <Link href={href} className={commonCls}>
+                  <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+                  {label}
+                </Link>
+              )}
             </li>
           )
         })}

@@ -61,6 +61,14 @@ export function SiteNav({ variant = 'light' }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // The bottom-nav "Tools" tab on mobile dispatches this event so the
+  // full drawer of tools opens without navigating to a placeholder page.
+  useEffect(() => {
+    const onOpen = () => setMobileOpen(true)
+    window.addEventListener('selfscience:open-mobile-menu', onOpen)
+    return () => window.removeEventListener('selfscience:open-mobile-menu', onOpen)
+  }, [])
+
   // Close dropdowns when clicking outside. This is the click-based UX pattern:
   // the dropdown stays open (regardless of where you move your cursor) until
   // you either pick a link, hit Escape, or click somewhere else on the page.
@@ -253,13 +261,13 @@ export function SiteNav({ variant = 'light' }) {
           Upload Genome
         </a>
 
-        {/* Mobile menu button — hidden on small screens because MobileNav
-            provides a bottom tab bar (better PWA UX). Retained on desktop
-            widths as a fallback if the bottom nav ever gets disabled. */}
+        {/* Mobile menu button — visible on <md. Complements the bottom
+            tab bar so mobile users can reach the full Tools + About +
+            Pillars menu without leaving the top of the page. */}
         <button
           type="button"
           onClick={() => setMobileOpen((v) => !v)}
-          className={`hidden ${isDark ? 'text-white' : 'text-ss-teal'}`}
+          className={`md:hidden ${isDark ? 'text-white' : 'text-ss-teal'}`}
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}
@@ -270,14 +278,19 @@ export function SiteNav({ variant = 'light' }) {
       {mobileOpen && (
         <div className="border-t border-white/10 bg-ss-teal text-white md:hidden">
           <nav className="container flex flex-col gap-3 py-4 text-sm">
-            <a href="/search" className="hover:opacity-80">Search</a>
-            <a href="/genome" className="hover:opacity-80">Upload Genome</a>
-            <a href="/biomarkers" className="hover:opacity-80">Biomarkers</a>
-            <a href="/training" className="hover:opacity-80">Training</a>
-            <a href="/drug-check" className="hover:opacity-80">Drug Check</a>
-            <a href="/population-compare" className="hover:opacity-80">Populations</a>
-            <a href="/ancestry" className="hover:opacity-80">Ancestry</a>
-            <a href="/practitioner-report" className="hover:opacity-80">Practitioner Report</a>
+            <a href="/search" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Search</a>
+            <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
+
+            <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Tools</div>
+            <a href="/nutrition"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
+            <a href="/biomarkers"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Biomarkers</a>
+            <a href="/training"            onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training</a>
+            <a href="/drug-check"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Drug Check</a>
+            <a href="/population-compare"  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Populations</a>
+            <a href="/ancestry"            onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry</a>
+            <a href="/practitioner-report" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Practitioner Report</a>
+
+            <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Browse</div>
             <details className="group">
               <summary className="flex cursor-pointer items-center justify-between hover:opacity-80">
                 <span>Pillars</span>
@@ -285,25 +298,20 @@ export function SiteNav({ variant = 'light' }) {
               </summary>
               <div className="mt-2 grid grid-cols-2 gap-1 pl-3 text-[13px]">
                 {PILLARS.map((p) => (
-                  <a key={p.key} href={`/search?pillar=${encodeURIComponent(p.name)}`} className="py-1 hover:opacity-80">
+                  <a key={p.key} href={`/search?pillar=${encodeURIComponent(p.name)}`} onClick={() => setMobileOpen(false)} className="py-1 hover:opacity-80">
                     {p.short}
                   </a>
                 ))}
               </div>
             </details>
-            <a href="/reading-list" className="hover:opacity-80">Reading List</a>
-            <details className="group">
-              <summary className="flex cursor-pointer items-center justify-between hover:opacity-80">
-                <span>About</span>
-                <ChevronDown size={14} className="transition group-open:rotate-180" />
-              </summary>
-              <div className="mt-2 flex flex-col gap-1 pl-3 text-[13px]">
-                <a href="/about" className="py-1 hover:opacity-80">About</a>
-                <a href="/mission" className="py-1 hover:opacity-80">Mission</a>
-                <a href="/how-it-works" className="py-1 hover:opacity-80">How It Works</a>
-              </div>
-            </details>
-            <a href="/support" className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-[#C45820] px-4 py-2 text-sm font-semibold text-white">☕ Support SelfScience</a>
+            <a href="/reading-list" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Reading List</a>
+
+            <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">About</div>
+            <a href="/about"        onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">About</a>
+            <a href="/mission"      onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">Mission</a>
+            <a href="/how-it-works" onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">How It Works</a>
+
+            <a href="/support" onClick={() => setMobileOpen(false)} className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-[#C45820] px-4 py-2 text-sm font-semibold text-white">☕ Support SelfScience</a>
           </nav>
         </div>
       )}
