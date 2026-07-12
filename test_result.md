@@ -1445,7 +1445,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "GET /api/nutrition/product — Open Food Facts proxy for barcode lookup and product search"
+    - "Supabase editorial articles — full CRUD + search + CSV import"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"

@@ -20,6 +20,24 @@ import {
   getFeaturedArticles as supabaseGetFeaturedArticles,
   pingArticlesTable as supabasePingArticles,
 } from '@/lib/supabase/articles'
+import {
+  isAdminAuthenticated,
+  verifyPassword,
+  expectedSessionToken,
+  ADMIN_COOKIE,
+} from '@/lib/admin-auth'
+import {
+  normalizeArticlePayload,
+  listAllArticles,
+  getArticleById,
+  createArticle,
+  updateArticleById,
+  deleteArticleById,
+  slugExists,
+  bulkInsertArticles,
+} from '@/lib/supabase/admin-articles'
+import { isValidSlug } from '@/lib/slugify'
+import { EDITORIAL_PILLARS } from '@/lib/supabase/pillar-map'
 
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
@@ -694,10 +712,17 @@ export async function GET(request, { params }) {
   const p = (await params)?.path || []
   const route = Array.isArray(p) ? p[0] : p
   const subRoute = Array.isArray(p) ? p[1] : null
+  const thirdRoute = Array.isArray(p) ? p[2] : null
 
   if (route === 'search') return handleSearch(request)
   if (route === 'autocomplete') return handleAutocomplete(request)
   if (route === 'admin' && subRoute === 'ai-usage') return handleAdminAiUsage(request)
+  if (route === 'admin' && subRoute === 'me') return handleAdminMe(request)
+  if (route === 'admin' && subRoute === 'articles') {
+    if (!thirdRoute) return handleAdminListArticles(request)
+    if (thirdRoute === 'check-slug') return handleAdminCheckSlug(request)
+    return handleAdminGetArticle(request, thirdRoute)
+  }
   if (route === 'editorial') {
     if (subRoute === 'health')   return handleEditorialHealth(request)
     if (subRoute === 'search')   return handleEditorialSearch(request)
@@ -1149,6 +1174,8 @@ async function handleInterpretGenome(request) {
 export async function POST(request, { params }) {
   const p = (await params)?.path || []
   const route = Array.isArray(p) ? p[0] : p
+  const subRoute = Array.isArray(p) ? p[1] : null
+  const thirdRoute = Array.isArray(p) ? p[2] : null
 
   // New endpoints per spec
   if (route === 'score-reliability') return handleScoreReliability(request)
@@ -1159,7 +1186,39 @@ export async function POST(request, { params }) {
   if (route === 'analyze') return handleScoreReliability(request)
   if (route === 'genome') return handleInterpretGenome(request)
 
+  // Admin endpoints
+  if (route === 'admin' && subRoute === 'login')  return handleAdminLogin(request)
+  if (route === 'admin' && subRoute === 'logout') return handleAdminLogout(request)
+  if (route === 'admin' && subRoute === 'articles') {
+    if (!thirdRoute)               return handleAdminCreateArticle(request)
+    if (thirdRoute === 'import')   return handleAdminImportCsv(request)
+  }
+
   return NextResponse.json({ status: 'ok' })
+}
+
+export async function PATCH(request, { params }) {
+  const p = (await params)?.path || []
+  const route = Array.isArray(p) ? p[0] : p
+  const subRoute = Array.isArray(p) ? p[1] : null
+  const thirdRoute = Array.isArray(p) ? p[2] : null
+
+  if (route === 'admin' && subRoute === 'articles' && thirdRoute) {
+    return handleAdminUpdateArticle(request, thirdRoute)
+  }
+  return NextResponse.json({ error: 'Not found' }, { status: 404 })
+}
+
+export async function DELETE(request, { params }) {
+  const p = (await params)?.path || []
+  const route = Array.isArray(p) ? p[0] : p
+  const subRoute = Array.isArray(p) ? p[1] : null
+  const thirdRoute = Array.isArray(p) ? p[2] : null
+
+  if (route === 'admin' && subRoute === 'articles' && thirdRoute) {
+    return handleAdminDeleteArticle(request, thirdRoute)
+  }
+  return NextResponse.json({ error: 'Not found' }, { status: 404 })
 }
 
 /**
@@ -1195,3 +1254,186 @@ async function handleAdminAiUsage(request) {
     priceTableNote: 'Prices in /app/lib/ai-usage.js. Update as providers publish new pricing.',
   })
 }
+
+/* -------------------------- /api/admin/articles ------------------------- */
+/**
+ * Password-gated CRUD + CSV bulk-import endpoints for the editorial
+ * `articles` table. All writes bypass RLS via the service-role client,
+ * so `guardAdmin()` MUST be called first on every mutating request.
+ */
+
+function unauthorized() {
+  return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+}
+
+function guardAdmin(request) {
+  if (!isAdminAuthenticated(request)) {
+    return unauthorized()
+  }
+  return null
+}
+
+/* --- POST /api/admin/login -------------------------------------------- */
+async function handleAdminLogin(request) {
+  let body = {}
+  try { body = await request.json() } catch { /* ignore */ }
+  const password = String(body?.password || '')
+  if (!verifyPassword(password)) {
+    return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
+  }
+  const token = expectedSessionToken()
+  const res = NextResponse.json({ ok: true })
+  res.cookies.set(ADMIN_COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  })
+  return res
+}
+
+/* --- POST /api/admin/logout ------------------------------------------ */
+async function handleAdminLogout() {
+  const res = NextResponse.json({ ok: true })
+  res.cookies.set(ADMIN_COOKIE, '', {
+    httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0,
+  })
+  return res
+}
+
+/* --- GET /api/admin/me ----------------------------------------------- */
+async function handleAdminMe(request) {
+  return NextResponse.json({ authenticated: isAdminAuthenticated(request) })
+}
+
+/* --- GET /api/admin/articles ----------------------------------------- */
+async function handleAdminListArticles(request) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  const { data, error } = await listAllArticles({ limit: 500 })
+  if (error) return NextResponse.json({ error }, { status: 500 })
+  return NextResponse.json({ articles: data, total: data.length, pillars: EDITORIAL_PILLARS })
+}
+
+/* --- GET /api/admin/articles/check-slug?slug=&excludeId= ------------- */
+async function handleAdminCheckSlug(request) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  const { searchParams } = new URL(request.url)
+  const slug = (searchParams.get('slug') || '').trim().toLowerCase()
+  const excludeId = searchParams.get('excludeId') || null
+  if (!slug) return NextResponse.json({ ok: false, reason: 'slug required' }, { status: 400 })
+  if (!isValidSlug(slug)) return NextResponse.json({ ok: false, taken: false, valid: false })
+  const taken = await slugExists(slug, { excludeId })
+  return NextResponse.json({ ok: true, taken, valid: true })
+}
+
+/* --- GET /api/admin/articles/[id] ------------------------------------ */
+async function handleAdminGetArticle(request, id) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  const { data, error } = await getArticleById(id)
+  if (error) return NextResponse.json({ error }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  return NextResponse.json({ article: data })
+}
+
+/* --- POST /api/admin/articles ---------------------------------------- */
+async function handleAdminCreateArticle(request) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  let payload
+  try { payload = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { data: normalized, errors } = normalizeArticlePayload(payload, { partial: false })
+  if (errors.length) return NextResponse.json({ error: errors.join('; ') }, { status: 400 })
+
+  if (await slugExists(normalized.slug)) {
+    return NextResponse.json({ error: `slug "${normalized.slug}" is already in use` }, { status: 409 })
+  }
+
+  const { data, error } = await createArticle(normalized)
+  if (error) return NextResponse.json({ error }, { status: 500 })
+  return NextResponse.json({ article: data }, { status: 201 })
+}
+
+/* --- PATCH /api/admin/articles/[id] ---------------------------------- */
+async function handleAdminUpdateArticle(request, id) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  let payload
+  try { payload = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { data: normalized, errors } = normalizeArticlePayload(payload, { partial: true })
+  if (errors.length) return NextResponse.json({ error: errors.join('; ') }, { status: 400 })
+
+  if (normalized.slug && await slugExists(normalized.slug, { excludeId: id })) {
+    return NextResponse.json({ error: `slug "${normalized.slug}" is already in use` }, { status: 409 })
+  }
+
+  const { data, error } = await updateArticleById(id, normalized)
+  if (error) return NextResponse.json({ error }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'not found' }, { status: 404 })
+  return NextResponse.json({ article: data })
+}
+
+/* --- DELETE /api/admin/articles/[id] --------------------------------- */
+async function handleAdminDeleteArticle(request, id) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  const { error } = await deleteArticleById(id)
+  if (error) return NextResponse.json({ error }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
+/* --- POST /api/admin/articles/import (CSV bulk) ---------------------- */
+async function handleAdminImportCsv(request) {
+  const unauth = guardAdmin(request); if (unauth) return unauth
+  let body
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const rows = Array.isArray(body?.rows) ? body.rows : null
+  if (!rows) return NextResponse.json({ error: 'rows array required' }, { status: 400 })
+
+  // Force imports as drafts (not published, not featured) regardless of CSV.
+  const toInsert = []
+  const errors = []
+  const seenSlugsInBatch = new Set()
+  for (let i = 0; i < rows.length; i++) {
+    const r = { ...rows[i], is_published: false, is_featured: false }
+    const { data: normalized, errors: rowErrs } = normalizeArticlePayload(r, { partial: false })
+    if (rowErrs.length) {
+      errors.push({ row: i + 1, slug: r.slug || null, error: rowErrs.join('; ') })
+      continue
+    }
+    if (seenSlugsInBatch.has(normalized.slug)) {
+      errors.push({ row: i + 1, slug: normalized.slug, error: 'duplicate slug within CSV' })
+      continue
+    }
+    if (await slugExists(normalized.slug)) {
+      errors.push({ row: i + 1, slug: normalized.slug, error: 'slug already exists in DB' })
+      continue
+    }
+    seenSlugsInBatch.add(normalized.slug)
+    toInsert.push(normalized)
+  }
+
+  if (!toInsert.length) {
+    return NextResponse.json({ inserted: 0, skipped: rows.length, errors }, { status: 200 })
+  }
+
+  const { data, error } = await bulkInsertArticles(toInsert)
+  if (error) {
+    return NextResponse.json({
+      inserted: 0,
+      skipped: rows.length,
+      errors: [...errors, { row: null, error: `bulk insert failed: ${error}` }],
+    }, { status: 500 })
+  }
+
+  return NextResponse.json({
+    inserted: data.length,
+    skipped: rows.length - data.length,
+    errors,
+    imported: data,
+  })
+}
+
