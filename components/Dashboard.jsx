@@ -137,10 +137,10 @@ export default function Dashboard() {
         </DashSection>
 
         {/* 3. PILLAR SCORE OVERVIEW */}
-        <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars." toneClass="text-ss-teal">
+        <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars. Click any to cross-reference the pillar with your tagged genes." toneClass="text-ss-teal">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {PILLARS.map((p) => (
-              <PillarTile key={p.key} pillar={p} summary={pillarSummary[p.name]} />
+              <PillarTile key={p.key} pillar={p} summary={pillarSummary[p.name]} genes={pillarGenes[p.name] || []} />
             ))}
           </div>
         </DashSection>
@@ -286,14 +286,19 @@ function CardRow({ items, tone }) {
   )
 }
 
-function PillarTile({ pillar, summary }) {
+function PillarTile({ pillar, summary, genes = [] }) {
   const positive = summary?.positive || 0
   const awareness = summary?.awareness || 0
   const neutral = summary?.neutral || 0
   const total = positive + awareness + neutral
+  // Build the same pillar+genes hand-off href the "Explore Your Pillars"
+  // card uses, so clicking any pillar in the Score Overview also fans out
+  // to per-gene searches instead of a bare pillar-only search.
+  const params = new URLSearchParams({ pillar: pillar.name })
+  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
   return (
     <Link
-      href={`/search?pillar=${encodeURIComponent(pillar.name)}`}
+      href={`/search?${params.toString()}`}
       className="flex flex-col rounded-xl bg-white p-4 ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="flex items-center gap-2">
@@ -316,6 +321,20 @@ function PillarTile({ pillar, summary }) {
       <div className="mt-2 text-[10px] text-ss-muted">
         {positive}·Benefit &nbsp;{awareness}·Aware &nbsp;{neutral}·Neutral
       </div>
+      {/* Compact gene chip preview so users can see WHICH of their genes
+          will fan out when they click this tile. */}
+      {genes.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {genes.slice(0, 4).map((g) => (
+            <span key={g} className="rounded-full bg-ss-orange/15 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-ss-orange">
+              {g}
+            </span>
+          ))}
+          {genes.length > 4 && (
+            <span className="text-[9px] font-semibold text-ss-muted">+{genes.length - 4}</span>
+          )}
+        </div>
+      )}
     </Link>
   )
 }

@@ -1077,6 +1077,57 @@ frontend:
             Verified: post-fix, navigating between /, /search, /genome and
             back produced ZERO console errors.
 
+  - task: "BUG FIX — Dashboard Pillar Score Overview tiles now include gene fan-out on click"
+    implemented: true
+    working: true
+    file: "/app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User reported: "still not working from My Dashboard — none of
+            the genes are highlighted". Investigation revealed the
+            Dashboard has TWO pillar grids:
+              Section 3 (Pillar Score Overview) — PillarTile → 5-col grid
+              Section 7 (Explore Your Pillars)  — ExplorePillarCard → 3-col
+            Only ExplorePillarCard passed genes in the href. PillarTile
+            (the more prominent, top-of-page grid) went to
+              /search?pillar=X
+            with no genes attached. Whichever tile the user clicked from
+            the top grid landed on a plain pillar-only search — the fan-
+            out never fired.
+            Fix:
+              • PillarTile now takes a genes prop and constructs the
+                same URLSearchParams({ pillar, genes }) href pattern.
+              • Renders a compact gene chip preview (first 4 + "+N") on
+                each tile so users can see WHICH of their genes will
+                fan out when they click.
+              • Section 3 now passes pillarGenes[p.name] into every tile
+                just like Section 7.
+              • DashSection subtitle updated to "Click any to cross-
+                reference the pillar with your tagged genes." to hint at
+                the interaction model.
+            Verified via Playwright with an Environmental Sensitivity
+            genome (AHR, EPHX1, HMOX1, NFE2L2 injected):
+              • Pillar Score Overview tile for Environmental Sensitivity
+                now shows AHR / EPHX1 / HMOX1 / NFE2L2 chips.
+              • Click routes to
+                /search?pillar=Environmental+Sensitivity&genes=AHR,EPHX1,HMOX1,NFE2L2
+              • Your Genome carousel shows "4 SELECTED" with all 4 chips
+                filled orange.
+              • Cross-referencing banner active: "Cross-referencing
+                Environmental Sensitivity with AHR × EPHX1 × HMOX1 ×
+                NFE2L2 × Clear".
+              • Top results include a Crossref 2023 paper
+                "Environmental Chemical-Sensing AHR Remains an
+                Enigmatic Key Player in Toxicology" with AHR
+                highlighted orange in the title.
+              • Second card: "Modelling of Environmental Chemical
+                Pollution" with EPHX1 + AHR gene chips above title.
+
   - task: "BUG FIX — Dashboard pillar tiles were orphaning genes due to classifier↔UI pillar name mismatch"
     implemented: true
     working: true
