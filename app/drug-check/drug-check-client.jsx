@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle } from 'lucide-react'
+import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
 import { getGenomeResults } from '@/lib/genomeSession'
@@ -37,10 +37,15 @@ import {
   HARM_REDUCTION_DISCLAIMER,
   SAMHSA_HELPLINE,
 } from '@/lib/drugCatalog'
+import { computeDrugInteractions } from '@/lib/drugInteractions'
 import { inferAllPGxPhenotypes } from '@/lib/pgxClassifier'
 
 const POPULAR_QUERIES = ['clopidogrel', 'warfarin', 'codeine', 'omeprazole', 'simvastatin', 'escitalopram']
 const HR_STORAGE_KEY  = 'selfscience_drug_harm_reduction_opt_in'
+const MODES = [
+  { key: 'single', label: 'Single drug', Icon: Pill },
+  { key: 'pair',   label: 'Two together', Icon: GitCompare },
+]
 
 export default function DrugCheckClient() {
   const [report, setReport] = useState(null)
@@ -48,6 +53,10 @@ export default function DrugCheckClient() {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(null)
   const [showHR, setShowHR] = useState(false)
+  // Pair mode state — Two Together checker.
+  const [mode, setMode] = useState('single')      // 'single' | 'pair'
+  const [drugA, setDrugA] = useState(null)
+  const [drugB, setDrugB] = useState(null)
 
   useEffect(() => {
     setReport(getGenomeResults()); setReady(true)
@@ -84,6 +93,11 @@ export default function DrugCheckClient() {
   const interactionSets = useMemo(
     () => (selected ? personaliseInteractions(selected, ctx) : { personalised: [], general: [] }),
     [selected, ctx],
+  )
+  // Pair-mode interaction analysis
+  const pairInteractions = useMemo(
+    () => (drugA && drugB) ? computeDrugInteractions(drugA, drugB, ctx) : null,
+    [drugA, drugB, ctx],
   )
 
   const pickDrug = (d) => {
@@ -133,107 +147,41 @@ export default function DrugCheckClient() {
 
         {ready && report && (
           <>
-            {/* Search input */}
-            <div className="relative mt-8">
-              <div className="flex items-center gap-2 rounded-2xl border border-ss-border-warm bg-white p-2 shadow-sm focus-within:ring-2 focus-within:ring-ss-teal/40">
-                <Search size={18} className="ml-2 text-ss-muted" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); setSelected(null) }}
-                  placeholder="Search for a medication (e.g. clopidogrel, warfarin, codeine)"
-                  className="flex-1 border-0 bg-transparent px-2 py-2 text-sm text-ss-text placeholder:text-ss-muted focus:outline-none"
-                  aria-label="Drug name search"
-                />
-                {query && (
-                  <button onClick={() => { setQuery(''); setSelected(null) }} aria-label="Clear" className="rounded-full p-1 text-ss-muted hover:bg-ss-bg">
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-
-              {/* Dropdown suggestions */}
-              {query && !selected && suggestions.length > 0 && (
-                <ul className="absolute left-0 right-0 z-10 mt-1 max-h-72 overflow-auto rounded-2xl border border-ss-border-warm bg-white shadow-lg">
-                  {suggestions.map((d) => (
-                    <li key={d.id}>
-                      <button
-                        onClick={() => pickDrug(d)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-ss-bg"
-                      >
-                        <div>
-                          <div className="font-semibold text-ss-text capitalize">{d.name || d.generic}</div>
-                          <div className="text-xs text-ss-muted">
-                            {d.class}{d.brand?.length > 0 && ` · ${d.brand.join(', ')}`}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {d.isHarmReduction && (
-                            <span className="rounded-full bg-ss-amber/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ss-amber">
-                              Harm reduction
-                            </span>
-                          )}
-                          {d.primaryGene && (
-                            <span className="rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ss-teal">
-                              {d.primaryGene}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {query && !selected && suggestions.length === 0 && (
-                <div className="mt-2 rounded-lg bg-ss-bg/60 p-3 text-xs text-ss-muted">
-                  No PGx-linked drug matches &ldquo;{query}&rdquo; in the catalog. This tool covers major CPIC-listed medications only — many common drugs (like acetaminophen or metformin) don&apos;t have actionable pharmacogenomic guidance.
-                  {!showHR && (
-                    <>
-                      {' '}
-                      <button
-                        onClick={toggleHR}
-                        className="underline decoration-dotted underline-offset-2 hover:text-ss-teal"
-                      >
-                        Enable harm-reduction content
-                      </button>{' '}
-                      to also search recreational substances.
-                    </>
-                  )}
-                </div>
-              )}
+            {/* Mode tabs: Single drug ↔ Two together */}
+            <div className="mt-8 inline-flex rounded-full bg-white p-1 shadow-sm ring-1 ring-ss-border-warm/60">
+              {MODES.map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setMode(key)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                    mode === key ? 'bg-ss-teal text-white shadow-sm' : 'text-ss-muted hover:text-ss-teal'
+                  }`}
+                >
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
             </div>
 
-            {/* Harm-reduction opt-in toggle */}
-            <HarmReductionToggle enabled={showHR} onToggle={toggleHR} />
-
-            {/* Popular queries */}
-            {!selected && !query && (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="text-xs text-ss-muted">Popular checks:</span>
-                {POPULAR_QUERIES.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => { const d = findDrug(q); if (d) pickDrug(d) }}
-                    className="rounded-full border border-ss-border-warm bg-white px-3 py-1 text-xs font-medium capitalize text-ss-teal transition hover:bg-ss-teal/5"
-                  >{q}</button>
-                ))}
-              </div>
-            )}
-
-            {/* Result card */}
-            {selected && (
-              <DrugCard
-                drug={selected}
+            {mode === 'pair' ? (
+              <PairChecker
+                drugA={drugA} drugB={drugB}
+                setDrugA={setDrugA} setDrugB={setDrugB}
+                showHR={showHR}
+                onToggleHR={toggleHR}
+                interactions={pairInteractions}
+              />
+            ) : (
+              <SingleDrugSection
+                query={query} setQuery={setQuery}
+                selected={selected} setSelected={setSelected}
+                pickDrug={pickDrug}
+                suggestions={suggestions}
+                showHR={showHR} onToggleHR={toggleHR}
                 guidance={guidance}
                 phenotypes={phenotypes}
                 interactionSets={interactionSets}
                 rawVariants={rawVariants}
               />
-            )}
-
-            {/* Phenotype snapshot */}
-            {phenotypes && (
-              <PhenotypeSnapshot phenotypes={phenotypes} onPickDrug={pickDrug} selectedId={selected?.id} />
             )}
 
             {/* Bottom disclaimer */}
@@ -248,6 +196,117 @@ export default function DrugCheckClient() {
         )}
       </div>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Single-drug section (extracted from the previous inline layout)
+// ---------------------------------------------------------------------------
+
+function SingleDrugSection({
+  query, setQuery, selected, setSelected, pickDrug, suggestions,
+  showHR, onToggleHR, guidance, phenotypes, interactionSets, rawVariants,
+}) {
+  return (
+    <>
+      {/* Search input */}
+      <div className="relative mt-6">
+        <div className="flex items-center gap-2 rounded-2xl border border-ss-border-warm bg-white p-2 shadow-sm focus-within:ring-2 focus-within:ring-ss-teal/40">
+          <Search size={18} className="ml-2 text-ss-muted" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSelected(null) }}
+            placeholder="Search for a medication (e.g. clopidogrel, warfarin, codeine)"
+            className="flex-1 border-0 bg-transparent px-2 py-2 text-sm text-ss-text placeholder:text-ss-muted focus:outline-none"
+            aria-label="Drug name search"
+          />
+          {query && (
+            <button onClick={() => { setQuery(''); setSelected(null) }} aria-label="Clear" className="rounded-full p-1 text-ss-muted hover:bg-ss-bg">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {query && !selected && suggestions.length > 0 && (
+          <ul className="absolute left-0 right-0 z-10 mt-1 max-h-72 overflow-auto rounded-2xl border border-ss-border-warm bg-white shadow-lg">
+            {suggestions.map((d) => (
+              <li key={d.id}>
+                <button
+                  onClick={() => pickDrug(d)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm hover:bg-ss-bg"
+                >
+                  <div>
+                    <div className="font-semibold text-ss-text capitalize">{d.name || d.generic}</div>
+                    <div className="text-xs text-ss-muted">
+                      {d.class}{d.brand?.length > 0 && ` · ${d.brand.join(', ')}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {d.isHarmReduction && (
+                      <span className="rounded-full bg-ss-amber/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ss-amber">
+                        Harm reduction
+                      </span>
+                    )}
+                    {d.primaryGene && (
+                      <span className="rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ss-teal">
+                        {d.primaryGene}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {query && !selected && suggestions.length === 0 && (
+          <div className="mt-2 rounded-lg bg-ss-bg/60 p-3 text-xs text-ss-muted">
+            No PGx-linked drug matches &ldquo;{query}&rdquo; in the catalog. This tool covers major CPIC-listed medications only — many common drugs (like acetaminophen or metformin) don&apos;t have actionable pharmacogenomic guidance.
+            {!showHR && (
+              <>
+                {' '}
+                <button
+                  onClick={onToggleHR}
+                  className="underline decoration-dotted underline-offset-2 hover:text-ss-teal"
+                >
+                  Enable harm-reduction content
+                </button>{' '}
+                to also search recreational substances.
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <HarmReductionToggle enabled={showHR} onToggle={onToggleHR} />
+
+      {!selected && !query && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ss-muted">Popular checks:</span>
+          {POPULAR_QUERIES.map((q) => (
+            <button
+              key={q}
+              onClick={() => { const d = findDrug(q); if (d) pickDrug(d) }}
+              className="rounded-full border border-ss-border-warm bg-white px-3 py-1 text-xs font-medium capitalize text-ss-teal transition hover:bg-ss-teal/5"
+            >{q}</button>
+          ))}
+        </div>
+      )}
+
+      {selected && (
+        <DrugCard
+          drug={selected}
+          guidance={guidance}
+          phenotypes={phenotypes}
+          interactionSets={interactionSets}
+          rawVariants={rawVariants}
+        />
+      )}
+
+      {phenotypes && (
+        <PhenotypeSnapshot phenotypes={phenotypes} onPickDrug={pickDrug} selectedId={selected?.id} />
+      )}
+    </>
   )
 }
 
@@ -578,3 +637,285 @@ function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId }) {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Pair-mode: "Check two substances together"
+// ---------------------------------------------------------------------------
+
+function PairChecker({ drugA, drugB, setDrugA, setDrugB, showHR, onToggleHR, interactions }) {
+  const swap = () => { const a = drugA; setDrugA(drugB); setDrugB(a) }
+  return (
+    <>
+      <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <GitCompare size={16} className="text-ss-teal" />
+              <h2 className="text-lg font-bold text-ss-text">Check two substances together</h2>
+            </div>
+            <p className="mt-1 text-xs text-ss-muted">
+              Pick two entries — we&rsquo;ll flag CYP-enzyme competition, class-level synergy
+              (CNS depressants, serotonergic overlap, stimulant stacking), and known
+              dangerous combinations. Genotype-specific single-drug interactions are
+              handled on the &ldquo;Single drug&rdquo; tab.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <DrugPicker
+            label="Drug A"
+            value={drugA} onChange={setDrugA}
+            showHR={showHR}
+            excludeId={drugB?.id}
+          />
+          <DrugPicker
+            label="Drug B"
+            value={drugB} onChange={setDrugB}
+            showHR={showHR}
+            excludeId={drugA?.id}
+          />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <button
+            onClick={swap}
+            disabled={!drugA && !drugB}
+            className="inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm bg-white px-3 py-1 text-xs font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <GitCompare size={12} /> Swap A ↔ B
+          </button>
+          <button
+            onClick={() => { setDrugA(null); setDrugB(null) }}
+            disabled={!drugA && !drugB}
+            className="text-[11px] font-semibold text-ss-muted hover:text-ss-teal disabled:opacity-50"
+          >
+            Clear both
+          </button>
+        </div>
+      </div>
+
+      <HarmReductionToggle enabled={showHR} onToggle={onToggleHR} />
+
+      {drugA && drugB && interactions && (
+        <PairResultCard drugA={drugA} drugB={drugB} interactions={interactions} />
+      )}
+
+      {(!drugA || !drugB) && (
+        <div className="mt-6 rounded-2xl border border-dashed border-ss-border-warm bg-white/40 p-8 text-center text-sm text-ss-muted">
+          Pick two substances above to see how they interact. Try{' '}
+          <span className="italic">tramadol + fluoxetine</span> for a CYP2D6 competition
+          + serotonergic overlap example.
+        </div>
+      )}
+    </>
+  )
+}
+
+function DrugPicker({ label, value, onChange, showHR, excludeId }) {
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const results = useMemo(() => {
+    if (!q) return []
+    return suggestDrugs(q, 12, { showHarmReduction: showHR }).filter((d) => d.id !== excludeId)
+  }, [q, showHR, excludeId])
+
+  const clear = () => { onChange(null); setQ(''); setOpen(false) }
+
+  return (
+    <div className="relative">
+      <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.18em] text-ss-muted">{label}</label>
+      {value ? (
+        <div className="flex items-start justify-between gap-2 rounded-xl border border-ss-teal/40 bg-ss-teal/5 p-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-sm font-bold text-ss-teal">{value.name || value.generic}</span>
+              {value.isHarmReduction && (
+                <span className="rounded-full bg-ss-amber/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ss-amber">
+                  Harm-reduction
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px] text-ss-muted">
+              {value.class}
+              {value.primaryGene && ` · Primary: ${value.primaryGene}`}
+            </div>
+          </div>
+          <button
+            onClick={clear}
+            aria-label="Clear"
+            className="rounded-full p-1 text-ss-muted hover:bg-white"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 rounded-xl border border-ss-border-warm bg-white p-1.5 focus-within:ring-2 focus-within:ring-ss-teal/40">
+            <Search size={14} className="ml-1.5 text-ss-muted" />
+            <input
+              type="text"
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setOpen(true) }}
+              onFocus={() => setOpen(true)}
+              placeholder={`Search drug ${label === 'Drug A' ? '#1' : '#2'}…`}
+              className="w-full border-0 bg-transparent px-1 py-1 text-sm text-ss-text placeholder:text-ss-muted focus:outline-none"
+            />
+          </div>
+          {open && q && results.length > 0 && (
+            <ul className="absolute left-0 right-0 z-10 mt-1 max-h-60 overflow-auto rounded-xl border border-ss-border-warm bg-white shadow-lg">
+              {results.map((d) => (
+                <li key={d.id}>
+                  <button
+                    onClick={() => { onChange(d); setQ(''); setOpen(false) }}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-ss-bg"
+                  >
+                    <div>
+                      <div className="text-[13px] font-semibold text-ss-text">{d.name || d.generic}</div>
+                      <div className="text-[10px] text-ss-muted">{d.class}</div>
+                    </div>
+                    {d.isHarmReduction && (
+                      <span className="rounded-full bg-ss-amber/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-ss-amber">
+                        HR
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {open && q && results.length === 0 && (
+            <div className="mt-1 rounded-lg bg-ss-bg/60 p-2 text-[11px] text-ss-muted">
+              No matches. {!showHR && 'Turn on harm-reduction content to include recreational substances.'}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function PairResultCard({ drugA, drugB, interactions }) {
+  const worstSev = interactions.severity
+  const chip = worstSev ? (SEVERITY_META[worstSev] || SEVERITY_META.informational) : null
+  const noFindings = interactions.findings.length === 0
+
+  const nameA = drugA.name || drugA.generic
+  const nameB = drugB.name || drugB.generic
+
+  return (
+    <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-ss-border-warm/60">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ss-border-warm/60 p-5">
+        <div>
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-ss-teal">{nameA}</span>
+            <span className="text-lg text-ss-muted">+</span>
+            <span className="text-2xl font-extrabold text-ss-teal">{nameB}</span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ss-muted">
+            <span>{drugA.class}</span>
+            <span>+</span>
+            <span>{drugB.class}</span>
+          </div>
+        </div>
+        {chip ? (
+          <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${chip.chip}`}>
+            <span className={`inline-block h-2 w-2 rounded-full ${chip.dot}`} aria-hidden="true" />
+            Worst interaction: {chip.label}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-2 rounded-full bg-ss-green/10 px-3 py-1 text-xs font-bold text-ss-green">
+            <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" />
+            No flagged interactions
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-5 p-5">
+        {(drugA.isHarmReduction || drugB.isHarmReduction) && (
+          <div className="rounded-lg border-l-4 border-ss-orange bg-ss-orange/10 p-4">
+            <div className="flex items-start gap-2">
+              <HeartHandshake size={16} className="mt-0.5 flex-shrink-0 text-ss-orange" />
+              <p className="text-xs leading-relaxed text-ss-text">
+                <span className="font-semibold">Harm reduction, not endorsement.</span>{' '}
+                {HARM_REDUCTION_DISCLAIMER}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {noFindings ? (
+          <p className="text-sm text-ss-text">
+            No CYP-enzyme competition, class-level synergy, or known dangerous combinations
+            were detected between these two substances in our data. That doesn&rsquo;t mean the
+            pairing is universally safe — it means nothing surfaced here. Discuss with your
+            prescriber and consult a full drug-interaction database (Micromedex, Lexicomp)
+            for a comprehensive check.
+          </p>
+        ) : (
+          <>
+            <Section
+              Icon={AlertTriangle}
+              title="Detected interactions"
+              subtitle="Ordered worst-to-least severe"
+            >
+              <div className="space-y-2">
+                {interactions.findings.map((f, i) => (
+                  <InteractionRow key={i} item={{ severity: f.severity, text: `${f.mechanism}: ${f.text}` }} />
+                ))}
+              </div>
+            </Section>
+
+            {/* Split by category */}
+            {(interactions.categories.cyp.length > 0
+              || interactions.categories.synergy.length > 0
+              || interactions.categories.named.length > 0) && (
+              <div className="grid gap-3 md:grid-cols-3">
+                <CategoryStat
+                  label="CYP competition"
+                  count={interactions.categories.cyp.length}
+                  Icon={Beaker}
+                />
+                <CategoryStat
+                  label="Class synergy"
+                  count={interactions.categories.synergy.length}
+                  Icon={Activity}
+                />
+                <CategoryStat
+                  label="Named dangerous combos"
+                  count={interactions.categories.named.length}
+                  Icon={AlertTriangle}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="flex items-start gap-2 rounded-lg bg-ss-bg/60 p-3 text-xs text-ss-muted">
+          <Info size={13} className="mt-0.5 flex-shrink-0" />
+          <span>
+            This check surfaces well-documented interactions plus your genotype-driven
+            CYP competition. It is not exhaustive — always verify with your prescriber and a
+            clinical interaction database before combining substances.
+          </span>
+        </div>
+
+        {(drugA.isHarmReduction || drugB.isHarmReduction) && <SamhsaCard />}
+      </div>
+    </div>
+  )
+}
+
+function CategoryStat({ label, count, Icon }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-ss-bg/60 p-3">
+      <Icon size={18} className="text-ss-teal" />
+      <div>
+        <div className="text-lg font-extrabold text-ss-teal">{count}</div>
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-ss-muted">{label}</div>
+      </div>
+    </div>
+  )
+}
+

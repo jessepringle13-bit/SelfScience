@@ -904,6 +904,54 @@ frontend:
               • MDMA / Alcohol / other recreational entries follow the same
                 pattern.
 
+  - task: "Drug Check v2.1 — Multi-drug Interaction Checker (Two together mode)"
+    implemented: true
+    working: true
+    file: "/app/lib/drugInteractions.js, /app/app/drug-check/drug-check-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            New mode-tab on /drug-check ("Single drug" ↔ "Two together").
+            /app/lib/drugInteractions.js exports computeDrugInteractions(A, B, ctx)
+            which returns categorised findings:
+              1. CYP competition  — auto-detected when both drugs share a
+                                    CYP in pk_genes; severity scales with the
+                                    user's phenotype at that gene (PM/IM →
+                                    "significant", UM/EM → "moderate"), and
+                                    the user's inferred phenotype label is
+                                    injected into the mechanism copy.
+              2. Class synergy    — via an INTERACTION_TAGS map + a CLASS_RULES
+                                    table. Covers opioid+benzo, opioid+alcohol,
+                                    benzo+alcohol, CNS-depressant stacking,
+                                    SSRI/SNRI/TCA + serotonergic, stimulant
+                                    stacking, stimulant+beta_blocker,
+                                    anticoagulant+NSAID/SSRI, antiplatelet+NSAID,
+                                    duplicate PPI/NSAID/statin therapy.
+              3. Named dangerous combos — hard-coded {ids:[a,b],severity,text}
+                                    for cocaine+alcohol (cocaethylene),
+                                    MDMA+psychedelics, MDMA+meth,
+                                    cannabis+alcohol, caffeine+alcohol,
+                                    nicotine+caffeine (CYP1A2 induction).
+            UI: PairChecker layout with two DrugPicker inputs, swap A↔B,
+            clear-both, and a PairResultCard that displays worst-severity chip,
+            severity-ordered findings, and per-category counts (CYP · class ·
+            named). Harm-reduction disclaimer + SAMHSA card render when either
+            drug is a HR entry. Filters through the harm-reduction opt-in
+            toggle (shared with Single-drug mode).
+            Verified:
+              • Cocaine + Alcohol → CRITICAL (cocaethylene) + SIGNIFICANT
+                (stimulant+cardiac_stressor). Correct category attribution.
+              • Tramadol + Fluoxetine → CRITICAL (serotonin syndrome) + MODERATE
+                (CYP2D6 competition, with the user's "Extensive (Normal)
+                Metabolizer" phenotype label injected into the copy).
+              • Opioids (Rec) + Benzodiazepines → CRITICAL (Synergistic CNS
+                depression, exact spec text) + SIGNIFICANT (additive CNS depr).
+              • Empty state shows a helpful "tramadol + fluoxetine" hint.
+
 metadata:
   created_by: "main_agent"
   version: "1.3"
