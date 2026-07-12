@@ -746,6 +746,13 @@ const QUICK_CATEGORIES = [
   { key: 'supplements',       label: 'Supplements',       group: 'Basics' },
 ]
 
+// Aisle order for the grouped category grid. Mirrors real supermarket
+// layouts so the browse feels natural to shoppers.
+const CATEGORY_GROUPS = [
+  'Protein', 'Beverages', 'Snacks', 'Breakfast',
+  'Dairy', 'Pantry', 'Frozen', 'Sweets', 'Basics',
+]
+
 // Popular US brands surfaced as quick-search chips when the results grid
 // is empty. Clicking a chip fires the same free-text search as typing.
 const POPULAR_US_BRANDS = [
@@ -918,44 +925,60 @@ function ScannerTab({ activeRules, hasGenome }) {
             </div>
           </div>
 
-          {/* Popular US brand chips — only when there's nothing on screen yet. */}
+          {/* Popular US brand chips — only when there's nothing on screen yet.
+              Rendered as a fixed-column responsive grid so every chip has
+              the same width; keeps the row from looking like a ragged left
+              margin. */}
           {!products.length && !loading && !error && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Popular US brands</div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Popular US brands</div>
+              <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
                 {brandChipsToShow.map((b) => (
                   <button
                     key={b}
                     onClick={() => { setQuery(b); runSearch({ q: b }) }}
-                    className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 text-[11px] font-semibold text-ss-teal transition hover:bg-ss-bg"
+                    className="truncate rounded-lg border border-ss-border-warm bg-white px-2 py-1.5 text-center text-[11px] font-semibold text-ss-teal transition hover:bg-ss-bg"
+                    title={b}
                   >
                     {b}
                   </button>
                 ))}
-                {POPULAR_US_BRANDS.length > 20 && (
+              </div>
+              {POPULAR_US_BRANDS.length > 20 && (
+                <div className="mt-2 flex justify-center">
                   <button
                     onClick={() => setShowAllBrands((v) => !v)}
-                    className="rounded-full bg-ss-teal/10 px-2.5 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-teal/20"
+                    className="rounded-full bg-ss-teal/10 px-3 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-teal/20"
                   >
-                    {showAllBrands ? 'Show fewer' : `Show ${POPULAR_US_BRANDS.length - 20} more brands`}
+                    {showAllBrands ? 'Show fewer brands' : `Show ${POPULAR_US_BRANDS.length - 20} more brands`}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Category quick-browse */}
-          <div className="mt-4">
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Browse by category</div>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_CATEGORIES.map((c) => (
-                <button
-                  key={c.key}
-                  onClick={() => runSearch({ category: c.key })}
-                  className="rounded-full border border-ss-border-warm bg-white px-2.5 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-bg"
-                >
-                  {c.label}
-                </button>
+          {/* Category quick-browse — grouped by aisle. Each aisle renders as
+              its own fixed-column grid so labels align cleanly instead of
+              wrapping into a jagged block. */}
+          <div className="mt-5">
+            <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Browse by category</div>
+            <div className="space-y-3">
+              {CATEGORY_GROUPS.map((group) => (
+                <div key={group}>
+                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ss-muted/80">{group}</div>
+                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+                    {QUICK_CATEGORIES.filter((c) => c.group === group).map((c) => (
+                      <button
+                        key={c.key}
+                        onClick={() => runSearch({ category: c.key })}
+                        className="truncate rounded-lg border border-ss-border-warm bg-white px-2 py-1.5 text-center text-[11px] font-semibold text-ss-teal transition hover:bg-ss-bg"
+                        title={c.label}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -334,6 +334,7 @@ async function handleCategory(categoryKey, page) {
     .filter((p) => p.product_name || p.product_name_en)
     .map(extractProductData)
     .filter(Boolean)
+    .filter((p) => !isNonHumanFood(p))
 
   // Preserve OFF's popularity ordering; only apply a light image-preference tiebreak.
   return NextResponse.json({
@@ -377,9 +378,54 @@ function addProductsToResults(rawProducts, results, seen) {
     if (!p) continue
     if (!p.name || p.name === 'Unknown product') continue
     if (!p.barcode || seen.has(p.barcode)) continue
+    if (isNonHumanFood(p)) continue
     results.push(p)
     seen.add(p.barcode)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Guardrails against non-human-food showing up in food searches. Two signals:
+//   1. Category tags — dog/cat/pet food is clearly tagged in OFF.
+//   2. Brand/name pattern — "Milk-Bone", "Purina", "Iams" etc. Handles the
+//      case where OFF has empty categories (data quality varies wildly).
+// ---------------------------------------------------------------------------
+const PET_CATEGORY_PATTERNS = [
+  'dog-snack', 'dog-biscuit', 'dog-food', 'dog-treat',
+  'cat-food', 'cat-treat', 'cat-snack',
+  'pet-food', 'pet-treat', 'pet-snack',
+  'animal-feed', 'animal-food', 'kibble',
+  'bird-food', 'fish-food', 'rabbit-food',
+]
+const PET_BRAND_PATTERNS = [
+  /milk[\s-]?bone/i,
+  /\bpurina\b/i,
+  /\biams\b/i,
+  /\bpedigree\b/i,
+  /\bfriskies\b/i,
+  /\bfancy feast\b/i,
+  /\bmeow mix\b/i,
+  /\bwhiskas\b/i,
+  /\bcesar\b/i,
+  /\bblue buffalo\b/i,
+  /\bhills? science diet\b/i,
+  /\bnutro\b/i,
+  /\btemptations\b/i,
+  /\bgreenies\b/i,
+  /\bwellness core\b/i,
+  /\borijen\b/i,
+  /\bacana\b/i,
+]
+function isNonHumanFood(p) {
+  const cats = (p.categories || []).map((c) => String(c).toLowerCase())
+  if (cats.some((c) => PET_CATEGORY_PATTERNS.some((pat) => c.includes(pat)))) return true
+  const brand = String(p.brand || '')
+  if (PET_BRAND_PATTERNS.some((re) => re.test(brand))) return true
+  // Very defensive last check: product name matches obvious pet-food giveaways.
+  const name = String(p.name || '')
+  if (/\b(dog|cat|puppy|kitten|pet)\s+(food|treat|biscuit|chew|snack|kibble|bone)/i.test(name)) return true
+  if (/\bmilk[\s-]?bone/i.test(name)) return true
+  return false
 }
 
 function scoreProduct(p) {
