@@ -93,15 +93,22 @@ export async function GET(request) {
         `search_terms=${encodeURIComponent(query)}` +
         `&search_simple=1&action=process&json=1&page_size=50` +
         `&sort_by=unique_scans_n&fields=${FIELDS}`
-      const primaryRes = await fetch(primaryUrl, { headers: { 'User-Agent': UA }, cache: 'no-store' })
-      let results = []
-      if (primaryRes.ok) {
-        const data = await primaryRes.json()
-        results = (data?.products || [])
-          .filter((p) => p.product_name || p.product_name_en)
-          .map(extractProductData)
-          .filter(Boolean)
+      // OFF cold-cache calls occasionally return 200 + empty products for
+      // popular queries. Retry once after a short delay to warm the CDN.
+      const fetchPrimary = async () => {
+        const r = await fetch(primaryUrl, { headers: { 'User-Agent': UA }, cache: 'no-store' })
+        if (!r.ok) return { products: [] }
+        return r.json()
       }
+      let data = await fetchPrimary()
+      if (!(data?.products?.length)) {
+        await new Promise((res) => setTimeout(res, 400))
+        data = await fetchPrimary()
+      }
+      let results = (data?.products || [])
+        .filter((p) => p.product_name || p.product_name_en)
+        .map(extractProductData)
+        .filter(Boolean)
       if (isLikelyBrand) {
         const brandUrl =
           `${OFF_BASE}/cgi/search.pl?` +

@@ -27,6 +27,7 @@ import {
   ChevronUp,
   CheckCircle2,
   AlertTriangle,
+  X,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import PgxDisclaimer from '@/components/PgxDisclaimer'
@@ -709,7 +710,11 @@ function ScannerTab({ activeRules, hasGenome }) {
   const [hideSeedOils, setHideSeedOils] = useState(false)
   const [hideArtSweetener, setHideArtSweetener] = useState(false)
 
-  const runSearch = async ({ barcode, q, category }) => {
+  const [lastSearch, setLastSearch] = useState(null) // { barcode?, q?, category? }
+
+  const runSearch = async (params) => {
+    const { barcode, q, category } = params
+    setLastSearch(params)
     setLoading(true)
     setError(null)
     setProducts([])
@@ -724,7 +729,7 @@ function ScannerTab({ activeRules, hasGenome }) {
       const data = await res.json()
       if (data.product) { setProducts([data.product]); setSelectedProduct(data.product) }
       else if (data.products?.length) setProducts(data.products)
-      else setError('No results.')
+      else setError('No results. Open Food Facts sometimes returns empty on the first request — click Try again below.')
     } catch { setError('Network error — try again.') }
     finally { setLoading(false) }
   }
@@ -774,7 +779,19 @@ function ScannerTab({ activeRules, hasGenome }) {
           </div>
 
           {loading && <div className="mt-4 flex items-center gap-2 text-sm text-ss-muted"><Loader2 size={14} className="animate-spin" /> Fetching from Open Food Facts…</div>}
-          {error && <div className="mt-4 rounded-lg bg-ss-orange/10 p-3 text-sm text-ss-orange">{error}</div>}
+          {error && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-ss-orange/10 p-3 text-sm text-ss-orange">
+              <span>{error}</span>
+              {lastSearch && (
+                <button
+                  onClick={() => runSearch(lastSearch)}
+                  className="rounded-full bg-ss-orange px-3 py-1 text-xs font-semibold text-white hover:brightness-110"
+                >
+                  Try again
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Filter bar + result grid */}
