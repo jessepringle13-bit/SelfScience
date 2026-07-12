@@ -981,12 +981,12 @@ function ProductCard({ product, activeRules, hasGenome, onIngredientClick, onSea
             <div className="mt-2 flex flex-wrap gap-1.5">
               {q.universal.flags.map((f, i) => {
                 const cls = f.severity === 'universal_avoid'
-                  ? 'bg-ss-orange text-white border-ss-orange'
+                  ? 'bg-red-600 text-white border-red-700 font-bold shadow-sm ring-1 ring-red-800/40'
                   : f.severity === 'universal_limit'
-                    ? 'bg-ss-amber/20 text-ss-amber border-ss-amber/50'
-                    : 'bg-ss-bg text-ss-muted border-ss-border-warm'
+                    ? 'bg-ss-orange text-white border-ss-orange font-bold shadow-sm'
+                    : 'bg-ss-amber/25 text-[#8B6A1F] border-ss-amber font-semibold'
                 return (
-                  <button key={i} onClick={() => onIngredientClick(f.ingredient)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition hover:opacity-80 ${cls}`}>
+                  <button key={i} onClick={() => onIngredientClick(f.ingredient)} className={`rounded-full border px-2.5 py-1 text-[11px] transition hover:brightness-110 ${cls}`}>
                     {f.ingredient}
                   </button>
                 )
@@ -1018,15 +1018,40 @@ function ProductCard({ product, activeRules, hasGenome, onIngredientClick, onSea
                 const raw = rawStr.trim().replace(/[()]/g, '').replace(/[.:]$/, '')
                 if (!raw) return null
                 const entry = lookupIngredient(raw)
-                let cls = 'bg-ss-bg text-ss-muted border-ss-border-warm'
-                if (entry?.severity === 'universal_avoid') cls = 'bg-ss-orange/20 text-ss-orange border-ss-orange/50 font-semibold'
-                else if (entry?.severity === 'universal_limit') cls = 'bg-ss-amber/15 text-ss-amber border-ss-amber/40'
-                else if (entry?.severity === 'caution') cls = 'bg-ss-bg text-ss-text border-ss-border-warm'
-                else if (entry?.severity === 'beneficial') cls = 'bg-ss-green/15 text-ss-green border-ss-green/40 font-semibold'
+                // High-contrast severity tint so problem ingredients pop
+                // out of a long ingredient list at a glance.
+                let cls = 'bg-white text-ss-muted border-ss-border-warm'
+                let dot = null
+                if (entry?.severity === 'universal_avoid') {
+                  cls = 'bg-red-600 text-white border-red-700 font-bold shadow-sm ring-1 ring-red-800/40'
+                  dot = <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-white" aria-hidden="true" />
+                } else if (entry?.severity === 'universal_limit') {
+                  cls = 'bg-ss-orange text-white border-ss-orange font-bold shadow-sm'
+                  dot = <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-white" aria-hidden="true" />
+                } else if (entry?.severity === 'caution') {
+                  cls = 'bg-ss-amber/25 text-[#8B6A1F] border-ss-amber font-semibold'
+                } else if (entry?.severity === 'beneficial') {
+                  cls = 'bg-ss-green text-white border-ss-green font-bold shadow-sm'
+                }
                 return (
-                  <button key={i} onClick={() => onIngredientClick(raw)} className={`rounded-full border px-2 py-0.5 text-[11px] transition hover:opacity-80 ${cls}`}>{raw}</button>
+                  <button
+                    key={i}
+                    onClick={() => onIngredientClick(raw)}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] transition hover:brightness-110 ${cls}`}
+                    title={entry?.severity === 'universal_avoid' ? 'High concern — tap for details' : entry?.severity === 'universal_limit' ? 'Limit — tap for details' : entry?.severity === 'beneficial' ? 'Beneficial ingredient' : 'Tap for details'}
+                  >
+                    {dot}
+                    {raw}
+                  </button>
                 )
               })}
+            </div>
+            {/* Colour legend so first-time users can decode the chips. */}
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-ss-muted">
+              <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full bg-red-600" /> High concern</span>
+              <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full bg-ss-orange" /> Limit</span>
+              <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full bg-ss-amber" /> Some concern</span>
+              <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full bg-ss-green" /> Beneficial</span>
             </div>
           </details>
         )}
