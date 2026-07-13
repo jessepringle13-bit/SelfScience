@@ -10,11 +10,12 @@
 import { useMemo, useState } from 'react'
 import {
   ExternalLink, ShieldCheck, Beaker, Info, AlertTriangle, ChevronDown,
-  Search, Package, Sparkles, Building2,
+  Search, Package, Sparkles, Building2, Scale, Dna, Check,
 } from 'lucide-react'
 import CertBadges from './CertBadges'
 import BrandProfileDrawer from './BrandProfileDrawer'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
+import { useCompare } from './CompareContext'
 
 const TIER_BADGE = {
   preferred: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', label: 'Preferred form', icon: ShieldCheck },
@@ -23,12 +24,13 @@ const TIER_BADGE = {
   unknown: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', label: 'Form not classified', icon: Info },
 }
 
-export default function GroupedProductCard({ group, whyThisFits }) {
+export default function GroupedProductCard({ group, whyThisFits, productSignals = [] }) {
   const [variantId, setVariantId] = useState(group.defaultVariant.id)
   const [openTip, setOpenTip] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const compare = useCompare()
 
   const variant = useMemo(
     () => group.variants.find((v) => v.id === variantId) || group.variants[0],
@@ -63,6 +65,19 @@ export default function GroupedProductCard({ group, whyThisFits }) {
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+      {/* "Matches your genome/biomarkers" ribbon */}
+      {productSignals?.length > 0 && (
+        <div className="flex items-start gap-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-200 px-4 py-2">
+          <Dna className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-700" />
+          <div className="text-[11px] leading-snug text-emerald-900">
+            <strong>Matches your profile:</strong>{' '}
+            {productSignals.slice(0, 2).map((s, i) => (
+              <span key={s.id}>{i > 0 ? ' · ' : ''}{s.headline}</span>
+            ))}
+            {productSignals.length > 2 && <span className="text-emerald-700"> +{productSignals.length - 2} more</span>}
+          </div>
+        </div>
+      )}
       {/* Brand header (clickable when a profile exists) */}
       <header className="p-4 md:p-5 border-b border-slate-100">
         <div className="flex items-center gap-2 text-xs flex-wrap">
@@ -213,34 +228,49 @@ export default function GroupedProductCard({ group, whyThisFits }) {
       </div>
 
       {/* CTA row */}
-      <div className="px-4 md:px-5 pb-3 pt-1 flex items-center justify-between gap-3">
+      <div className="px-4 md:px-5 pb-3 pt-1 flex items-center justify-between gap-3 flex-wrap">
         <div className="text-[11px] text-slate-500">
           Source: NIH DSLD label #{product.id}
         </div>
-        {brandUrl ? (
-          <a
-            href={brandUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${
-              brandUrlSource === 'curated'
-                ? 'bg-[#C45820] hover:bg-[#a94a1a] text-white'
-                : brandUrlSource === 'dsld_manufacturer'
-                  ? 'bg-[#1B474D] hover:bg-[#0f2f34] text-white'
-                  : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => compare.toggle(product)}
+            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+              compare.isIn(product.id)
+                ? 'bg-[#1B474D] text-white border-[#1B474D]'
+                : 'bg-white text-slate-700 border-slate-300 hover:border-[#1B474D] hover:text-[#1B474D]'
             }`}
-            title={
-              brandUrlSource === 'curated' ? 'Curated official brand store'
-                : brandUrlSource === 'dsld_manufacturer' ? 'Manufacturer website from NIH label record'
-                : 'Search fallback (brand website not verified)'
-            }
+            title={compare.isIn(product.id) ? 'Remove from comparison' : 'Add to comparison (max 4)'}
           >
-            {brandUrlSource === 'search_fallback' ? <Search className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
-            {brandUrlSource === 'curated' ? 'Visit brand store'
-              : brandUrlSource === 'dsld_manufacturer' ? 'Manufacturer site'
-              : 'Find brand'}
-          </a>
-        ) : null}
+            {compare.isIn(product.id) ? <Check className="h-3.5 w-3.5" /> : <Scale className="h-3.5 w-3.5" />}
+            {compare.isIn(product.id) ? 'In compare' : 'Compare'}
+          </button>
+          {brandUrl ? (
+            <a
+              href={brandUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                brandUrlSource === 'curated'
+                  ? 'bg-[#C45820] hover:bg-[#a94a1a] text-white'
+                  : brandUrlSource === 'dsld_manufacturer'
+                    ? 'bg-[#1B474D] hover:bg-[#0f2f34] text-white'
+                    : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+              }`}
+              title={
+                brandUrlSource === 'curated' ? 'Curated official brand store'
+                  : brandUrlSource === 'dsld_manufacturer' ? 'Manufacturer website from NIH label record'
+                  : 'Search fallback (brand website not verified)'
+              }
+            >
+              {brandUrlSource === 'search_fallback' ? <Search className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+              {brandUrlSource === 'curated' ? 'Visit brand store'
+                : brandUrlSource === 'dsld_manufacturer' ? 'Manufacturer site'
+                : 'Find brand'}
+            </a>
+          ) : null}
+        </div>
       </div>
 
       {/* Progressive disclosure: full label detail */}

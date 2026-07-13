@@ -4,11 +4,12 @@ import ProductCard from './ProductCard'
 import GroupedProductCard from './GroupedProductCard'
 import ViewToggle from './ViewToggle'
 import { groupProducts, buildWhyThisFits } from '@/lib/supplements/grouping'
+import { signalsForProduct } from '@/lib/supplements/personalisation'
 import { Loader2, Sparkles, Award } from 'lucide-react'
 
 const VIEW_STORAGE_KEY = 'selfscience_supplements_view_v1'
 
-export default function ProductList({ category }) {
+export default function ProductList({ category, signals = [] }) {
   const [state, setState] = useState({ loading: false, error: null, results: [], query: null })
   const [view, setView] = useState('curated')
   const [goldOnly, setGoldOnly] = useState(false)
@@ -136,6 +137,7 @@ export default function ProductList({ category }) {
                 key={`${g.brand}-${g.family}`}
                 group={g}
                 whyThisFits={buildWhyThisFits({ category, group: g })}
+                productSignals={signalsForProduct(signals, g.defaultVariant)}
               />
             ))}
           </div>
