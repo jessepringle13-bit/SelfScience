@@ -25,6 +25,14 @@ import { buildTrainingProfile, TRAINING_VARIANTS, CATEGORY_META } from '@/lib/tr
 import { buildTrainingSummary } from '@/lib/training/summary'
 import { buildSmartAlternatives } from '@/lib/training/alternatives'
 import { buildWeeklyBlueprint } from '@/lib/training/blueprint'
+import { buildMobilityProtocol } from '@/lib/training/mobility'
+import { buildRecoveryProtocol } from '@/lib/training/recovery'
+import { buildSupplementProtocol } from '@/lib/training/supplements'
+import { buildEquipmentRecommendations } from '@/lib/training/equipment'
+import { buildMetricsPlan } from '@/lib/training/metrics'
+import { buildGoalsFramework } from '@/lib/training/goals'
+import { buildBeginnerContent } from '@/lib/training/beginner'
+import { buildYouthContent } from '@/lib/training/youth'
 import { saveTrainingProtocol, loadTrainingProtocol } from '@/lib/training/intake'
 
 import TrainingIntakeForm from '@/components/training/IntakeForm'
@@ -33,6 +41,10 @@ import WeeklyBlueprint from '@/components/training/WeeklyBlueprint'
 import SmartAlternatives from '@/components/training/SmartAlternatives'
 import WorkoutSession from '@/components/training/WorkoutSession'
 import TabNav from '@/components/training/TabNav'
+import {
+  MobilityPanel, RecoveryPanel, SupplementPanel, EquipmentPanel,
+  MetricsPanel, GoalsPanel, BeginnerPanel, YouthPanel, CoachSharePanel,
+} from '@/components/training/Phase2Panels'
 
 export default function TrainingProtocolClient() {
   const [ready, setReady] = useState(false)
@@ -70,11 +82,23 @@ export default function TrainingProtocolClient() {
     const alternatives = buildSmartAlternatives(submittedIntake, profile)
     const blueprint    = buildWeeklyBlueprint(submittedIntake, profile)
 
+    // Phase 2 deterministic sections
+    const mobility     = buildMobilityProtocol(submittedIntake, profile)
+    const recovery     = buildRecoveryProtocol(submittedIntake, profile)
+    const supplements  = buildSupplementProtocol(submittedIntake, profile, labs)
+    const equipment    = buildEquipmentRecommendations(submittedIntake, profile)
+    const metrics      = buildMetricsPlan(submittedIntake, profile, labs)
+    const goalsFrame   = buildGoalsFramework(submittedIntake, profile)
+    const beginner     = buildBeginnerContent(submittedIntake)
+    const youth        = buildYouthContent(submittedIntake)
+
     // Fetch exercises for each strength/skill session.
     const sessions = await fetchAllSessions(blueprint, submittedIntake, profile)
 
     const nextProto = {
       summary, profile, alternatives, blueprint, sessions,
+      mobility, recovery, supplements, equipment, metrics,
+      goalsFrame, beginner, youth,
       intake: submittedIntake,
       generatedAt: new Date().toISOString(),
     }
@@ -179,10 +203,19 @@ export default function TrainingProtocolClient() {
             <div className="ss-screen-only no-print">
               <TabNav
                 tabs={[
-                  { id: 'overview',  label: 'Overview' },
-                  { id: 'profile',   label: 'Genetic Profile' },
-                  { id: 'blueprint', label: 'Weekly Blueprint' },
-                  { id: 'workouts',  label: 'Workouts' },
+                  { id: 'overview',    label: 'Overview' },
+                  { id: 'profile',     label: 'Genetic Profile' },
+                  { id: 'blueprint',   label: 'Weekly Blueprint' },
+                  { id: 'workouts',    label: 'Workouts' },
+                  { id: 'mobility',    label: 'Mobility' },
+                  { id: 'recovery',    label: 'Recovery' },
+                  { id: 'supplements', label: 'Supplements' },
+                  { id: 'equipment',   label: 'Equipment' },
+                  { id: 'metrics',     label: 'Metrics' },
+                  { id: 'goals',       label: 'Goals' },
+                  ...(protocol.beginner ? [{ id: 'beginner', label: 'Beginner' }] : []),
+                  ...(protocol.youth    ? [{ id: 'youth',    label: 'Youth' }]    : []),
+                  { id: 'coach',       label: 'Coach Share' },
                 ]}
                 active={tab}
                 onChange={setTab}
@@ -262,6 +295,30 @@ export default function TrainingProtocolClient() {
                 ))}
               </div>
             )}
+
+            {/* ------------ Phase 2 tabs ------------ */}
+            {tab === 'mobility'    && <MobilityPanel   mobility={protocol.mobility} />}
+            {tab === 'recovery'    && <RecoveryPanel   recovery={protocol.recovery} />}
+            {tab === 'supplements' && <SupplementPanel supplements={protocol.supplements} />}
+            {tab === 'equipment'   && <EquipmentPanel  items={protocol.equipment} />}
+            {tab === 'metrics'     && <MetricsPanel    metrics={protocol.metrics} />}
+            {tab === 'goals'       && <GoalsPanel      goals={protocol.goalsFrame} />}
+            {tab === 'beginner' && protocol.beginner && <BeginnerPanel content={protocol.beginner} />}
+            {tab === 'youth'    && protocol.youth    && <YouthPanel    content={protocol.youth} />}
+            {tab === 'coach'       && <CoachSharePanel protocol={protocol} intake={protocol.intake} profile={protocol.profile} />}
+
+            {/* ------------ Print-only assembly ------------ */}
+            <div className="print-only mt-8 space-y-6">
+              <MobilityPanel   mobility={protocol.mobility} />
+              <RecoveryPanel   recovery={protocol.recovery} />
+              <SupplementPanel supplements={protocol.supplements} />
+              <EquipmentPanel  items={protocol.equipment} />
+              <MetricsPanel    metrics={protocol.metrics} />
+              <GoalsPanel      goals={protocol.goalsFrame} />
+              {protocol.beginner && <BeginnerPanel content={protocol.beginner} />}
+              {protocol.youth    && <YouthPanel    content={protocol.youth} />}
+              <CoachSharePanel protocol={protocol} intake={protocol.intake} profile={protocol.profile} />
+            </div>
           </div>
         )}
       </div>
