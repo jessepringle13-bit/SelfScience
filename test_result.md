@@ -203,18 +203,22 @@ backend:
 
   - task: "GET /api/supplements/dsld/{id} — NIH DSLD label detail proxy"
     implemented: true
-    working: false
+    working: true
     file: "/app/app/api/[[...path]]/route.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
-        -working: "NA"
+        -working: true
           agent: "main"
           comment: |
-            NEW ENDPOINT for the Supplement Discovery feature.
-            Server-side proxy to https://api.ods.od.nih.gov/dsld/v9/label/{id}.
-            Returns normalised product detail:
+            FIXED 2026-07-13: 404 bug patched. DSLD upstream returns 200 with an
+            empty array `[]` (not a real 404) for unknown label IDs. Handler now
+            explicitly returns 404 when the payload is empty/array/missing
+            core fields. Verified: /api/supplements/dsld/999999999 -> HTTP 404
+            {"error":"Label not found"}. Valid ID 274162 continues to return
+            200 with correct MethylPro / Metabolic Maintenance data and a
+            preferred-tier L-5-Methylfolate formQuality row.
               {
                 product: {
                   id, fullName, brand: {...manufacturer contact block...},

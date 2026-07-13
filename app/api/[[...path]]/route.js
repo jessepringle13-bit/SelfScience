@@ -780,6 +780,10 @@ async function handleSupplementsDsldLabel(request, id) {
     if (resp.status === 404) return NextResponse.json({ error: 'Label not found' }, { status: 404 })
     if (!resp.ok) return NextResponse.json({ error: `DSLD upstream ${resp.status}` }, { status: 502 })
     const data = await resp.json()
+    // DSLD quirk: unknown IDs return 200 with an empty array [] instead of 404.
+    if (!data || (Array.isArray(data) && data.length === 0) || (typeof data === 'object' && !data.id && !data.fullName && !data.brandName)) {
+      return NextResponse.json({ error: 'Label not found' }, { status: 404 })
+    }
     const product = normalizeLabelDetail(data)
     if (!product) return NextResponse.json({ error: 'Invalid label payload' }, { status: 500 })
 
