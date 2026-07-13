@@ -22,31 +22,41 @@ export default function IntakeForm({ onChange }) {
   const [state, setState] = useState(INTAKE_DEFAULTS)
   const [expanded, setExpanded] = useState(true)
   const [savedAt, setSavedAt] = useState(null)
+  const [loaded, setLoaded] = useState(false)
 
+  // Load persisted intake once on mount.
   useEffect(() => {
-    const loaded = loadIntake()
-    setState(loaded)
-    // Auto-collapse if any critical field is already filled.
-    if (loaded.patientName || loaded.reasonForVisit) setExpanded(false)
-    onChange?.(loaded)
-     
+    const l = loadIntake()
+    setState(l)
+    if (l.patientName || l.reasonForVisit) setExpanded(false)
+    setLoaded(true)
   }, [])
+
+  // Notify parent whenever `state` changes — but only after the first load,
+  // and only from an effect (never inside a setState updater or during render).
+  useEffect(() => {
+    if (!loaded) return
+    onChange?.(state)
+    // We intentionally omit `onChange` from deps to avoid re-firing when the
+    // parent recreates its handler; parent should pass a stable/memoized ref
+    // if it cares, but the intake payload itself is the source of truth.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, loaded])
 
   const update = (patch) => {
     setState((prev) => {
       const next = { ...prev, ...patch }
+      // Persist synchronously so refresh keeps the latest value.
       saveIntake(next)
-      setSavedAt(Date.now())
-      onChange?.(next)
       return next
     })
+    setSavedAt(Date.now())
   }
 
   const handleClear = () => {
     if (!confirm('Clear all intake information? This cannot be undone.')) return
     clearIntake()
     setState({ ...INTAKE_DEFAULTS })
-    onChange?.({ ...INTAKE_DEFAULTS })
     setSavedAt(Date.now())
   }
 
