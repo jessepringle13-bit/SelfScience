@@ -322,12 +322,35 @@ function Field({ label, children, full = false }) {
 /**
  * Height field — switches between:
  *  • metric: single cm input, showing "= 5'6"" beside as it types
- *  • imperial: paired ft + in inputs, showing "= 168 cm" beside as it types
+ *  • imperial: paired ft + in inputs (local string state so keystrokes are
+ *    never overwritten by round-trip conversion), showing "= 168 cm" beside.
  * Canonical storage is always heightCm.
  */
 function HeightField({ state, update }) {
   const isImperial = state.unitSystem === 'imperial'
   const ftin = cmToFtIn(state.heightCm)
+
+  // Local string state for imperial inputs so the user's typing is authoritative.
+  // We only sync FROM canonical cm when the unit system changes.
+  const [ftStr, setFtStr] = useState(ftin?.ft != null ? String(ftin.ft) : '')
+  const [inStr, setInStr] = useState(ftin?.in != null ? String(ftin.in) : '')
+
+  useEffect(() => {
+    if (!isImperial) return
+    const canon = cmToFtIn(state.heightCm)
+    // Only overwrite local state if it does NOT already round-trip back to
+    // the same canonical value — that means the change came from outside
+    // (a mount, unit toggle, or Clear). Do not overwrite as the user types.
+    const localCanon = ftInToCm(ftStr || 0, inStr || 0)
+    const externalCm = state.heightCm ? parseFloat(state.heightCm) : NaN
+    if (!Number.isFinite(externalCm)) {
+      if (ftStr !== '' || inStr !== '') { setFtStr(''); setInStr('') }
+    } else if (!Number.isFinite(localCanon) || Math.abs(localCanon - externalCm) > 0.9) {
+      setFtStr(canon?.ft != null ? String(canon.ft) : '')
+      setInStr(canon?.in != null ? String(canon.in) : '')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isImperial, state.heightCm])
 
   if (!isImperial) {
     return (
@@ -351,15 +374,18 @@ function HeightField({ state, update }) {
     )
   }
 
-  // Imperial mode: two side-by-side inputs.
-  const ft = ftin?.ft ?? ''
-  const inch = ftin?.in ?? ''
   const handleFtChange = (e) => {
-    const cm = ftInToCm(e.target.value, inch || 0)
+    const raw = e.target.value
+    setFtStr(raw)
+    if (raw === '' && inStr === '') { update({ heightCm: '' }); return }
+    const cm = ftInToCm(raw || 0, inStr || 0)
     update({ heightCm: cm != null ? String(cm) : '' })
   }
   const handleInChange = (e) => {
-    const cm = ftInToCm(ft || 0, e.target.value)
+    const raw = e.target.value
+    setInStr(raw)
+    if (raw === '' && ftStr === '') { update({ heightCm: '' }); return }
+    const cm = ftInToCm(ftStr || 0, raw || 0)
     update({ heightCm: cm != null ? String(cm) : '' })
   }
 
@@ -372,7 +398,7 @@ function HeightField({ state, update }) {
             inputMode="numeric"
             min="0"
             max="9"
-            value={ft}
+            value={ftStr}
             onChange={handleFtChange}
             placeholder="ft"
             className={INPUT_CLS}
@@ -383,7 +409,7 @@ function HeightField({ state, update }) {
             inputMode="numeric"
             min="0"
             max="11"
-            value={inch}
+            value={inStr}
             onChange={handleInChange}
             placeholder="in"
             className={INPUT_CLS}
@@ -401,13 +427,32 @@ function HeightField({ state, update }) {
 /**
  * Weight field — switches between:
  *  • metric: kg input, showing "= 149.9 lb" beside
- *  • imperial: lb input (canonicalised to kg), showing "= 68 kg" beside
+ *  • imperial: lb input with LOCAL string state so keystrokes are never
+ *    corrupted by round-trip conversion. Canonical storage is always kg.
  */
 function WeightField({ state, update }) {
   const isImperial = state.unitSystem === 'imperial'
+  const lb = kgToLb(state.weightKg)
+
+  const [lbStr, setLbStr] = useState(lb != null ? String(lb) : '')
+
+  useEffect(() => {
+    if (!isImperial) return
+    const externalKg = state.weightKg ? parseFloat(state.weightKg) : NaN
+    if (!Number.isFinite(externalKg)) {
+      if (lbStr !== '') setLbStr('')
+      return
+    }
+    // Only overwrite local when external changes don't round-trip.
+    const localKg = lbStr ? parseFloat(lbStr) * 0.45359237 : NaN
+    if (!Number.isFinite(localKg) || Math.abs(localKg - externalKg) > 0.2) {
+      const newLb = kgToLb(state.weightKg)
+      setLbStr(newLb != null ? String(newLb) : '')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isImperial, state.weightKg])
 
   if (!isImperial) {
-    const lb = kgToLb(state.weightKg)
     return (
       <Field label="Weight (kg)">
         <div className="flex items-center gap-2">
@@ -429,10 +474,11 @@ function WeightField({ state, update }) {
     )
   }
 
-  // Imperial mode: input in lb, store in kg.
-  const lbShown = kgToLb(state.weightKg)
   const handleLbChange = (e) => {
-    const kg = lbToKg(e.target.value)
+    const raw = e.target.value
+    setLbStr(raw)
+    if (raw === '') { update({ weightKg: '' }); return }
+    const kg = lbToKg(raw)
     update({ weightKg: kg != null ? String(kg) : '' })
   }
 
@@ -442,9 +488,9 @@ function WeightField({ state, update }) {
         <input
           type="number"
           inputMode="decimal"
-          min="40"
+          min="20"
           max="900"
-          value={lbShown ?? ''}
+          value={lbStr}
           onChange={handleLbChange}
           placeholder="e.g. 150"
           className={INPUT_CLS}

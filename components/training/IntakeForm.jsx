@@ -95,18 +95,7 @@ export default function TrainingIntakeForm({ hasGenome, hasBiomarkers, onSubmit,
           </div>
 
           {isImp ? (
-            <Field label="Height (ft &amp; in)">
-              <div className="flex items-center gap-1">
-                <input type="number" min="0" max="9" value={ftin?.ft ?? ''}
-                  onChange={(e) => update({ heightCm: String(ftInToCm(e.target.value, ftin?.in || 0) ?? '') })}
-                  placeholder="ft" className={INPUT_CLS} />
-                <span className="text-[10px] text-ss-muted">ft</span>
-                <input type="number" min="0" max="11" value={ftin?.in ?? ''}
-                  onChange={(e) => update({ heightCm: String(ftInToCm(ftin?.ft || 0, e.target.value) ?? '') })}
-                  placeholder="in" className={INPUT_CLS} />
-                <span className="text-[10px] text-ss-muted">in</span>
-              </div>
-            </Field>
+            <TrainingHeightImperial state={state} update={update} />
           ) : (
             <Field label="Height (cm)">
               <div className="flex items-center gap-2">
@@ -117,14 +106,7 @@ export default function TrainingIntakeForm({ hasGenome, hasBiomarkers, onSubmit,
             </Field>
           )}
           {isImp ? (
-            <Field label="Weight (lb)">
-              <div className="flex items-center gap-2">
-                <input type="number" min="40" max="900" value={lb ?? ''}
-                  onChange={(e) => update({ weightKg: String(lbToKg(e.target.value) ?? '') })}
-                  placeholder="e.g. 150" className={INPUT_CLS} />
-                <span className="text-[10px] text-ss-muted">= {state.weightKg ? `${state.weightKg} kg` : '—'}</span>
-              </div>
-            </Field>
+            <TrainingWeightImperial state={state} update={update} />
           ) : (
             <Field label="Weight (kg)">
               <div className="flex items-center gap-2">
@@ -285,5 +267,98 @@ function DataStatus({ label, ok, okMsg, nokMsg }) {
       </div>
       <div className="mt-1 text-[11px] leading-relaxed text-ss-text">{ok ? okMsg : nokMsg}</div>
     </div>
+  )
+}
+
+
+// ─────────────────── Imperial input sub-components ───────────────────
+// These use LOCAL string state so the user's keystrokes are authoritative.
+// Canonical storage stays in metric (heightCm / weightKg). Without local
+// state the controlled input would clobber typing on every keystroke due
+// to lb↔kg / ft-in↔cm rounding round-trips.
+
+function TrainingHeightImperial({ state, update }) {
+  const ftin = cmToFtIn(state.heightCm)
+  const [ftStr, setFtStr] = useState(ftin?.ft != null ? String(ftin.ft) : '')
+  const [inStr, setInStr] = useState(ftin?.in != null ? String(ftin.in) : '')
+
+  useEffect(() => {
+    const externalCm = state.heightCm ? parseFloat(state.heightCm) : NaN
+    if (!Number.isFinite(externalCm)) {
+      if (ftStr !== '' || inStr !== '') { setFtStr(''); setInStr('') }
+      return
+    }
+    const localCm = ftInToCm(ftStr || 0, inStr || 0)
+    if (!Number.isFinite(localCm) || Math.abs(localCm - externalCm) > 0.9) {
+      const canon = cmToFtIn(state.heightCm)
+      setFtStr(canon?.ft != null ? String(canon.ft) : '')
+      setInStr(canon?.in != null ? String(canon.in) : '')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.heightCm])
+
+  const handleFt = (e) => {
+    const raw = e.target.value
+    setFtStr(raw)
+    if (raw === '' && inStr === '') { update({ heightCm: '' }); return }
+    const cm = ftInToCm(raw || 0, inStr || 0)
+    update({ heightCm: cm != null ? String(cm) : '' })
+  }
+  const handleIn = (e) => {
+    const raw = e.target.value
+    setInStr(raw)
+    if (raw === '' && ftStr === '') { update({ heightCm: '' }); return }
+    const cm = ftInToCm(ftStr || 0, raw || 0)
+    update({ heightCm: cm != null ? String(cm) : '' })
+  }
+
+  return (
+    <Field label="Height (ft &amp; in)">
+      <div className="flex items-center gap-1">
+        <input type="number" min="0" max="9" value={ftStr} onChange={handleFt} placeholder="ft" className={INPUT_CLS} />
+        <span className="text-[10px] text-ss-muted">ft</span>
+        <input type="number" min="0" max="11" value={inStr} onChange={handleIn} placeholder="in" className={INPUT_CLS} />
+        <span className="text-[10px] text-ss-muted">in</span>
+      </div>
+      <div className="text-[10px] text-ss-muted">= {state.heightCm ? `${state.heightCm} cm` : '—'}</div>
+    </Field>
+  )
+}
+
+function TrainingWeightImperial({ state, update }) {
+  const [lbStr, setLbStr] = useState(() => {
+    const lb = kgToLb(state.weightKg)
+    return lb != null ? String(lb) : ''
+  })
+
+  useEffect(() => {
+    const externalKg = state.weightKg ? parseFloat(state.weightKg) : NaN
+    if (!Number.isFinite(externalKg)) {
+      if (lbStr !== '') setLbStr('')
+      return
+    }
+    const localKg = lbStr ? parseFloat(lbStr) * 0.45359237 : NaN
+    if (!Number.isFinite(localKg) || Math.abs(localKg - externalKg) > 0.2) {
+      const newLb = kgToLb(state.weightKg)
+      setLbStr(newLb != null ? String(newLb) : '')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.weightKg])
+
+  const handle = (e) => {
+    const raw = e.target.value
+    setLbStr(raw)
+    if (raw === '') { update({ weightKg: '' }); return }
+    const kg = lbToKg(raw)
+    update({ weightKg: kg != null ? String(kg) : '' })
+  }
+
+  return (
+    <Field label="Weight (lb)">
+      <div className="flex items-center gap-2">
+        <input type="number" min="20" max="900" value={lbStr} onChange={handle} placeholder="e.g. 150" className={INPUT_CLS} />
+        <span className="text-[10px] text-ss-muted">= {state.weightKg ? `${state.weightKg} kg` : '—'}</span>
+      </div>
+    </Field>
   )
 }
