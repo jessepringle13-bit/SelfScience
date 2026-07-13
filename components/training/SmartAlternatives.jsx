@@ -10,20 +10,27 @@ export default function SmartAlternatives({ result }) {
   return (
     <div className="space-y-3">
       {result.protected && (
-        <div className="flex items-start gap-2 rounded-xl border-l-4 border-ss-orange bg-orange-50 p-3">
-          <Shield size={14} className="mt-0.5 shrink-0 text-ss-orange" />
-          <div className="text-[11.5px] leading-relaxed text-ss-text">
-            <span className="font-semibold text-ss-orange">Your protected activity: {result.protected}.</span>{' '}
+        <div
+          className="flex items-start gap-2 rounded-xl border-2 border-ss-orange/50 p-3 shadow-md"
+          style={{ background: 'linear-gradient(135deg, #FED7AA55 0%, #FFF7ED 60%, #FFEDD5 100%)' }}
+        >
+          <Shield size={16} className="mt-0.5 shrink-0 text-ss-orange" />
+          <div className="text-[12px] leading-relaxed text-ss-text">
+            <span className="font-extrabold text-ss-orange">Your protected activity: {result.protected}.</span>{' '}
             We will never recommend stopping this. Everything below is about doing it more effectively and with less injury risk.
           </div>
         </div>
       )}
 
       {result.items.map((item) => (
-        <div key={item.id} className="rounded-2xl border border-ss-border-warm bg-white p-4 shadow-sm">
+        <div
+          key={item.id}
+          className="rounded-2xl border-2 border-ss-teal/40 p-4 shadow-md"
+          style={{ background: 'linear-gradient(135deg, #F0FDFA 0%, #FFFFFF 55%, #ECFEFF 100%)' }}
+        >
           <div className="flex items-center gap-2">
-            <Lightbulb size={14} className="text-ss-orange" />
-            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-ss-orange">Smart alternative</div>
+            <Lightbulb size={16} className="text-ss-orange" />
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-ss-orange">Smart alternative</div>
           </div>
           <div className="mt-2 space-y-2 text-[12px] leading-relaxed text-ss-text">
             <Row label="What you're doing">{item.doing}</Row>

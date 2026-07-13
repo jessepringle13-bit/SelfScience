@@ -227,28 +227,42 @@ export default function TrainingProtocolClient() {
               <div className="space-y-6">
                 {/* 3A summary */}
                 {protocol.summary && (
-                  <div className="rounded-2xl border-l-4 border-ss-teal bg-white p-5 shadow-sm">
-                    <div className="mb-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-orange">3A · Your Genetic Training Summary</div>
-                    <p className="text-[13.5px] leading-relaxed text-ss-text">{protocol.summary}</p>
+                  <div
+                    className="rounded-2xl border-2 border-ss-teal/50 p-5 shadow-md avoid-break"
+                    style={{ background: 'linear-gradient(135deg, #0F766E14 0%, #FFFFFF 55%, #0F766E08 100%)' }}
+                  >
+                    <div className="-mx-5 -mt-5 mb-3 rounded-t-2xl border-b-2 border-ss-teal/30 bg-ss-teal/10 px-5 py-3">
+                      <div className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-ss-orange">3A · Your Genetic Training Summary</div>
+                    </div>
+                    <p className="text-[14px] leading-relaxed text-ss-text">{protocol.summary}</p>
                   </div>
                 )}
 
                 {/* 3B smart alternatives */}
-                <div>
-                  <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-orange">3B · Smart Alternative Suggestions</div>
+                <div
+                  className="rounded-2xl border-2 border-ss-orange/50 p-5 shadow-md avoid-break"
+                  style={{ background: 'linear-gradient(135deg, #EA580C14 0%, #FFFFFF 55%, #EA580C08 100%)' }}
+                >
+                  <div className="-mx-5 -mt-5 mb-3 rounded-t-2xl border-b-2 border-ss-orange/30 bg-ss-orange/10 px-5 py-3">
+                    <div className="text-[10px] font-extrabold uppercase tracking-[0.22em] text-ss-orange">3B · Smart Alternative Suggestions</div>
+                  </div>
                   <SmartAlternatives result={protocol.alternatives} />
                 </div>
 
                 {/* Snapshot of blueprint */}
-                <div>
-                  <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-orange">3C · Weekly Blueprint (snapshot)</div>
+                <div
+                  className="rounded-2xl border-2 border-cyan-500/40 p-5 shadow-md avoid-break"
+                  style={{ background: 'linear-gradient(135deg, #0891B214 0%, #FFFFFF 55%, #0891B208 100%)' }}
+                >
+                  <div className="-mx-5 -mt-5 mb-3 rounded-t-2xl border-b-2 border-cyan-500/30 bg-cyan-500/10 px-5 py-3">
+                    <div className="text-[10px] font-extrabold uppercase tracking-[0.22em]" style={{ color: '#0891B2' }}>3C · Weekly Blueprint (snapshot)</div>
+                  </div>
                   <WeeklyBlueprint blueprint={protocol.blueprint} />
                 </div>
 
-                {/* Coming in Phase 2 */}
-                <div className="rounded-2xl border border-dashed border-ss-border-warm bg-white/50 p-4 text-[11px] italic text-ss-muted">
+                <div className="rounded-2xl border border-dashed border-ss-border-warm bg-white/60 p-4 text-[11px] italic text-ss-muted">
                   <Info size={12} className="mr-1 inline text-ss-teal" />
-                  Coming in the next release: dedicated Stretching &amp; Mobility, Recovery, Supplements (tuned to your PGx), Equipment, Metrics-to-Track, and a shareable Coach summary tab.
+                  Every tab above contains a full genome-personalised section — Mobility, Recovery, Supplements, Equipment, Metrics, Goals, and a printable Coach Share brief.
                 </div>
               </div>
             )}

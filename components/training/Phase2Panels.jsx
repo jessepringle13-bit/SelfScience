@@ -15,12 +15,22 @@ import { PRIORITY_META } from '@/lib/training/equipment'
 // ─────────────────── Small primitives ───────────────────
 
 function Panel({ icon: Icon, title, eyebrow, accent = '#0F766E', children }) {
+  // Build a subtle diagonal gradient tinted with the section's accent so each
+  // tab has its own clear visual identity. Border is a stronger accent tint
+  // so the card lifts off the page.
+  const bg = `linear-gradient(135deg, ${accent}0F 0%, #FFFFFF 55%, ${accent}08 100%)`
   return (
-    <div className="rounded-2xl border border-ss-border-warm bg-white p-5 shadow-sm avoid-break">
-      <div className="mb-3">
-        <div className="text-[10px] font-extrabold uppercase tracking-[0.18em]" style={{ color: accent }}>{eyebrow}</div>
-        <h2 className="mt-0.5 flex items-center gap-2 text-base font-extrabold" style={{ color: accent }}>
-          <Icon size={16} /> {title}
+    <div
+      className="rounded-2xl border-2 p-5 shadow-md avoid-break"
+      style={{ background: bg, borderColor: `${accent}55` }}
+    >
+      <div
+        className="mb-4 -mx-5 -mt-5 rounded-t-2xl px-5 py-3"
+        style={{ background: `${accent}15`, borderBottom: `2px solid ${accent}30` }}
+      >
+        <div className="text-[10px] font-extrabold uppercase tracking-[0.22em]" style={{ color: accent }}>{eyebrow}</div>
+        <h2 className="mt-0.5 flex items-center gap-2 text-lg font-extrabold" style={{ color: accent }}>
+          <Icon size={18} /> {title}
         </h2>
       </div>
       {children}
