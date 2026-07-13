@@ -1,26 +1,37 @@
 'use client'
 
 // /app/app/biomarkers/biomarkers-client.jsx
-// SelfScience — Lab Biomarker Panel.
-// 17-field bloodwork form with per-field reference ranges shown
-// BEFORE typing, live status dots after typing, a status overview card,
-// and a Genetic Context panel powered by biomarker × genome correlations.
+// SelfScience — Biomarker Panel (Phase 1 redesign).
+//
+// Uses the schema-driven biomarker library in /app/lib/biomarkers/. Each
+// biomarker renders as a rich BiomarkerCard with:
+//   • "Why this matters" explainer
+//   • Standard clinical range vs SelfScience optimization range
+//   • Range bar with the user's value overlaid
+//   • Evidence drawer (confidence badge + curated citations)
+//   • Related biomarker chips (scroll-jump to interpret alongside)
+//   • Possible next-step suggestions
+//
+// Status vocabulary: in_target / borderline / outside / insufficient
+// (see /app/lib/biomarkers/status.js).
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ShieldAlert, Trash2, ArrowRight, TestTube2, Loader2 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
-import {
-  BIOMARKERS,
-  STATUS_META,
-  evaluateAllBiomarkers,
-  BIOMARKERS_DISCLAIMER,
-  getBiomarkersForSex,
-} from '@/lib/biomarkers'
+import { BIOMARKERS_DISCLAIMER } from '@/lib/biomarkers/schema'
+import { evaluateAllBiomarkers, getBiomarkersForSex, groupByCategory } from '@/lib/biomarkers/status'
+import { CATEGORIES } from '@/lib/biomarkers/schema'
 import { deriveCorrelations } from '@/lib/biomarkerCorrelations'
-import { getBiomarkerValues, saveBiomarkerValues, clearBiomarkerValues } from '@/lib/biomarkersSession'
-import { getGenomeResults, hasGenomeResults } from '@/lib/genomeSession'
+import {
+  getBiomarkerValues, saveBiomarkerValues, clearBiomarkerValues,
+} from '@/lib/biomarkersSession'
+import { getGenomeResults } from '@/lib/genomeSession'
+
+import { PanelSummary } from '@/components/biomarkers/PanelSummary'
+import { BiomarkerCard } from '@/components/biomarkers/BiomarkerCard'
+import { EmptyStateOnboarding } from '@/components/biomarkers/EmptyStateOnboarding'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
 
@@ -28,12 +39,9 @@ export default function BiomarkersClient() {
   const [values, setValues] = useState({})
   const [ready, setReady] = useState(false)
   const [report, setReport] = useState(null)
-  // Biological sex controls reference ranges for testosterone (total &
-  // free), hemoglobin, ferritin, and SHBG. Default male; persisted to
-  // localStorage so it survives across visits.
   const [sex, setSex] = useState('male')
 
-  // Hydrate localStorage (biomarker values + sex) + sessionStorage (genome) on mount.
+  // Hydrate localStorage (values + sex) + sessionStorage (genome) on mount.
   useEffect(() => {
     setValues(getBiomarkerValues())
     setReport(getGenomeResults())
@@ -47,13 +55,11 @@ export default function BiomarkersClient() {
     return () => window.removeEventListener('selfscience:genome-changed', onGenomeChange)
   }, [])
 
-  // Persist sex selection so subsequent visits keep the same reference ranges.
   useEffect(() => {
     if (!ready) return
     try { localStorage.setItem(SEX_STORAGE_KEY, sex) } catch { /* noop */ }
   }, [sex, ready])
 
-  // Persist to localStorage on every change (with a tiny debounce).
   useEffect(() => {
     if (!ready) return
     const t = setTimeout(() => saveBiomarkerValues(values), 250)
@@ -62,47 +68,62 @@ export default function BiomarkersClient() {
 
   const biomarkersForSex = useMemo(() => getBiomarkersForSex(sex), [sex])
   const evaluated = useMemo(() => evaluateAllBiomarkers(values, sex), [values, sex])
-  const summary = useMemo(() => {
-    const c = { optimal: 0, caution: 0, flag: 0, unknown: 0 }
-    for (const b of biomarkersForSex) c[evaluated[b.id].status]++
-    const filled = biomarkersForSex.length - c.unknown
-    return { ...c, filled, total: biomarkersForSex.length }
-  }, [evaluated, biomarkersForSex])
+  const grouped = useMemo(() => groupByCategory(biomarkersForSex), [biomarkersForSex])
 
+  const enteredCount = Object.values(evaluated).filter((r) => r.status !== 'insufficient').length
+
+  // Legacy correlations for the Genetic Context sidebar — computed with
+  // the legacy status vocabulary via the compat facade. Keeps the existing
+  // Phase 2 preview (formal genome integration lands in Phase 2 proper).
+  const legacyEvaluated = useMemo(() => {
+    const out = {}
+    const map = { in_target: 'optimal', borderline: 'caution', outside: 'flag', insufficient: 'unknown' }
+    for (const [id, r] of Object.entries(evaluated)) {
+      out[id] = { value: r.value, status: map[r.status] || 'unknown' }
+    }
+    return out
+  }, [evaluated])
   const correlations = useMemo(
-    () => deriveCorrelations({ status: evaluated, report }),
-    [evaluated, report]
+    () => deriveCorrelations({ status: legacyEvaluated, report }),
+    [legacyEvaluated, report]
   )
 
   const setField = (id, v) => setValues((prev) => ({ ...prev, [id]: v }))
+
   const clearAll = () => {
     if (!confirm('Clear all biomarker entries? This cannot be undone.')) return
     clearBiomarkerValues()
     setValues({})
   }
 
+  const scrollToBiomarker = (id) => {
+    const el = document.getElementById(`bm-${id}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className="min-h-screen bg-ss-bg">
       <SiteNav />
 
-      <div className="container pt-8 pb-24">
+      <div className="container pb-24 pt-24 md:pt-28">
         {/* Header */}
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
               <TestTube2 size={14} /> Biomarkers
             </div>
             <h1 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
-              Your lab panel, in context.
+              Your bloodwork, in context.
             </h1>
-            <p className="mt-2 max-w-2xl text-ss-muted">
-              Enter recent bloodwork to see how each value compares against research-informed
-              targets, and how it connects to your genome findings.
+            <p className="mt-2 text-ss-muted">
+              A schema-driven biomarker interpretation tool. Every range shown here is traceable
+              to a source, labeled with a confidence tier, and framed as a discussion point —
+              not a diagnosis.
             </p>
           </div>
           <div className="flex items-center gap-2">
             {report && <RegenTools compact />}
-            {summary.filled > 0 && (
+            {enteredCount > 0 && (
               <button
                 onClick={clearAll}
                 className="inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm bg-white px-3 py-1.5 text-xs font-semibold text-ss-muted transition hover:bg-ss-bg"
@@ -113,18 +134,23 @@ export default function BiomarkersClient() {
           </div>
         </div>
 
-        {/* Top disclaimer */}
+        {/* Educational disclaimer */}
         <div className="mt-6 flex items-start gap-3 rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
           <ShieldAlert size={18} className="mt-0.5 flex-shrink-0 text-ss-amber" />
           <p className="text-sm text-ss-text">
-            <span className="font-semibold">Educational only.</span>{' '}
+            <span className="font-semibold">Educational, not medical advice.</span>{' '}
             {BIOMARKERS_DISCLAIMER}
           </p>
         </div>
 
-        {/* Biological sex toggle — controls reference ranges for
-            testosterone (total & free), hemoglobin, ferritin, and SHBG.
-            Persisted to localStorage so it sticks across visits. */}
+        {/* Onboarding empty state — only when nothing entered */}
+        {ready && enteredCount === 0 && (
+          <div className="mt-6">
+            <EmptyStateOnboarding />
+          </div>
+        )}
+
+        {/* Sex toggle */}
         <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ss-border-warm/60">
           <span className="text-xs font-bold uppercase tracking-wider text-ss-teal">
             Biological sex
@@ -140,9 +166,7 @@ export default function BiomarkersClient() {
               aria-checked={sex === 'male'}
               onClick={() => setSex('male')}
               className={`px-4 py-1.5 text-sm font-semibold transition ${
-                sex === 'male'
-                  ? 'bg-ss-teal text-white'
-                  : 'bg-white text-ss-teal hover:bg-ss-bg'
+                sex === 'male' ? 'bg-ss-teal text-white' : 'bg-white text-ss-teal hover:bg-ss-bg'
               }`}
             >
               Male
@@ -153,9 +177,7 @@ export default function BiomarkersClient() {
               aria-checked={sex === 'female'}
               onClick={() => setSex('female')}
               className={`px-4 py-1.5 text-sm font-semibold transition ${
-                sex === 'female'
-                  ? 'bg-ss-teal text-white'
-                  : 'bg-white text-ss-teal hover:bg-ss-bg'
+                sex === 'female' ? 'bg-ss-teal text-white' : 'bg-white text-ss-teal hover:bg-ss-bg'
               }`}
             >
               Female
@@ -166,45 +188,63 @@ export default function BiomarkersClient() {
           </span>
         </div>
 
-        <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[1fr,360px]">
-          {/* ================= FORM ================= */}
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr,320px]">
+          {/* ============ MAIN COLUMN ============ */}
           <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-ss-text">Your Bloodwork</h2>
-              <div className="text-xs text-ss-muted">
-                {summary.filled} of {summary.total} filled
-              </div>
+            {/* Snapshot summary */}
+            <PanelSummary evaluated={evaluated} total={biomarkersForSex.length} />
+
+            {/* Category-grouped biomarker cards */}
+            <div className="mt-8 space-y-10">
+              {grouped.map(({ category, items }) => (
+                <section key={category} id={`cat-${category}`}>
+                  <div className="mb-4 flex items-baseline justify-between gap-3">
+                    <h2 className="text-xl font-extrabold text-ss-teal md:text-2xl">
+                      {CATEGORIES[category]?.label || category}
+                    </h2>
+                    <span className="text-xs text-ss-muted">
+                      {items.length} marker{items.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-5">
+                    {items.map((b) => (
+                      <BiomarkerCard
+                        key={b.id}
+                        biomarker={b}
+                        sex={sex}
+                        value={values[b.id] ?? ''}
+                        onChange={setField}
+                        onScrollToRelated={scrollToBiomarker}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {biomarkersForSex.map((b) => (
-                <BiomarkerField
-                  key={b.id}
-                  field={b}
-                  value={values[b.id] ?? ''}
-                  onChange={(v) => setField(b.id, v)}
-                  status={evaluated[b.id].status}
-                />
-              ))}
+            {/* Bottom disclaimer */}
+            <div className="mt-12 rounded-2xl bg-white p-6 text-sm leading-relaxed text-ss-muted ring-1 ring-ss-border-warm/60">
+              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-ss-orange">
+                Methodology
+              </div>
+              <p className="mt-2">
+                Standard ranges are drawn from major-institution consensus (ADA, ATA, ACC/AHA, ESC,
+                WHO, Endocrine Society). SelfScience target ranges are a synthesis of the evidence
+                cited on each biomarker card and current editorial judgment. Confidence tiers are
+                shown per marker; ranges labeled &quot;Contested&quot; or &quot;Emerging&quot; reflect meaningful
+                expert disagreement.
+              </p>
+              <p className="mt-3">
+                Nothing here is diagnostic. Interpretations are educational and should be reviewed
+                with a qualified clinician who knows your history.
+              </p>
             </div>
           </section>
 
-          {/* ================= SIDE PANEL ================= */}
+          {/* ============ SIDEBAR ============ */}
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-            {/* Status Overview */}
-            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-ss-teal">Status Overview</h3>
-              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-                <StatusStat count={summary.optimal} tone="optimal" />
-                <StatusStat count={summary.caution} tone="caution" />
-                <StatusStat count={summary.flag}    tone="flag" />
-              </div>
-              <div className="mt-3 text-[10px] uppercase tracking-wider text-ss-muted text-center">
-                From {summary.filled} entered {summary.filled === 1 ? 'biomarker' : 'biomarkers'}
-              </div>
-            </div>
-
-            {/* Genetic Context */}
+            {/* Genetic Context (Phase 2 will formalize; this preserves the existing preview) */}
             <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-ss-teal">Genetic Context</h3>
@@ -221,7 +261,9 @@ export default function BiomarkersClient() {
                 </div>
               ) : !report ? (
                 <div className="mt-4 rounded-lg bg-ss-bg p-3 text-xs text-ss-muted">
-                  Upload your genome to unlock biomarker × gene correlations tailored to your variants.
+                  Upload a genome to cross-reference biomarkers with published SNP associations
+                  (MTHFR→homocysteine, HFE→ferritin, APOE→lipids, etc.). Coming with full evidence
+                  tiers in Phase 2.
                   <div className="mt-2">
                     <Link href="/genome" className="inline-flex items-center gap-1 font-semibold text-ss-teal hover:underline">
                       Upload genome <ArrowRight size={11} />
@@ -230,19 +272,25 @@ export default function BiomarkersClient() {
                 </div>
               ) : correlations.length === 0 ? (
                 <p className="mt-4 text-xs text-ss-muted">
-                  No specific correlations triggered yet — fill in more biomarkers or your
-                  genome findings may not match the current correlation rules.
+                  No correlations triggered yet — enter more biomarker values, or your genome may
+                  not carry the variants covered by the current rule set.
                 </p>
               ) : (
                 <ul className="mt-4 space-y-3">
                   {correlations.map((c) => (
-                    <CorrelationCard key={c.id} c={c} />
+                    <li key={c.id} className={`rounded-lg border-l-4 p-3 text-xs leading-relaxed text-ss-text ${
+                      c.tone === 'priority'  ? 'border-l-ss-teal   bg-ss-teal/5' :
+                      c.tone === 'awareness' ? 'border-l-ss-amber  bg-ss-amber/5' :
+                                               'border-l-ss-muted  bg-ss-bg/40'
+                    }`}>
+                      <div className="mb-1 text-[11px] font-bold text-ss-teal">{c.title}</div>
+                      <div>{c.body}</div>
+                    </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            {/* Genome shortcut */}
             {report && (
               <Link
                 href="/genome"
@@ -256,69 +304,5 @@ export default function BiomarkersClient() {
         </div>
       </div>
     </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-
-function BiomarkerField({ field, value, onChange, status }) {
-  const meta = STATUS_META[status]
-  const filled = value !== ''
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="flex items-center gap-2 text-sm font-semibold text-ss-text">
-        {field.label}
-        {field.secondaryLabel && (
-          <span className="rounded-full bg-ss-bg px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-ss-muted">
-            {field.secondaryLabel}
-          </span>
-        )}
-      </span>
-      {/* Reference note shown BEFORE typing */}
-      <span className="text-[11px] text-ss-muted">{field.optimal}</span>
-      <div className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2 ring-1 ring-transparent transition ${
-        filled && status !== 'unknown' ? `${meta.ring} ring-2 border-transparent` : 'border-ss-border-warm'
-      }`}>
-        <input
-          type="number"
-          inputMode="decimal"
-          step={field.step ?? 0.1}
-          min={field.min}
-          max={field.max}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="—"
-          className="min-w-0 flex-1 border-0 bg-transparent text-sm text-ss-text placeholder:text-ss-muted focus:outline-none"
-          aria-label={field.label}
-        />
-        <span className="text-xs text-ss-muted">{field.unit}</span>
-        {filled && status !== 'unknown' && (
-          <span title={meta.label} className={`inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full ${meta.dot}`} aria-label={`Status: ${meta.label}`} />
-        )}
-      </div>
-    </label>
-  )
-}
-
-function StatusStat({ count, tone }) {
-  const meta = STATUS_META[tone]
-  return (
-    <div className={`rounded-xl px-2 py-3 ${meta.chip}`}>
-      <div className="text-2xl font-extrabold leading-none">{count}</div>
-      <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider">{meta.label}</div>
-    </div>
-  )
-}
-
-function CorrelationCard({ c }) {
-  const toneClass =
-    c.tone === 'priority'  ? 'border-l-ss-teal   bg-ss-teal/5' :
-    c.tone === 'awareness' ? 'border-l-ss-amber  bg-ss-amber/5' :
-                             'border-l-ss-muted  bg-ss-bg/40'
-  return (
-    <li className={`rounded-lg border-l-4 p-3 text-xs leading-relaxed text-ss-text ${toneClass}`}>
-      <div className="mb-1 text-[11px] font-bold text-ss-teal">{c.title}</div>
-      <div>{c.body}</div>
-    </li>
   )
 }
