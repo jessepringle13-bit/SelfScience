@@ -35,6 +35,7 @@ import { EmptyStateOnboarding } from '@/components/biomarkers/EmptyStateOnboardi
 import { PatternPanel } from '@/components/biomarkers/PatternPanel'
 import { GenomeSidebar } from '@/components/biomarkers/GenomeSidebar'
 import { ContextPanel } from '@/components/biomarkers/ContextPanel'
+import { TrendControls } from '@/components/biomarkers/TrendControls'
 import { loadContext, saveContext } from '@/lib/biomarkers/context'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
@@ -144,6 +145,12 @@ export default function BiomarkersClient() {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Trend + report toolbar (Phase 3) \u2014 Save snapshot, History, Print report.
+            Everything is client-side; snapshots live only in localStorage. */}
+        <div className="mt-4">
+          <TrendControls values={values} context={context} sex={sex} />
         </div>
 
         {/* Educational disclaimer */}

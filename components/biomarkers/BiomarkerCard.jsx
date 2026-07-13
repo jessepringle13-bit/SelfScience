@@ -20,6 +20,7 @@ import { STATUS, evaluateBiomarker, resolveForSex } from '@/lib/biomarkers/statu
 import RangeBar from './RangeBar'
 import EvidenceDrawer from './EvidenceDrawer'
 import GenomeLinks from './GenomeLinks'
+import Sparkline from './Sparkline'
 
 export function BiomarkerCard({ biomarker, sex = 'male', value, onChange, onScrollToRelated, report = null }) {
   const resolved = useMemo(() => resolveForSex(biomarker, sex), [biomarker, sex])
@@ -87,6 +88,11 @@ export function BiomarkerCard({ biomarker, sex = 'male', value, onChange, onScro
       {/* Range bar */}
       <div className="mt-4">
         <RangeBar biomarker={resolved} value={evalResult.value} />
+      </div>
+
+      {/* Trend sparkline (hidden until 2+ dated snapshots exist) */}
+      <div className="mt-3">
+        <Sparkline biomarker={resolved} />
       </div>
 
       {/* Range summaries */}
