@@ -6,6 +6,7 @@ import { X, ExternalLink, ShieldCheck, Building2, Factory, FileCheck2, FlaskConi
 import { getBrandProfile } from '@/lib/supplements/brandProfiles'
 import { CERT_REGISTRY } from '@/lib/supplements/certifications'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
+import { getBrandCoA } from '@/lib/supplements/brandCoA'
 import CertBadges from './CertBadges'
 
 export default function BrandProfileDrawer({ brandName, open, onClose }) {
@@ -106,6 +107,36 @@ export default function BrandProfileDrawer({ brandName, open, onClose }) {
                   </ul>
                 </section>
               )}
+
+              {/* CoA / test-report attachments (public transparency pages) */}
+              {(() => {
+                const coa = getBrandCoA(profile.name)
+                if (!coa?.length) return null
+                return (
+                  <section>
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Certificates of Analysis &amp; test reports</h3>
+                    <ul className="mt-2 space-y-1.5">
+                      {coa.map((c) => (
+                        <li key={c.url}>
+                          <a
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 hover:border-[#1B474D] hover:bg-slate-50"
+                          >
+                            <FileCheck2 className="h-3.5 w-3.5 text-[#1B474D] shrink-0" />
+                            <span className="flex-1">{c.label}</span>
+                            <ExternalLink className="h-3 w-3 text-slate-400" />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1 text-[10px] text-slate-400">
+                      Links open the brand&apos;s own transparency pages. SelfScience does not host CoAs.
+                    </p>
+                  </section>
+                )
+              })()}
 
               {/* Company facts */}
               <section>

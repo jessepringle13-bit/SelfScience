@@ -7,7 +7,8 @@ import CertBadges from '@/components/supplements/CertBadges'
 import { BRAND_PROFILES } from '@/lib/supplements/brandProfiles'
 import { CERT_REGISTRY } from '@/lib/supplements/certifications'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
-import { Trophy, ArrowLeft, Award, Search, ExternalLink } from 'lucide-react'
+import { BRAND_CATEGORIES, inferBrandCategories } from '@/lib/supplements/brandCategories'
+import { Trophy, ArrowLeft, Award, Search, ExternalLink, Filter } from 'lucide-react'
 
 const FILTER_TAGS = [
   { id: 'all',     label: 'All' },
@@ -23,20 +24,36 @@ const FILTER_TAGS = [
 export default function BrandsLeaderboardClient() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const [category, setCategory] = useState('all')
   const [drawerBrand, setDrawerBrand] = useState(null)
 
+  // Pre-compute categories per brand once
+  const brandsWithCats = useMemo(() => {
+    return Object.values(BRAND_PROFILES).map((b) => ({
+      ...b,
+      _categories: inferBrandCategories(b),
+    }))
+  }, [])
+
+  // Only show categories that actually contain at least one brand
+  const availableCategories = useMemo(() => {
+    const present = new Set()
+    for (const b of brandsWithCats) b._categories.forEach((c) => present.add(c))
+    return BRAND_CATEGORIES.filter((c) => present.has(c.id))
+  }, [brandsWithCats])
+
   const brands = useMemo(() => {
-    const all = Object.values(BRAND_PROFILES)
     const q = query.trim().toLowerCase()
-    const filtered = all.filter((b) => {
+    const filtered = brandsWithCats.filter((b) => {
       if (q && !b.name.toLowerCase().includes(q) && !(b.focus || '').toLowerCase().includes(q)) return false
       if (filter !== 'all' && !(b.programmes || []).includes(filter)) return false
+      if (category !== 'all' && !b._categories.includes(category)) return false
       return true
     })
     // Sort by score desc, then name asc
     filtered.sort((a, b) => (b.score - a.score) || a.name.localeCompare(b.name))
     return filtered
-  }, [query, filter])
+  }, [brandsWithCats, query, filter, category])
 
   return (
     <div className="min-h-screen bg-[#F7F6F2] text-[#28251D]">
@@ -74,6 +91,22 @@ export default function BrandsLeaderboardClient() {
                 placeholder="Search brand or focus…"
                 className="w-full rounded-lg border border-slate-300 bg-white pl-8 pr-3 py-2 text-sm focus:border-[#1B474D] focus:outline-none focus:ring-1 focus:ring-[#1B474D]"
               />
+            </label>
+            <label className="relative">
+              <span className="sr-only">Category</span>
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white pl-2 pr-1 py-1 text-sm">
+                <Filter className="h-4 w-4 text-slate-500" />
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="bg-transparent pr-1 py-1 text-sm text-slate-800 focus:outline-none"
+                >
+                  <option value="all">All categories</option>
+                  {availableCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
             </label>
             <div className="text-xs text-slate-500">
               {brands.length} of {Object.keys(BRAND_PROFILES).length} brands

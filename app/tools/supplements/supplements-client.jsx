@@ -50,7 +50,7 @@ export default function SupplementsClient() {
         </div>
       </section>
 
-      <main className="mx-auto max-w-6xl px-4 md:px-6 -mt-4 md:-mt-6 pb-16 space-y-6">
+      <main className="mx-auto max-w-6xl px-4 md:px-6 pt-6 md:pt-8 pb-16 space-y-6">
         <GoalPicker onSelect={onGoalSelect} initialGoalId={goal?.id} />
         {goal && (
           <CategoryStrip
