@@ -41,6 +41,7 @@ import PrintCoverPage from '@/components/practitioner/PrintCoverPage'
 import ClinicianNote from '@/components/practitioner/ClinicianNote'
 import PatientContextTable from '@/components/practitioner/PatientContextTable'
 import BiomarkerSummary from '@/components/practitioner/BiomarkerSummary'
+import PractitionerSupplementBlock from '@/components/practitioner/PractitionerSupplementBlock'
 import GeneticVariantSummary from '@/components/practitioner/GeneticVariantSummary'
 import DisclaimerPage from '@/components/practitioner/DisclaimerPage'
 
@@ -214,6 +215,9 @@ export default function PractitionerReportClient() {
             {sections.biomarkers && hasBiomarkers && (
               <BiomarkerSummary values={labs} history={history} sex={intake?.sex || 'male'} />
             )}
+
+            {/* Supplement considerations (auto-hidden if no signals) */}
+            <PractitionerSupplementBlock />
 
             {/* Page 5 — Genetic variant summary (toggleable) */}
             {sections.variants && (

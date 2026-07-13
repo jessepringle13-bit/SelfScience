@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { X, ShieldCheck, ExternalLink, Beaker, AlertTriangle, Info } from 'lucide-react'
 import { useCompare } from './CompareContext'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
+import { getBrandTierMeta } from '@/lib/supplements/brandTiers'
 import CertBadges from './CertBadges'
 
 const TIER_STYLE = {
@@ -101,6 +102,13 @@ export default function CompareDrawer() {
                       if (typeof s !== 'number') return <td key={p.id} className="px-4 py-3 text-slate-400 text-xs">Not scored</td>
                       const style = getScoreStyle(s)
                       return <td key={p.id} className="px-4 py-3"><span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${style.chip}`}><span className="font-semibold">{s}</span><span className="opacity-60">/5</span><span className="opacity-80 hidden lg:inline">· {style.label}</span></span></td>
+                    })}
+                  </Row>
+                  <Row label="Price tier">
+                    {items.map((p) => {
+                      const tm = getBrandTierMeta(p.brand?.name)
+                      if (!tm) return <td key={p.id} className="px-4 py-3 text-slate-400 text-xs">\u2014</td>
+                      return <td key={p.id} className="px-4 py-3"><span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tm.style}`} title={tm.description}>{tm.label}</span></td>
                     })}
                   </Row>
                   <Row label="Third-party certifications">

@@ -1,5 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import SiteNav from '@/components/site-nav'
 import SiteFooter from '@/components/site-footer'
 import AdvisoryBanner from '@/components/supplements/AdvisoryBanner'
@@ -11,13 +12,22 @@ import PersonalisationBanner from '@/components/supplements/PersonalisationBanne
 import { CompareProvider } from '@/components/supplements/CompareContext'
 import CompareFloatingBar from '@/components/supplements/CompareFloatingBar'
 import CompareDrawer from '@/components/supplements/CompareDrawer'
-import { GOALS } from '@/lib/supplements/goalCategories'
+import { GOALS, getGoalById } from '@/lib/supplements/goalCategories'
 import { computePersonalisation, signalsForCategory } from '@/lib/supplements/personalisation'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { getBiomarkerValues } from '@/lib/biomarkersSession'
 import { Pill, ShieldCheck, ShieldAlert, Dna } from 'lucide-react'
 
 export default function SupplementsClient() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F7F6F2]" />}>
+      <SupplementsClientInner />
+    </Suspense>
+  )
+}
+
+function SupplementsClientInner() {
+  const searchParams = useSearchParams()
   const [goal, setGoal] = useState(null)
   const [context, setContext] = useState({})
   const [category, setCategory] = useState(null)
@@ -36,6 +46,22 @@ export default function SupplementsClient() {
       setHasBiomarkers(!!(b && Object.values(b).some((v) => v != null && v !== '')))
     } catch { /* silent */ }
   }, [])
+
+  // Hydrate goal + category from ?goal=... &category=... (deep-link support)
+  useEffect(() => {
+    const goalId = searchParams?.get('goal')
+    const catId  = searchParams?.get('category')
+    if (!goalId) return
+    const g = getGoalById(goalId)
+    if (!g) return
+    setGoal(g)
+    if (catId) {
+      const c = g.categories.find((x) => x.id === catId) || g.categories[0]
+      setCategory(c)
+    } else {
+      setCategory(g.categories[0])
+    }
+  }, [searchParams])
 
   const onGoalSelect = ({ goal: g, context: c }) => {
     setGoal(g)
@@ -69,12 +95,22 @@ export default function SupplementsClient() {
                 NIH label data. Ingredient-form science. Brand-direct only &mdash; never Amazon.
               </p>
             </div>
-            <a
-              href="/tools/supplements/brands"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-2 text-sm font-semibold text-white transition"
-            >
-              <ShieldCheck className="h-4 w-4" /> Brand leaderboard
-            </a>
+            <div className="flex items-center gap-2">
+              {(hasGenome || hasBiomarkers) && (
+                <a
+                  href="/tools/supplements/my-variants"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-2 text-sm font-semibold text-white transition"
+                >
+                  <Dna className="h-4 w-4" /> My variants
+                </a>
+              )}
+              <a
+                href="/tools/supplements/brands"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-2 text-sm font-semibold text-white transition"
+              >
+                <ShieldCheck className="h-4 w-4" /> Brand leaderboard
+              </a>
+            </div>
           </div>
         </div>
       </section>

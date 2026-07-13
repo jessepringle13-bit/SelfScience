@@ -31,7 +31,25 @@ export function CompareProvider({ children }) {
     if (!product?.id) return
     setItems((prev) => {
       if (prev.some((p) => p.id === product.id)) return prev
-      // Cap at 4 to keep the table readable
+      // Category-scoped compare: only allow products sharing the same primary
+      // ingredient family (top-tier ingredient in formQuality).
+      const familyOf = (p) => {
+        const q = p?.formQuality || []
+        const pref = q.find((f) => f.tier === 'preferred') || q[0]
+        return pref?.ingredient || null
+      }
+      const family = familyOf(product)
+      if (prev.length > 0) {
+        const existingFamily = familyOf(prev[0])
+        if (family && existingFamily && family !== existingFamily) {
+          // Family mismatch: replace list with just this new product to prevent
+          // apples-to-oranges compares. Surface a warning via a flash-set state.
+          if (typeof window !== 'undefined') {
+            try { window.dispatchEvent(new CustomEvent('selfscience:compare-family-conflict', { detail: { newFamily: family, prevFamily: existingFamily } })) } catch {}
+          }
+          return [product]
+        }
+      }
       const next = [...prev, product]
       return next.slice(-4)
     })

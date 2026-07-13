@@ -15,6 +15,7 @@ import {
 import CertBadges from './CertBadges'
 import BrandProfileDrawer from './BrandProfileDrawer'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
+import { getBrandTierMeta } from '@/lib/supplements/brandTiers'
 import { useCompare } from './CompareContext'
 
 const TIER_BADGE = {
@@ -24,7 +25,7 @@ const TIER_BADGE = {
   unknown: { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-300', label: 'Form not classified', icon: Info },
 }
 
-export default function GroupedProductCard({ group, whyThisFits, productSignals = [] }) {
+export default function GroupedProductCard({ group, whyThisFits, productSignals = [], budgetAlternative = null }) {
   const [variantId, setVariantId] = useState(group.defaultVariant.id)
   const [openTip, setOpenTip] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -110,6 +111,18 @@ export default function GroupedProductCard({ group, whyThisFits, productSignals 
               <span className="opacity-60">/5</span>
             </button>
           )}
+          {(() => {
+            const tm = getBrandTierMeta(group.brand)
+            if (!tm) return null
+            return (
+              <span
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${tm.style}`}
+                title={tm.description}
+              >
+                {tm.tier}
+              </span>
+            )
+          })()}
           {group.variantCount > 1 && (
             <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px]">
               {group.variantCount} versions
@@ -272,6 +285,24 @@ export default function GroupedProductCard({ group, whyThisFits, productSignals 
           ) : null}
         </div>
       </div>
+
+      {/* Budget-aware swap-in suggestion */}
+      {budgetAlternative && budgetAlternative.brand !== group.brand && (
+        <div className="mx-4 md:mx-5 mb-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs">
+          <div className="flex items-center gap-2 text-emerald-900">
+            <Sparkles className="h-3.5 w-3.5 shrink-0" />
+            <div className="flex-1">
+              <div className="font-semibold">Same form, lower price tier</div>
+              <div className="text-emerald-900/85 mt-0.5">
+                <strong>{budgetAlternative.brand}</strong> offers the same preferred form
+                ({budgetAlternative.form || 'active ingredient'}) at
+                <span className="mx-1 rounded bg-white border border-emerald-200 px-1 text-[10px] font-semibold">{budgetAlternative.tier}</span>
+                vs your current {getBrandTierMeta(group.brand)?.tier || 'brand'}.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Progressive disclosure: full label detail */}
       <details

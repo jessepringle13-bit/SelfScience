@@ -5,6 +5,7 @@ import GroupedProductCard from './GroupedProductCard'
 import ViewToggle from './ViewToggle'
 import { groupProducts, buildWhyThisFits } from '@/lib/supplements/grouping'
 import { signalsForProduct } from '@/lib/supplements/personalisation'
+import { tierRank } from '@/lib/supplements/brandTiers'
 import { Loader2, Sparkles, Award } from 'lucide-react'
 
 const VIEW_STORAGE_KEY = 'selfscience_supplements_view_v1'
@@ -132,14 +133,37 @@ export default function ProductList({ category, signals = [] }) {
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {displayGroups.map((g) => (
-              <GroupedProductCard
-                key={`${g.brand}-${g.family}`}
-                group={g}
-                whyThisFits={buildWhyThisFits({ category, group: g })}
-                productSignals={signalsForProduct(signals, g.defaultVariant)}
-              />
-            ))}
+            {displayGroups.map((g) => {
+              // Compute cheapest same-form alternative (preferred-tier ingredient + lower price tier)
+              const currentTier = g.defaultVariant?.brand?.priceTier
+              let alt = null
+              if (currentTier) {
+                const currentRank = tierRank(currentTier)
+                const currentPreferred = (g.defaultVariant.formQuality || []).find((f) => f.tier === 'preferred')
+                if (currentPreferred) {
+                  const candidates = displayGroups.filter((other) => {
+                    if (other.brand === g.brand) return false
+                    const otherTier = other.defaultVariant?.brand?.priceTier
+                    if (!otherTier || tierRank(otherTier) >= currentRank) return false
+                    const otherPreferred = (other.defaultVariant.formQuality || []).find((f) => f.tier === 'preferred')
+                    return otherPreferred && otherPreferred.ingredient === currentPreferred.ingredient && otherPreferred.formLabel === currentPreferred.formLabel
+                  })
+                  candidates.sort((a, b) => tierRank(a.defaultVariant.brand.priceTier) - tierRank(b.defaultVariant.brand.priceTier))
+                  if (candidates.length) {
+                    alt = { brand: candidates[0].brand, tier: candidates[0].defaultVariant.brand.priceTier, form: currentPreferred.formLabel }
+                  }
+                }
+              }
+              return (
+                <GroupedProductCard
+                  key={`${g.brand}-${g.family}`}
+                  group={g}
+                  whyThisFits={buildWhyThisFits({ category, group: g })}
+                  productSignals={signalsForProduct(signals, g.defaultVariant)}
+                  budgetAlternative={alt}
+                />
+              )
+            })}
           </div>
         </>
       )}

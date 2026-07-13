@@ -29,6 +29,7 @@ import { buildMobilityProtocol } from '@/lib/training/mobility'
 import { buildRecoveryProtocol } from '@/lib/training/recovery'
 import { buildSupplementProtocol } from '@/lib/training/supplements'
 import { buildEquipmentRecommendations } from '@/lib/training/equipment'
+import TrainingSupplementLink from '@/components/training/TrainingSupplementLink'
 import { buildMetricsPlan } from '@/lib/training/metrics'
 import { buildGoalsFramework } from '@/lib/training/goals'
 import { buildBeginnerContent } from '@/lib/training/beginner'
@@ -323,7 +324,12 @@ function TrainingProtocolInner() {
             {/* ------------ Phase 2 tabs ------------ */}
             {tab === 'mobility'    && <MobilityPanel   mobility={protocol.mobility} />}
             {tab === 'recovery'    && <RecoveryPanel   recovery={protocol.recovery} />}
-            {tab === 'supplements' && <SupplementPanel supplements={protocol.supplements} />}
+            {tab === 'supplements' && (
+              <div className="space-y-4">
+                <SupplementPanel supplements={protocol.supplements} />
+                <TrainingSupplementLink />
+              </div>
+            )}
             {tab === 'equipment'   && <EquipmentPanel  items={protocol.equipment} />}
             {tab === 'metrics'     && <MetricsPanel    metrics={protocol.metrics} />}
             {tab === 'goals'       && <GoalsPanel      goals={protocol.goalsFrame} />}
