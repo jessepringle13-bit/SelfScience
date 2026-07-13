@@ -22,6 +22,7 @@ import {
 } from '@/lib/supabase/articles'
 import { loadExerciseDB, filterExercises } from '@/lib/training/exerciseDb'
 import { normalizeSearchHit, normalizeLabelDetail } from '@/lib/supplements/dsld'
+import PRICES_JSON from '@/lib/supplements/prices.json'
 import {
   isAdminAuthenticated,
   verifyPassword,
@@ -765,6 +766,16 @@ async function handleSupplementsDsldSearch(request) {
   }
 }
 
+async function handleSupplementsPrices(request) {
+  // Serve the cached prices JSON to the client. Read-only from the browser;
+  // scraper script writes directly to the file.
+  return NextResponse.json({
+    meta: PRICES_JSON?._meta || {},
+    prices: PRICES_JSON?.prices || {},
+    count: Object.keys(PRICES_JSON?.prices || {}).length,
+  })
+}
+
 async function handleSupplementsDsldLabel(request, id) {
   if (!id) return NextResponse.json({ error: 'Missing label id' }, { status: 400 })
 
@@ -822,6 +833,7 @@ export async function GET(request, { params }) {
   if (route === 'supplements') {
     if (subRoute === 'dsld' && thirdRoute === 'search') return handleSupplementsDsldSearch(request)
     if (subRoute === 'dsld' && thirdRoute && thirdRoute !== 'search') return handleSupplementsDsldLabel(request, thirdRoute)
+    if (subRoute === 'prices') return handleSupplementsPrices(request)
   }
 
   return NextResponse.json({

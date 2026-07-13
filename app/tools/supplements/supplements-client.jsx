@@ -13,6 +13,7 @@ import { CompareProvider } from '@/components/supplements/CompareContext'
 import CompareFloatingBar from '@/components/supplements/CompareFloatingBar'
 import CompareDrawer from '@/components/supplements/CompareDrawer'
 import CompareToast from '@/components/supplements/CompareToast'
+import CompareConflictDialog from '@/components/supplements/CompareConflictDialog'
 import { GOALS, getGoalById } from '@/lib/supplements/goalCategories'
 import { computePersonalisation, signalsForCategory } from '@/lib/supplements/personalisation'
 import { getGenomeResults } from '@/lib/genomeSession'
@@ -167,6 +168,7 @@ function SupplementsClientInner() {
       <SiteFooter />
       <CompareFloatingBar />
       <CompareDrawer />
+      <CompareConflictDialog />
       <CompareToast />
     </div>
     </CompareProvider>

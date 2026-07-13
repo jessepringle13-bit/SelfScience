@@ -10,6 +10,7 @@ const STORAGE_KEY = 'selfscience_supplement_compare_v1'
 export function CompareProvider({ children }) {
   const [items, setItems] = useState([])   // array of full product objects
   const [open, setOpen] = useState(false)
+  const [pendingConflict, setPendingConflict] = useState(null)   // { newProduct, newFamily, prevFamily }
 
   // Hydrate on mount (items are lightweight normalized products)
   useEffect(() => {
@@ -29,31 +30,49 @@ export function CompareProvider({ children }) {
 
   const add = useCallback((product) => {
     if (!product?.id) return
+    const familyOf = (p) => {
+      const q = p?.formQuality || []
+      const pref = q.find((f) => f.tier === 'preferred') || q[0]
+      return pref?.ingredient || null
+    }
     setItems((prev) => {
       if (prev.some((p) => p.id === product.id)) return prev
-      // Category-scoped compare: only allow products sharing the same primary
-      // ingredient family (top-tier ingredient in formQuality).
-      const familyOf = (p) => {
-        const q = p?.formQuality || []
-        const pref = q.find((f) => f.tier === 'preferred') || q[0]
-        return pref?.ingredient || null
-      }
       const family = familyOf(product)
       if (prev.length > 0) {
         const existingFamily = familyOf(prev[0])
         if (family && existingFamily && family !== existingFamily) {
-          // Family mismatch: replace list with just this new product to prevent
-          // apples-to-oranges compares. Surface a warning via a flash-set state.
-          if (typeof window !== 'undefined') {
-            try { window.dispatchEvent(new CustomEvent('selfscience:compare-family-conflict', { detail: { newFamily: family, prevFamily: existingFamily } })) } catch {}
-          }
-          return [product]
+          // Surface an inline confirmation prompt via pendingConflict.
+          setPendingConflict({ newProduct: product, newFamily: family, prevFamily: existingFamily })
+          return prev
         }
       }
       const next = [...prev, product]
       return next.slice(-4)
     })
   }, [])
+
+  // Called when the user confirms the family conflict prompt.
+  const acceptConflictReplace = useCallback(() => {
+    setPendingConflict((pc) => {
+      if (!pc) return null
+      setItems([pc.newProduct])
+      if (typeof window !== 'undefined') {
+        try { window.dispatchEvent(new CustomEvent('selfscience:compare-family-conflict', { detail: { newFamily: pc.newFamily, prevFamily: pc.prevFamily } })) } catch {}
+      }
+      return null
+    })
+  }, [])
+  const acceptConflictKeepBoth = useCallback(() => {
+    setPendingConflict((pc) => {
+      if (!pc) return null
+      setItems((prev) => {
+        const next = [...prev, pc.newProduct]
+        return next.slice(-4)
+      })
+      return null
+    })
+  }, [])
+  const dismissConflict = useCallback(() => setPendingConflict(null), [])
 
   const remove = useCallback((id) => {
     setItems((prev) => prev.filter((p) => p.id !== id))
@@ -67,7 +86,10 @@ export function CompareProvider({ children }) {
 
   const clear = useCallback(() => setItems([]), [])
 
-  const value = useMemo(() => ({ items, add, remove, toggle, clear, isIn, open, setOpen }), [items, add, remove, toggle, clear, isIn, open])
+  const value = useMemo(() => ({
+    items, add, remove, toggle, clear, isIn, open, setOpen,
+    pendingConflict, acceptConflictReplace, acceptConflictKeepBoth, dismissConflict,
+  }), [items, add, remove, toggle, clear, isIn, open, pendingConflict, acceptConflictReplace, acceptConflictKeepBoth, dismissConflict])
 
   return <CompareContext.Provider value={value}>{children}</CompareContext.Provider>
 }

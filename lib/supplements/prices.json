@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "description": "Cached per-brand, per-ingredient-family per-serving prices. Curated + scraper-writable. Do not edit by hand while a scrape is in flight.",
+    "lastUpdated": "2026-07-01",
+    "currency": "USD",
+    "schema": "key: '<brand>::<ingredientFamily>' -> { perServing:number, currency:string, updated:'YYYY-MM', source:'curated'|'scraped', productUrl?:string }"
+  },
+  "prices": {
+    "methylpro::folate (vitamin b9)":              { "perServing": 0.28, "currency": "USD", "updated": "2026-07", "source": "curated" },
+    "thorne::folate (vitamin b9)":                 { "perServing": 0.42, "currency": "USD", "updated": "2026-07", "source": "curated" },
+    "nordic naturals::omega-3 (epa/dha)":           { "perServing": 0.80, "currency": "USD", "updated": "2026-07", "source": "curated" },
+    "carlson::omega-3 (epa/dha)":                   { "perServing": 0.55, "currency": "USD", "updated": "2026-07", "source": "curated" },
+    "momentous::creatine":                          { "perServing": 1.10, "currency": "USD", "updated": "2026-07", "source": "curated" },
+    "thorne::creatine":                             { "perServing": 0.55, "currency": "USD", "updated": "2026-07", "source": "curated" },
+    "now foods::vitamin d":                         { "perServing": 0.05, "currency": "USD", "updated": "2026-07", "source": "curated" }
+  }
+}

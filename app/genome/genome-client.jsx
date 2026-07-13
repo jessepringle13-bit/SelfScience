@@ -36,6 +36,7 @@ import { getEvidenceStrength } from '@/lib/evidenceStrength'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 import YourProtocolTab from '@/components/YourProtocolTab'
 import { saveGenomeResults, clearGenomeResults, notifyGenomeResultsChanged } from '@/lib/genomeSession'
+import GenomeSupplementLinks from '@/components/genome/GenomeSupplementLinks'
 import { YOUTH_VARIANT_CROSSREFS } from '@/lib/youth-content'
 
 const PILLAR_COLOR = {
@@ -805,6 +806,9 @@ function OverviewTab({ report, onSearch }) {
           “{sys}”
         </div>
       )}
+
+      {/* Recommended supplement forms based on the user's variants */}
+      <GenomeSupplementLinks report={report} />
 
       {/* Recommended Reading based on the user's actual variant genotypes */}
       <RecommendedBooks variants={report?._variants || {}} onSearch={onSearch} />

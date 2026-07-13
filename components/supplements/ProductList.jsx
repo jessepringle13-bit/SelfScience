@@ -6,7 +6,8 @@ import ViewToggle from './ViewToggle'
 import { groupProducts, buildWhyThisFits } from '@/lib/supplements/grouping'
 import { signalsForProduct } from '@/lib/supplements/personalisation'
 import { tierRank } from '@/lib/supplements/brandTiers'
-import { Loader2, Sparkles, Award } from 'lucide-react'
+import { getPriceForProduct } from '@/lib/supplements/prices'
+import { Loader2, Sparkles, Award, ArrowUpDown } from 'lucide-react'
 
 const VIEW_STORAGE_KEY = 'selfscience_supplements_view_v1'
 
@@ -14,6 +15,7 @@ export default function ProductList({ category, signals = [] }) {
   const [state, setState] = useState({ loading: false, error: null, results: [], query: null })
   const [view, setView] = useState('curated')
   const [goldOnly, setGoldOnly] = useState(false)
+  const [sortBy, setSortBy] = useState('default')
 
   // Persist view choice across category changes
   useEffect(() => {
@@ -56,13 +58,37 @@ export default function ProductList({ category, signals = [] }) {
 
   // Gold-tier filter: keep only groups with at least one gold-tier certification.
   const displayGroups = useMemo(() => {
-    if (!goldOnly) return groups
-    return groups.filter((g) => (g.bestCertTier ?? 0) >= 3)
-  }, [groups, goldOnly])
+    const gs = goldOnly ? groups.filter((g) => (g.bestCertTier ?? 0) >= 3) : groups
+    if (sortBy === 'cost-asc' || sortBy === 'cost-desc') {
+      const priceOf = (g) => getPriceForProduct(g.defaultVariant)?.perServing ?? null
+      const sorted = [...gs].sort((a, b) => {
+        const pa = priceOf(a); const pb = priceOf(b)
+        // Priced items first; unknown at the end
+        if (pa == null && pb == null) return 0
+        if (pa == null) return 1
+        if (pb == null) return -1
+        return sortBy === 'cost-asc' ? pa - pb : pb - pa
+      })
+      return sorted
+    }
+    return gs
+  }, [groups, goldOnly, sortBy])
   const filteredFlat = useMemo(() => {
-    if (!goldOnly) return state.results
-    return state.results.filter((p) => (p.certifications || []).some((c) => c.tier === 'gold'))
-  }, [state.results, goldOnly])
+    const list = goldOnly
+      ? state.results.filter((p) => (p.certifications || []).some((c) => c.tier === 'gold'))
+      : state.results
+    if (sortBy === 'cost-asc' || sortBy === 'cost-desc') {
+      const priceOf = (p) => getPriceForProduct(p)?.perServing ?? null
+      return [...list].sort((a, b) => {
+        const pa = priceOf(a); const pb = priceOf(b)
+        if (pa == null && pb == null) return 0
+        if (pa == null) return 1
+        if (pb == null) return -1
+        return sortBy === 'cost-asc' ? pa - pb : pb - pa
+      })
+    }
+    return list
+  }, [state.results, goldOnly, sortBy])
 
   if (!category) return null
 
@@ -96,6 +122,19 @@ export default function ProductList({ category, signals = [] }) {
             <Award className="h-4 w-4" />
             Gold-tier only
           </button>
+          <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white pl-2 pr-1 py-1 text-sm">
+            <ArrowUpDown className="h-4 w-4 text-slate-500" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent pr-1 py-1 text-sm text-slate-800 focus:outline-none"
+              title="Sort products"
+            >
+              <option value="default">Default sort</option>
+              <option value="cost-asc">Cost \u2191 (cheapest first)</option>
+              <option value="cost-desc">Cost \u2193 (premium first)</option>
+            </select>
+          </div>
           <ViewToggle
             value={view}
             onChange={changeView}
