@@ -1,516 +1,508 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for SelfScience Search Endpoint
-Focus: Gene fan-out load pattern from Dashboard→Search handoff
+Backend API tests for Supplement Discovery (DSLD proxy endpoints)
+Tests GET /api/supplements/dsld/search and GET /api/supplements/dsld/{id}
 """
 
-import asyncio
-import aiohttp
-import time
+import requests
 import json
-import os
-from typing import List, Dict, Any
+import time
+import sys
+import re
 
-# Load base URL from .env
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://health-research-hub-3.preview.emergentagent.com')
-API_BASE = f"{BASE_URL}/api"
+# Base URL from environment
+BASE_URL = "https://health-research-hub-3.preview.emergentagent.com/api"
 
-# Test genes for concurrent burst test
-GENE_QUERIES = [
-    "ALDH2 nutrigenomics dietary intervention",
-    "CYP1A2 nutrigenomics dietary intervention",
-    "LCT nutrigenomics dietary intervention",
-    "FTO nutrigenomics dietary intervention",
-    "APOA5 nutrigenomics dietary intervention",
-    "MTHFR nutrigenomics dietary intervention",
-    "VDR nutrigenomics dietary intervention",
-    "APOE nutrigenomics dietary intervention",
+# Marketplace domains that should NEVER appear in brand URLs
+MARKETPLACE_DOMAINS = [
+    'amazon.', 'walmart.', 'iherb.', 'vitacost.', 'gnc.',
+    'ebay.', 'target.', 'costco.'
 ]
 
-# Regression test queries
-REGRESSION_QUERIES = [
-    {"q": "MTHFR C677T", "expected_status": 200, "expect_results": True},
-    {"q": "zone 2 training", "expected_status": 200, "expect_results": True},
-    {"q": "creatine supplementation", "expected_status": 200, "expect_results": True},
-]
-
-class TestResults:
-    def __init__(self):
-        self.passed = []
-        self.failed = []
-        self.warnings = []
-    
-    def add_pass(self, test_name: str, details: str = ""):
-        self.passed.append({"test": test_name, "details": details})
-        print(f"✅ PASS: {test_name}")
-        if details:
-            print(f"   {details}")
-    
-    def add_fail(self, test_name: str, details: str):
-        self.failed.append({"test": test_name, "details": details})
-        print(f"❌ FAIL: {test_name}")
-        print(f"   {details}")
-    
-    def add_warning(self, test_name: str, details: str):
-        self.warnings.append({"test": test_name, "details": details})
-        print(f"⚠️  WARNING: {test_name}")
-        print(f"   {details}")
-    
-    def summary(self):
-        print("\n" + "="*80)
-        print("TEST SUMMARY")
-        print("="*80)
-        print(f"✅ Passed: {len(self.passed)}")
-        print(f"❌ Failed: {len(self.failed)}")
-        print(f"⚠️  Warnings: {len(self.warnings)}")
-        print("="*80)
-        
-        if self.failed:
-            print("\nFailed Tests:")
-            for fail in self.failed:
-                print(f"  - {fail['test']}: {fail['details']}")
-        
-        if self.warnings:
-            print("\nWarnings:")
-            for warn in self.warnings:
-                print(f"  - {warn['test']}: {warn['details']}")
-        
-        return len(self.failed) == 0
-
-
-async def test_concurrent_burst(session: aiohttp.ClientSession, results: TestResults):
-    """
-    Test 1: Concurrent burst test - Fire 8 parallel GET requests
-    All must return HTTP 200 within 60s total wall-time
-    """
-    print("\n" + "="*80)
-    print("TEST 1: Concurrent Burst Test (8 parallel gene queries)")
-    print("="*80)
-    
-    start_time = time.time()
-    tasks = []
-    
-    for gene_query in GENE_QUERIES:
-        url = f"{API_BASE}/search?q={gene_query}&limit=12"
-        tasks.append(fetch_with_timing(session, url, gene_query))
-    
+def test_search_methylfolate():
+    """Test 1: Search for methylfolate with size=5, verify MethylPro curated brand"""
+    print("\n=== Test 1: Search methylfolate (size=5) ===")
     try:
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
-        wall_time = time.time() - start_time
+        start = time.time()
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'methylfolate',
+            'size': 5
+        }, timeout=15)
+        elapsed = time.time() - start
         
-        print(f"\n⏱️  Total wall-time: {wall_time:.2f}s")
+        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         
-        # Check wall-time constraint
-        if wall_time > 60:
-            results.add_fail(
-                "Concurrent burst - wall-time",
-                f"Took {wall_time:.2f}s, exceeds 60s limit"
-            )
-        else:
-            results.add_pass(
-                "Concurrent burst - wall-time",
-                f"Completed in {wall_time:.2f}s (< 60s)"
-            )
+        data = resp.json()
+        print(f"✓ Query: {data.get('query')}")
+        print(f"✓ Total: {data.get('total')}, Returned: {data.get('returned')}")
         
-        # Check individual responses
-        all_200 = True
-        latencies = []
+        assert 'results' in data, "Missing 'results' field"
+        assert data['returned'] <= 5, f"Expected returned <= 5, got {data['returned']}"
         
-        for i, resp_data in enumerate(responses):
-            gene_name = GENE_QUERIES[i].split()[0]
-            
-            if isinstance(resp_data, Exception):
-                results.add_fail(
-                    f"Concurrent burst - {gene_name}",
-                    f"Request failed with exception: {str(resp_data)}"
-                )
-                all_200 = False
-                continue
-            
-            status, data, latency = resp_data
-            latencies.append(latency)
-            
-            if status == 200:
-                print(f"  ✓ {gene_name}: HTTP {status} in {latency:.2f}s")
-            elif status in [502, 503, 504]:
-                results.add_fail(
-                    f"Concurrent burst - {gene_name}",
-                    f"Got HTTP {status} (gateway error) in {latency:.2f}s"
-                )
-                all_200 = False
-            else:
-                results.add_warning(
-                    f"Concurrent burst - {gene_name}",
-                    f"Got HTTP {status} (not 200) in {latency:.2f}s"
-                )
+        results = data['results']
+        assert len(results) > 0, "Expected non-empty results"
         
-        if all_200:
-            avg_latency = sum(latencies) / len(latencies) if latencies else 0
-            results.add_pass(
-                "Concurrent burst - all 200 OK",
-                f"All 8 requests returned 200. Avg latency: {avg_latency:.2f}s"
-            )
+        # Find MethylPro product
+        methylpro_found = False
+        methylpro_curated = False
+        methylpro_url_correct = False
+        methylpro_formquality_preferred = False
         
-        return responses
+        for r in results:
+            if r.get('brand', {}).get('name') == 'MethylPro':
+                methylpro_found = True
+                brand = r['brand']
+                print(f"✓ Found MethylPro product: {r.get('fullName')}")
+                print(f"  Brand curated: {brand.get('curated')}")
+                print(f"  Brand URL: {brand.get('url', {}).get('url')}")
+                print(f"  URL source: {brand.get('url', {}).get('source')}")
+                
+                if brand.get('curated') == True:
+                    methylpro_curated = True
+                
+                if brand.get('url', {}).get('source') == 'curated' and \
+                   brand.get('url', {}).get('url') == 'https://methylpro.com':
+                    methylpro_url_correct = True
+                
+                # Check formQuality for preferred L-5-Methylfolate
+                formQuality = r.get('formQuality', [])
+                for fq in formQuality:
+                    if fq.get('tier') == 'preferred' and 'methylfolate' in fq.get('formLabel', '').lower():
+                        methylpro_formquality_preferred = True
+                        print(f"  ✓ FormQuality: {fq.get('ingredient')} - {fq.get('tier')} - {fq.get('formLabel')}")
         
+        assert methylpro_found, "MethylPro product not found in results"
+        assert methylpro_curated, "MethylPro brand.curated should be true"
+        assert methylpro_url_correct, "MethylPro URL should be curated https://methylpro.com"
+        assert methylpro_formquality_preferred, "MethylPro should have preferred tier L-5-Methylfolate"
+        
+        print("✅ Test 1 PASSED")
+        return True
     except Exception as e:
-        results.add_fail("Concurrent burst test", f"Exception: {str(e)}")
-        return []
+        print(f"❌ Test 1 FAILED: {e}")
+        return False
 
+def test_search_magnesium_glycinate():
+    """Test 2: Search magnesium glycinate, verify all required fields present"""
+    print("\n=== Test 2: Search magnesium glycinate (size=8) ===")
+    try:
+        start = time.time()
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'magnesium glycinate',
+            'size': 8
+        }, timeout=15)
+        elapsed = time.time() - start
+        
+        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        
+        data = resp.json()
+        results = data.get('results', [])
+        print(f"✓ Returned {len(results)} results")
+        
+        # Verify all required fields in each result
+        required_fields = ['id', 'fullName', 'brand', 'productType', 'physicalState', 
+                          'netContents', 'offMarket', 'entryDate', 'ingredients', 'formQuality']
+        
+        for i, r in enumerate(results):
+            for field in required_fields:
+                assert field in r, f"Result {i} missing field '{field}'"
+            
+            # Verify brand structure
+            brand = r['brand']
+            assert 'name' in brand, f"Result {i} brand missing 'name'"
+            assert 'curated' in brand, f"Result {i} brand missing 'curated'"
+            assert 'trustBadges' in brand, f"Result {i} brand missing 'trustBadges'"
+            assert 'url' in brand, f"Result {i} brand missing 'url'"
+            
+            # Verify brand.url structure
+            url_obj = brand['url']
+            assert 'url' in url_obj, f"Result {i} brand.url missing 'url'"
+            assert 'source' in url_obj, f"Result {i} brand.url missing 'source'"
+            assert 'canonical' in url_obj, f"Result {i} brand.url missing 'canonical'"
+            assert 'trust' in url_obj, f"Result {i} brand.url missing 'trust'"
+        
+        print(f"✓ All {len(results)} results have required fields")
+        print("✅ Test 2 PASSED")
+        return True
+    except Exception as e:
+        print(f"❌ Test 2 FAILED: {e}")
+        return False
 
-async def test_response_shape(responses: List[Any], results: TestResults):
-    """
-    Test 2: Response shape validation
-    Verify JSON has: query, results (with proper fields), sources object
-    """
-    print("\n" + "="*80)
-    print("TEST 2: Response Shape Validation")
-    print("="*80)
-    
-    if not responses:
-        results.add_fail("Response shape", "No responses to validate")
-        return
-    
-    for i, resp_data in enumerate(responses):
-        if isinstance(resp_data, Exception):
-            continue
+def test_search_ubiquinol():
+    """Test 3: Search ubiquinol, verify CoQ10 formQuality with preferred tier"""
+    print("\n=== Test 3: Search ubiquinol (size=5) ===")
+    try:
+        start = time.time()
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'ubiquinol',
+            'size': 5
+        }, timeout=15)
+        elapsed = time.time() - start
         
-        status, data, latency = resp_data
-        gene_name = GENE_QUERIES[i].split()[0]
+        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         
-        if status != 200:
-            continue
+        data = resp.json()
+        results = data.get('results', [])
+        print(f"✓ Returned {len(results)} results")
         
-        try:
-            # Check top-level fields
-            required_fields = ['query', 'results', 'sources']
-            missing_fields = [f for f in required_fields if f not in data]
-            
-            if missing_fields:
-                results.add_fail(
-                    f"Response shape - {gene_name}",
-                    f"Missing fields: {missing_fields}"
-                )
-                continue
-            
-            # Check query field
-            if not isinstance(data['query'], str):
-                results.add_fail(
-                    f"Response shape - {gene_name}",
-                    f"'query' is not a string: {type(data['query'])}"
-                )
-                continue
-            
-            # Check results array
-            if not isinstance(data['results'], list):
-                results.add_fail(
-                    f"Response shape - {gene_name}",
-                    f"'results' is not a list: {type(data['results'])}"
-                )
-                continue
-            
-            # Check result object structure
-            if len(data['results']) > 0:
-                result = data['results'][0]
-                required_result_fields = ['id', 'provider', 'title', 'url', 'source', 'year']
-                missing_result_fields = [f for f in required_result_fields if f not in result]
+        # Look for CoQ10 formQuality with preferred tier and Ubiquinol
+        coq10_preferred_found = False
+        for r in results:
+            formQuality = r.get('formQuality', [])
+            for fq in formQuality:
+                ingredient = fq.get('ingredient', '')
+                tier = fq.get('tier', '')
+                formLabel = fq.get('formLabel', '')
                 
-                if missing_result_fields:
-                    results.add_fail(
-                        f"Response shape - {gene_name} result object",
-                        f"Missing fields in result: {missing_result_fields}"
-                    )
-                    continue
-                
-                # Check for MongoDB ObjectId leaks
-                result_str = json.dumps(result)
-                if 'ObjectId' in result_str or 'ObjectID' in result_str:
-                    results.add_fail(
-                        f"Response shape - {gene_name}",
-                        "MongoDB ObjectId detected in response"
-                    )
-                    continue
-            
-            # Check sources object
-            if not isinstance(data['sources'], dict):
-                results.add_fail(
-                    f"Response shape - {gene_name}",
-                    f"'sources' is not an object: {type(data['sources'])}"
-                )
-                continue
-            
-            required_sources = ['pubmed', 'semanticScholar', 'openAlex', 'crossref']
-            missing_sources = [s for s in required_sources if s not in data['sources']]
-            
-            if missing_sources:
-                results.add_fail(
-                    f"Response shape - {gene_name}",
-                    f"Missing source keys: {missing_sources}"
-                )
-                continue
-            
-            # Verify source values are numbers
-            for source_key, source_val in data['sources'].items():
-                if not isinstance(source_val, (int, float)):
-                    results.add_fail(
-                        f"Response shape - {gene_name}",
-                        f"Source '{source_key}' value is not a number: {type(source_val)}"
-                    )
+                if 'coq10' in ingredient.lower() and tier == 'preferred' and 'ubiquinol' in formLabel.lower():
+                    coq10_preferred_found = True
+                    print(f"✓ Found CoQ10 preferred form: {ingredient} - {tier} - {formLabel}")
+                    print(f"  Product: {r.get('fullName')}")
                     break
-            else:
-                results.add_pass(
-                    f"Response shape - {gene_name}",
-                    f"All fields valid. {len(data['results'])} results, sources: {data['sources']}"
-                )
+            if coq10_preferred_found:
+                break
         
-        except Exception as e:
-            results.add_fail(
-                f"Response shape - {gene_name}",
-                f"Validation exception: {str(e)}"
-            )
-
-
-async def test_rate_limit_graceful_degradation(session: aiohttp.ClientSession, results: TestResults):
-    """
-    Test 3: Rate-limit graceful degradation
-    If Semantic Scholar returns 429, endpoint should still return 200 with sources.semanticScholar: 0
-    """
-    print("\n" + "="*80)
-    print("TEST 3: Rate-limit Graceful Degradation")
-    print("="*80)
-    
-    # This test is implicit in the concurrent burst test
-    # If any request succeeded with 200, the graceful degradation is working
-    # We'll do a simple check here
-    
-    url = f"{API_BASE}/search?q=test+query&limit=5"
-    
-    try:
-        status, data, latency = await fetch_with_timing(session, url, "rate-limit test")
-        
-        if status == 200:
-            # Check if semanticScholar is 0 (might be rate-limited)
-            if 'sources' in data and 'semanticScholar' in data['sources']:
-                if data['sources']['semanticScholar'] == 0:
-                    results.add_pass(
-                        "Rate-limit graceful degradation",
-                        "Endpoint returned 200 with semanticScholar: 0 (graceful degradation working)"
-                    )
-                else:
-                    results.add_pass(
-                        "Rate-limit graceful degradation",
-                        f"Endpoint returned 200 with semanticScholar: {data['sources']['semanticScholar']}"
-                    )
-            else:
-                results.add_warning(
-                    "Rate-limit graceful degradation",
-                    "Could not verify - sources object missing semanticScholar key"
-                )
-        else:
-            results.add_fail(
-                "Rate-limit graceful degradation",
-                f"Expected 200, got {status}"
-            )
-    
+        assert coq10_preferred_found, "No product found with CoQ10 preferred tier Ubiquinol"
+        print("✅ Test 3 PASSED")
+        return True
     except Exception as e:
-        results.add_fail(
-            "Rate-limit graceful degradation",
-            f"Exception: {str(e)}"
-        )
+        print(f"❌ Test 3 FAILED: {e}")
+        return False
 
-
-async def test_empty_gene_guard(session: aiohttp.ClientSession, results: TestResults):
-    """
-    Test 4: Empty-gene guard
-    Test with bogus gene name, must return 200 with results: []
-    """
-    print("\n" + "="*80)
-    print("TEST 4: Empty-gene Guard")
-    print("="*80)
-    
-    url = f"{API_BASE}/search?q=BOGUSGENEXYZ+nutrigenomics&limit=12"
-    
+def test_search_empty_query():
+    """Test 4: Empty query should return 200 with empty results"""
+    print("\n=== Test 4: Empty query ===")
     try:
-        status, data, latency = await fetch_with_timing(session, url, "empty-gene test")
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': ''
+        }, timeout=15)
         
-        if status != 200:
-            results.add_fail(
-                "Empty-gene guard",
-                f"Expected 200, got {status}"
-            )
-            return
+        print(f"✓ Status: {resp.status_code}")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         
-        if 'results' not in data:
-            results.add_fail(
-                "Empty-gene guard",
-                "Response missing 'results' field"
-            )
-            return
+        data = resp.json()
+        print(f"✓ Query: '{data.get('query')}'")
+        print(f"✓ Total: {data.get('total')}, Returned: {data.get('returned')}")
         
-        if not isinstance(data['results'], list):
-            results.add_fail(
-                "Empty-gene guard",
-                f"'results' is not a list: {type(data['results'])}"
-            )
-            return
+        assert data.get('query') == '', "Expected empty query string"
+        assert data.get('total') == 0, "Expected total = 0"
+        assert data.get('results') == [], "Expected empty results array"
         
-        # Empty or very few results is expected for bogus gene
-        if len(data['results']) == 0:
-            results.add_pass(
-                "Empty-gene guard",
-                "Returned 200 with empty results array as expected"
-            )
-        else:
-            results.add_warning(
-                "Empty-gene guard",
-                f"Returned {len(data['results'])} results (expected 0, but some noise is acceptable)"
-            )
-    
+        print("✅ Test 4 PASSED")
+        return True
     except Exception as e:
-        results.add_fail(
-            "Empty-gene guard",
-            f"Exception: {str(e)}"
-        )
+        print(f"❌ Test 4 FAILED: {e}")
+        return False
 
+def test_search_size_clamping():
+    """Test 5: size=100 should be clamped to 50"""
+    print("\n=== Test 5: Size clamping (size=100) ===")
+    try:
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'vitamin d',
+            'size': 100
+        }, timeout=15)
+        
+        print(f"✓ Status: {resp.status_code}")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        
+        data = resp.json()
+        returned = data.get('returned', 0)
+        print(f"✓ Returned: {returned}")
+        
+        assert returned <= 50, f"Expected returned <= 50, got {returned}"
+        print("✅ Test 5 PASSED")
+        return True
+    except Exception as e:
+        print(f"❌ Test 5 FAILED: {e}")
+        return False
 
-async def test_regression_queries(session: aiohttp.ClientSession, results: TestResults):
-    """
-    Test 5: Regression sweep
-    Test previously-verified queries to ensure nothing broke
-    """
-    print("\n" + "="*80)
-    print("TEST 5: Regression Sweep")
-    print("="*80)
-    
-    # Test service metadata endpoint
+def test_search_onmarket_zero():
+    """Test 6: onMarket=0 should still return 200"""
+    print("\n=== Test 6: onMarket=0 ===")
     try:
-        url = f"{API_BASE}/"
-        status, data, latency = await fetch_with_timing(session, url, "service metadata")
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'vitamin c',
+            'size': 5,
+            'onMarket': 0
+        }, timeout=15)
         
-        if status == 200 and 'status' in data and data['status'] == 'ok':
-            results.add_pass(
-                "Regression - GET /api/",
-                f"Service metadata returned correctly in {latency:.2f}s"
-            )
-        else:
-            results.add_fail(
-                "Regression - GET /api/",
-                f"Expected 200 with status:ok, got {status}"
-            )
+        print(f"✓ Status: {resp.status_code}")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        
+        data = resp.json()
+        print(f"✓ Returned: {data.get('returned')}")
+        print("✅ Test 6 PASSED")
+        return True
     except Exception as e:
-        results.add_fail("Regression - GET /api/", f"Exception: {str(e)}")
-    
-    # Test autocomplete endpoint
+        print(f"❌ Test 6 FAILED: {e}")
+        return False
+
+def test_search_cache_hit():
+    """Test 7: Repeat request should return cache hit"""
+    print("\n=== Test 7: Cache hit ===")
     try:
-        url = f"{API_BASE}/autocomplete?q=metfor"
-        status, data, latency = await fetch_with_timing(session, url, "autocomplete")
+        # First request
+        resp1 = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'methylfolate',
+            'size': 5
+        }, timeout=15)
+        data1 = resp1.json()
+        cache1 = data1.get('_cache')
+        print(f"✓ First request _cache: {cache1}")
         
-        if status == 200 and 'suggestions' in data and isinstance(data['suggestions'], list):
-            results.add_pass(
-                "Regression - GET /api/autocomplete",
-                f"Autocomplete returned {len(data['suggestions'])} suggestions in {latency:.2f}s"
-            )
-        else:
-            results.add_fail(
-                "Regression - GET /api/autocomplete",
-                f"Expected 200 with suggestions array, got {status}"
-            )
+        # Second request (should hit cache)
+        time.sleep(0.5)
+        resp2 = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+            'q': 'methylfolate',
+            'size': 5
+        }, timeout=15)
+        data2 = resp2.json()
+        cache2 = data2.get('_cache')
+        print(f"✓ Second request _cache: {cache2}")
+        
+        assert cache2 == 'hit', f"Expected _cache='hit' on second request, got '{cache2}'"
+        print("✅ Test 7 PASSED")
+        return True
     except Exception as e:
-        results.add_fail("Regression - GET /api/autocomplete", f"Exception: {str(e)}")
-    
-    # Test regression queries
-    for query_spec in REGRESSION_QUERIES:
-        q = query_spec['q']
-        expected_status = query_spec['expected_status']
-        expect_results = query_spec['expect_results']
+        print(f"❌ Test 7 FAILED: {e}")
+        return False
+
+def test_no_marketplace_urls():
+    """Test 8: Verify no marketplace URLs in any brand.url.url"""
+    print("\n=== Test 8: No marketplace URLs ===")
+    try:
+        # Test multiple queries
+        queries = ['methylfolate', 'magnesium', 'vitamin d']
+        all_urls = []
         
-        try:
-            url = f"{API_BASE}/search?q={q}"
-            status, data, latency = await fetch_with_timing(session, url, f"regression {q}")
+        for q in queries:
+            resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
+                'q': q,
+                'size': 10
+            }, timeout=15)
+            data = resp.json()
+            results = data.get('results', [])
             
-            if status != expected_status:
-                results.add_fail(
-                    f"Regression - {q}",
-                    f"Expected {expected_status}, got {status}"
-                )
-                continue
-            
-            if expect_results:
-                if 'results' in data and len(data['results']) > 0:
-                    results.add_pass(
-                        f"Regression - {q}",
-                        f"Returned {len(data['results'])} results in {latency:.2f}s"
-                    )
-                else:
-                    results.add_warning(
-                        f"Regression - {q}",
-                        f"Expected non-empty results, got {len(data.get('results', []))} results"
-                    )
-            else:
-                results.add_pass(
-                    f"Regression - {q}",
-                    f"Returned {status} in {latency:.2f}s"
-                )
+            for r in results:
+                url = r.get('brand', {}).get('url', {}).get('url', '')
+                if url:
+                    all_urls.append((q, r.get('fullName'), url))
         
-        except Exception as e:
-            results.add_fail(f"Regression - {q}", f"Exception: {str(e)}")
-
-
-async def fetch_with_timing(session: aiohttp.ClientSession, url: str, label: str):
-    """Helper to fetch URL and return (status, data, latency)"""
-    start = time.time()
-    try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as response:
-            latency = time.time() - start
-            status = response.status
-            
-            try:
-                data = await response.json()
-            except:
-                data = {}
-            
-            return (status, data, latency)
-    except asyncio.TimeoutError:
-        latency = time.time() - start
-        print(f"  ⏱️  TIMEOUT: {label} after {latency:.2f}s")
-        raise Exception(f"Timeout after {latency:.2f}s")
+        print(f"✓ Collected {len(all_urls)} URLs from {len(queries)} queries")
+        
+        # Check for marketplace domains
+        marketplace_found = []
+        for query, product, url in all_urls:
+            url_lower = url.lower()
+            for marketplace in MARKETPLACE_DOMAINS:
+                if marketplace in url_lower:
+                    marketplace_found.append((query, product, url, marketplace))
+        
+        if marketplace_found:
+            print("❌ Found marketplace URLs:")
+            for query, product, url, marketplace in marketplace_found:
+                print(f"  Query: {query}")
+                print(f"  Product: {product}")
+                print(f"  URL: {url}")
+                print(f"  Marketplace: {marketplace}")
+            assert False, f"Found {len(marketplace_found)} marketplace URLs"
+        
+        print("✓ No marketplace URLs found")
+        print("✅ Test 8 PASSED")
+        return True
     except Exception as e:
-        latency = time.time() - start
-        print(f"  ❌ ERROR: {label} - {str(e)}")
-        raise
+        print(f"❌ Test 8 FAILED: {e}")
+        return False
 
+def test_label_detail_methylpro():
+    """Test 9: Label detail for MethylPro L-Methylfolate 1mg (id=274162)"""
+    print("\n=== Test 9: Label detail 274162 (MethylPro) ===")
+    try:
+        start = time.time()
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/274162", timeout=15)
+        elapsed = time.time() - start
+        
+        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        
+        data = resp.json()
+        assert 'product' in data, "Missing 'product' field"
+        
+        product = data['product']
+        print(f"✓ Product: {product.get('fullName')}")
+        
+        # Verify brand
+        brand = product.get('brand', {})
+        brand_name = brand.get('name')
+        print(f"✓ Brand name: {brand_name}")
+        assert brand_name == 'MethylPro', f"Expected brand 'MethylPro', got '{brand_name}'"
+        
+        # Verify manufacturer
+        manufacturer = brand.get('manufacturer', {})
+        mfg_name = manufacturer.get('name')
+        print(f"✓ Manufacturer: {mfg_name}")
+        assert mfg_name == 'Metabolic Maintenance', f"Expected manufacturer 'Metabolic Maintenance', got '{mfg_name}'"
+        
+        # Verify labelPdf
+        labelPdf = product.get('labelPdf')
+        print(f"✓ Label PDF: {labelPdf}")
+        assert labelPdf and labelPdf.startswith('https://dsld.od.nih.gov/labels/'), \
+            f"Expected labelPdf to start with 'https://dsld.od.nih.gov/labels/', got '{labelPdf}'"
+        
+        # Verify formQuality has preferred L-5-Methylfolate
+        formQuality = product.get('formQuality', [])
+        preferred_found = False
+        for fq in formQuality:
+            if fq.get('tier') == 'preferred' and 'methylfolate' in fq.get('formLabel', '').lower():
+                preferred_found = True
+                print(f"✓ FormQuality: {fq.get('ingredient')} - {fq.get('tier')} - {fq.get('formLabel')}")
+        
+        assert preferred_found, "Expected preferred tier L-5-Methylfolate in formQuality"
+        
+        print("✅ Test 9 PASSED")
+        return True
+    except Exception as e:
+        print(f"❌ Test 9 FAILED: {e}")
+        return False
 
-async def main():
-    print("="*80)
-    print("SelfScience Backend API Testing")
-    print("Focus: /api/search gene fan-out load pattern")
+def test_label_detail_not_found():
+    """Test 10: Non-existent label should return 404"""
+    print("\n=== Test 10: Label detail 999999999 (not found) ===")
+    try:
+        resp = requests.get(f"{BASE_URL}/supplements/dsld/999999999", timeout=15)
+        
+        print(f"✓ Status: {resp.status_code}")
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        
+        data = resp.json()
+        assert 'error' in data, "Expected 'error' field in response"
+        print(f"✓ Error message: {data.get('error')}")
+        
+        # Verify it's not a 500 error
+        assert resp.status_code != 500, "Should return 404, not 500"
+        
+        print("✅ Test 10 PASSED")
+        return True
+    except Exception as e:
+        print(f"❌ Test 10 FAILED: {e}")
+        return False
+
+def test_label_detail_cache_hit():
+    """Test 11: Repeat label detail request should return cache hit"""
+    print("\n=== Test 11: Label detail cache hit ===")
+    try:
+        # First request
+        resp1 = requests.get(f"{BASE_URL}/supplements/dsld/274162", timeout=15)
+        data1 = resp1.json()
+        cache1 = data1.get('_cache')
+        print(f"✓ First request _cache: {cache1}")
+        
+        # Second request (should hit cache)
+        time.sleep(0.5)
+        resp2 = requests.get(f"{BASE_URL}/supplements/dsld/274162", timeout=15)
+        data2 = resp2.json()
+        cache2 = data2.get('_cache')
+        print(f"✓ Second request _cache: {cache2}")
+        
+        assert cache2 == 'hit', f"Expected _cache='hit' on second request, got '{cache2}'"
+        print("✅ Test 11 PASSED")
+        return True
+    except Exception as e:
+        print(f"❌ Test 11 FAILED: {e}")
+        return False
+
+def test_timing_and_json():
+    """Test 12-13: All calls within 15s and JSON well-formed"""
+    print("\n=== Test 12-13: Timing and JSON validation ===")
+    try:
+        test_cases = [
+            (f"{BASE_URL}/supplements/dsld/search?q=creatine&size=5", "search creatine"),
+            (f"{BASE_URL}/supplements/dsld/274162", "label detail 274162"),
+        ]
+        
+        for url, desc in test_cases:
+            start = time.time()
+            resp = requests.get(url, timeout=15)
+            elapsed = time.time() - start
+            
+            print(f"✓ {desc}: {resp.status_code} in {elapsed:.2f}s")
+            assert elapsed < 15, f"{desc} took {elapsed:.2f}s (> 15s)"
+            
+            # Verify JSON is well-formed
+            data = resp.json()
+            json_str = json.dumps(data)
+            
+            # Check for MongoDB ObjectId patterns (should not exist)
+            objectid_pattern = r'ObjectId\(["\']?[a-f0-9]{24}["\']?\)'
+            if re.search(objectid_pattern, json_str, re.IGNORECASE):
+                raise AssertionError(f"Found MongoDB ObjectId in response for {desc}")
+            
+            # Check for undefined values in critical fields
+            if 'results' in data:
+                for r in data['results']:
+                    for key in ['id', 'fullName', 'brand']:
+                        if key not in r or r[key] is None:
+                            raise AssertionError(f"Critical field '{key}' is undefined in {desc}")
+            
+            if 'product' in data:
+                product = data['product']
+                for key in ['id', 'fullName', 'brand']:
+                    if key not in product or product[key] is None:
+                        raise AssertionError(f"Critical field '{key}' is undefined in product for {desc}")
+        
+        print("✓ All requests completed within 15s")
+        print("✓ JSON well-formed, no ObjectId leaks, no undefined critical fields")
+        print("✅ Test 12-13 PASSED")
+        return True
+    except Exception as e:
+        print(f"❌ Test 12-13 FAILED: {e}")
+        return False
+
+def main():
+    print("=" * 70)
+    print("BACKEND API TESTS - Supplement Discovery (DSLD Proxy)")
+    print("=" * 70)
     print(f"Base URL: {BASE_URL}")
-    print("="*80)
     
-    results = TestResults()
+    # Spread requests over time to respect rate limits
+    tests = [
+        test_search_methylfolate,
+        test_search_magnesium_glycinate,
+        test_search_ubiquinol,
+        test_search_empty_query,
+        test_search_size_clamping,
+        test_search_onmarket_zero,
+        test_search_cache_hit,
+        test_no_marketplace_urls,
+        test_label_detail_methylpro,
+        test_label_detail_not_found,
+        test_label_detail_cache_hit,
+        test_timing_and_json,
+    ]
     
-    async with aiohttp.ClientSession() as session:
-        # Test 1: Concurrent burst
-        responses = await test_concurrent_burst(session, results)
-        
-        # Test 2: Response shape
-        await test_response_shape(responses, results)
-        
-        # Test 3: Rate-limit graceful degradation
-        await test_rate_limit_graceful_degradation(session, results)
-        
-        # Test 4: Empty-gene guard
-        await test_empty_gene_guard(session, results)
-        
-        # Test 5: Regression sweep
-        await test_regression_queries(session, results)
+    results = []
+    for i, test in enumerate(tests):
+        if i > 0:
+            time.sleep(1)  # Spread requests to respect rate limits
+        results.append(test())
     
-    # Print summary
-    success = results.summary()
+    print("\n" + "=" * 70)
+    print("TEST SUMMARY")
+    print("=" * 70)
+    passed = sum(results)
+    total = len(results)
+    print(f"Passed: {passed}/{total}")
     
-    return 0 if success else 1
+    if passed == total:
+        print("✅ ALL TESTS PASSED")
+        sys.exit(0)
+    else:
+        print(f"❌ {total - passed} TEST(S) FAILED")
+        sys.exit(1)
 
-
-if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    exit(exit_code)
+if __name__ == '__main__':
+    main()

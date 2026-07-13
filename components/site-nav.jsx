@@ -121,6 +121,7 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/nutrition',           label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
     { href: '/biomarkers',         label: 'Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
     { href: '/tools/training',     label: 'Training Protocol', Icon: Activity,  blurb: 'Genome-driven training plan for your sport.' },
+    { href: '/tools/supplements',  label: 'Supplements',       Icon: Pill,      blurb: 'Discover supplements by ingredient FORM. NIH label data. Brand-direct only.' },
     { href: '/drug-check',         label: 'Drug Check',        Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
     { href: '/population-compare', label: 'Population Compare',Icon: Globe2,    blurb: 'How your variants compare globally.' },
     { href: '/ancestry',            label: 'Ancestry Report',      Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },

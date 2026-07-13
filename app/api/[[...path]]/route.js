@@ -21,6 +21,7 @@ import {
   pingArticlesTable as supabasePingArticles,
 } from '@/lib/supabase/articles'
 import { loadExerciseDB, filterExercises } from '@/lib/training/exerciseDb'
+import { normalizeSearchHit, normalizeLabelDetail } from '@/lib/supplements/dsld'
 import {
   isAdminAuthenticated,
   verifyPassword,
@@ -709,6 +710,87 @@ async function handleSearch(request) {
 
 /* --------------------------------- Router --------------------------------- */
 
+/* --------------------- /api/supplements/dsld/* -------------------- */
+// Server-side proxy to the NIH Dietary Supplement Label Database (DSLD).
+// Public API, no key required. We add:
+//   - hard fetch timeouts
+//   - on-market filtering (offMarket=1 in DSLD means discontinued)
+//   - normalisation via /lib/supplements/dsld.js
+//   - in-memory caching (searchCache) with modest TTLs
+
+const DSLD_BASE = 'https://api.ods.od.nih.gov/dsld/v9'
+
+async function handleSupplementsDsldSearch(request) {
+  const url = new URL(request.url)
+  const q = (url.searchParams.get('q') || '').trim()
+  const sizeRaw = parseInt(url.searchParams.get('size') || '20', 10)
+  const size = Number.isFinite(sizeRaw) ? Math.min(Math.max(sizeRaw, 1), 50) : 20
+  const onMarketOnly = url.searchParams.get('onMarket') !== '0'
+
+  if (!q) {
+    return NextResponse.json({ query: '', total: 0, results: [] })
+  }
+
+  const cacheKey = makeCacheKey('dsld-search', { q, size, onMarketOnly })
+  const cached = searchCache.get(cacheKey)
+  if (cached) return NextResponse.json({ ...cached, _cache: 'hit' })
+
+  // Ask DSLD for extra results if we plan to filter offMarket client-side
+  const dsldSize = onMarketOnly ? Math.min(size * 3, 100) : size
+  const upstream = `${DSLD_BASE}/search-filter?q=${encodeURIComponent(q)}&size=${dsldSize}`
+
+  try {
+    const resp = await fetchWithTimeout(upstream, {
+      headers: { Accept: 'application/json' },
+    }, 12_000)
+    if (!resp.ok) {
+      return NextResponse.json({ error: `DSLD upstream ${resp.status}`, results: [] }, { status: 502 })
+    }
+    const data = await resp.json()
+    const hits = Array.isArray(data.hits) ? data.hits : []
+    let normalized = hits.map(normalizeSearchHit).filter(Boolean)
+    if (onMarketOnly) normalized = normalized.filter((p) => !p.offMarket)
+    normalized = normalized.slice(0, size)
+
+    const payload = {
+      query: q,
+      total: data?.stats?.count ?? normalized.length,
+      returned: normalized.length,
+      results: normalized,
+    }
+    searchCache.set(cacheKey, payload, 10 * 60 * 1000) // 10 min
+    return NextResponse.json({ ...payload, _cache: 'miss' })
+  } catch (err) {
+    return NextResponse.json({ error: String(err?.message || err), results: [] }, { status: 500 })
+  }
+}
+
+async function handleSupplementsDsldLabel(request, id) {
+  if (!id) return NextResponse.json({ error: 'Missing label id' }, { status: 400 })
+
+  const cacheKey = makeCacheKey('dsld-label', { id })
+  const cached = searchCache.get(cacheKey)
+  if (cached) return NextResponse.json({ ...cached, _cache: 'hit' })
+
+  const upstream = `${DSLD_BASE}/label/${encodeURIComponent(id)}`
+  try {
+    const resp = await fetchWithTimeout(upstream, {
+      headers: { Accept: 'application/json' },
+    }, 12_000)
+    if (resp.status === 404) return NextResponse.json({ error: 'Label not found' }, { status: 404 })
+    if (!resp.ok) return NextResponse.json({ error: `DSLD upstream ${resp.status}` }, { status: 502 })
+    const data = await resp.json()
+    const product = normalizeLabelDetail(data)
+    if (!product) return NextResponse.json({ error: 'Invalid label payload' }, { status: 500 })
+
+    const payload = { product }
+    searchCache.set(cacheKey, payload, 60 * 60 * 1000) // 1 hour
+    return NextResponse.json({ ...payload, _cache: 'miss' })
+  } catch (err) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 })
+  }
+}
+
 export async function GET(request, { params }) {
   const p = (await params)?.path || []
   const route = Array.isArray(p) ? p[0] : p
@@ -733,14 +815,20 @@ export async function GET(request, { params }) {
     if (subRoute === 'exercises')     return handleTrainingExercises(request)
     if (subRoute === 'exercise-find') return handleTrainingExerciseFind(request)
   }
+  if (route === 'supplements') {
+    if (subRoute === 'dsld' && thirdRoute === 'search') return handleSupplementsDsldSearch(request)
+    if (subRoute === 'dsld' && thirdRoute && thirdRoute !== 'search') return handleSupplementsDsldLabel(request, thirdRoute)
+  }
 
   return NextResponse.json({
     status: 'ok',
     service: 'selfscience',
-    version: '0.5.0',
+    version: '0.6.0',
     endpoints: [
       '/api/search?q=<query>&source=all|pubmed|s2|openalex|crossref&limit=40&pillar=<name>',
       '/api/autocomplete?q=<partial>',
+      '/api/supplements/dsld/search?q=<query>&size=20&onMarket=1',
+      '/api/supplements/dsld/<labelId>',
       'POST /api/analyze  { title, journal, year, authorsShort, abstract, source }',
       'POST /api/genome  { variants: { rsid: genotype } }',
     ],
