@@ -21,6 +21,7 @@ import {
   Globe2,
   Compass,
   FileText,
+  Rocket,
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 
@@ -116,6 +117,7 @@ export function SiteNav({ variant = 'light' }) {
   // under a single "Tools" dropdown so the desktop nav stays scannable.
   // On mobile the drawer still lists them individually so nothing is hidden.
   const TOOL_ITEMS = [
+    { href: '/get-started',         label: 'Get Started',       Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
     { href: '/nutrition',           label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
     { href: '/biomarkers',         label: 'Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
     { href: '/training',           label: 'Training Protocol', Icon: Activity,  blurb: 'Zone-based training + sport affinity.' },
@@ -274,22 +276,17 @@ export function SiteNav({ variant = 'light' }) {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Donate — desktop: icon + label pill. Links straight to Buy Me a
-              Coffee so donors don't need an intermediate hop through /support.
-              This is deliberately distinct from the "Support" nav link, which
-              still points to the internal /support page (roadmap, ways to help
-              beyond money, etc.). Yellow/amber to match the "coin" ask and
-              differentiate from the orange "Upload Genome" primary CTA. */}
+          {/* Support pill \u2014 links to /support which lists Buy Me a Coffee +
+              other ways to help. Replaces the standalone Donate button; a
+              single call-to-action reduces nav clutter on both desktop
+              and mobile. */}
           <a
-            href="https://buymeacoffee.com/selfscience"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_donate_desktop' })}
-            className="hidden items-center gap-1.5 rounded-full bg-amber-400 px-3 py-1.5 text-xs font-bold text-amber-950 shadow-sm ring-1 ring-amber-500/40 transition hover:bg-amber-300 md:inline-flex"
-            aria-label="Donate on Buy Me a Coffee"
+            href="/support"
+            onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_support_mobile' })}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#C45820] text-white shadow-sm transition hover:bg-[#A5471A] md:hidden"
+            aria-label="Support SelfScience"
           >
-            <DollarSign size={13} strokeWidth={2.5} />
-            Donate
+            <Coffee size={15} strokeWidth={2.25} />
           </a>
 
           <a
@@ -299,21 +296,7 @@ export function SiteNav({ variant = 'light' }) {
             Upload Genome
           </a>
 
-          {/* Mobile-only Donate icon button — placed next to the hamburger per
-              the user's request. Icon-only to keep the header uncluttered on
-              small viewports. Yellow "coin" for scannability. */}
-          <a
-            href="https://buymeacoffee.com/selfscience"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackEvent(EVENTS.SUPPORT_CLICKED, { source: 'nav_donate_mobile' })}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-400 text-amber-950 shadow-sm ring-1 ring-amber-500/40 transition hover:bg-amber-300 md:hidden"
-            aria-label="Donate on Buy Me a Coffee"
-          >
-            <DollarSign size={16} strokeWidth={2.75} />
-          </a>
-
-          {/* Mobile menu button — visible on <md. Complements the bottom
+          {/* Mobile menu button \u2014 visible on <md. Complements the bottom
               tab bar so mobile users can reach the full Tools + About +
               Pillars menu without leaving the top of the page. */}
           <button
@@ -342,6 +325,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
 
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Tools</div>
+            <a href="/get-started"         onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
             <a href="/nutrition"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
             <a href="/biomarkers"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Biomarkers</a>
             <a href="/training"            onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training</a>
