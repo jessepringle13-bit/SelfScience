@@ -32,6 +32,7 @@ import { getGenomeResults } from '@/lib/genomeSession'
 import { PanelSummary } from '@/components/biomarkers/PanelSummary'
 import { BiomarkerCard } from '@/components/biomarkers/BiomarkerCard'
 import { EmptyStateOnboarding } from '@/components/biomarkers/EmptyStateOnboarding'
+import { PatternPanel } from '@/components/biomarkers/PatternPanel'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
 
@@ -193,6 +194,10 @@ export default function BiomarkersClient() {
           <section>
             {/* Snapshot summary */}
             <PanelSummary evaluated={evaluated} total={biomarkersForSex.length} />
+
+            {/* Cross-marker pattern detection (hidden when no clusters have
+                enough entered data to evaluate). */}
+            <PatternPanel evaluated={evaluated} onScrollToMarker={scrollToBiomarker} />
 
             {/* Category-grouped biomarker cards */}
             <div className="mt-8 space-y-10">
