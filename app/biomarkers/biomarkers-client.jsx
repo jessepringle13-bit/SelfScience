@@ -30,6 +30,7 @@ import {
 import { getGenomeResults } from '@/lib/genomeSession'
 
 import { PanelSummary } from '@/components/biomarkers/PanelSummary'
+import BiomarkerSupplementLinks from '@/components/biomarkers/BiomarkerSupplementLinks'
 import { BiomarkerCard } from '@/components/biomarkers/BiomarkerCard'
 import { EmptyStateOnboarding } from '@/components/biomarkers/EmptyStateOnboarding'
 import { PatternPanel } from '@/components/biomarkers/PatternPanel'
@@ -222,6 +223,10 @@ export default function BiomarkersClient() {
             {/* Cross-marker pattern detection (hidden when no clusters have
                 enough entered data to evaluate). */}
             <PatternPanel evaluated={evaluated} onScrollToMarker={scrollToBiomarker} context={context} />
+
+            {/* Deep-links to matching supplement categories, only when any
+                biomarker triggers a personalisation signal. */}
+            <BiomarkerSupplementLinks />
 
             {/* Category-grouped biomarker cards */}
             <div className="mt-8 space-y-10">

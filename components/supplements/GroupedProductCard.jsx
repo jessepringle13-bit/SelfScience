@@ -16,6 +16,7 @@ import CertBadges from './CertBadges'
 import BrandProfileDrawer from './BrandProfileDrawer'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
 import { getBrandTierMeta } from '@/lib/supplements/brandTiers'
+import { getPriceForProduct, formatPrice } from '@/lib/supplements/prices'
 import { useCompare } from './CompareContext'
 
 const TIER_BADGE = {
@@ -242,8 +243,21 @@ export default function GroupedProductCard({ group, whyThisFits, productSignals 
 
       {/* CTA row */}
       <div className="px-4 md:px-5 pb-3 pt-1 flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-[11px] text-slate-500">
-          Source: NIH DSLD label #{product.id}
+        <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+          <span>Source: NIH DSLD label #{product.id}</span>
+          {(() => {
+            const price = getPriceForProduct(product)
+            const label = formatPrice(price)
+            if (!label) return null
+            return (
+              <span
+                className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 text-[10px] font-semibold"
+                title={`Curated estimate; updated ${price.updated}. Check brand store for current price.`}
+              >
+                ~{label}
+              </span>
+            )
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <button
