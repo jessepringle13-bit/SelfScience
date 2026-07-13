@@ -7,8 +7,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, Sparkles } from 'lucide-react'
+import { ChevronDown, Sparkles, MessageSquareWarning } from 'lucide-react'
 import { detectPatterns, SEVERITY_META } from '@/lib/biomarkers/patterns'
+import { contextCaveats } from '@/lib/biomarkers/context'
 import { STATUS } from '@/lib/biomarkers/status'
 
 const HUMAN_MARKER = {
@@ -19,8 +20,9 @@ const HUMAN_MARKER = {
   apob: 'ApoB', ldl: 'LDL-C', hdl: 'HDL-C',
 }
 
-export function PatternPanel({ evaluated, onScrollToMarker }) {
+export function PatternPanel({ evaluated, onScrollToMarker, context }) {
   const patterns = useMemo(() => detectPatterns(evaluated || {}), [evaluated])
+  const caveats  = useMemo(() => contextCaveats(context || {}), [context])
 
   if (patterns.length === 0) return null
 
@@ -44,6 +46,23 @@ export function PatternPanel({ evaluated, onScrollToMarker }) {
           {patterns.length} pattern{patterns.length === 1 ? '' : 's'} detected
         </span>
       </div>
+
+      {/* Global context caveats (appear once above all pattern cards). */}
+      {caveats.length > 0 && (
+        <div className="mb-4 rounded-2xl border-l-4 border-ss-orange bg-ss-orange/5 p-4">
+          <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">
+            <MessageSquareWarning size={12} /> Context noted — read this alongside
+          </div>
+          <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-ss-text/90">
+            {caveats.map((c, i) => (
+              <li key={i} className="flex gap-1.5">
+                <span className="mt-1 inline-block h-1 w-1 shrink-0 rounded-full bg-ss-orange" />
+                <span>{c}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4">
         {patterns.map((p) => (

@@ -34,6 +34,8 @@ import { BiomarkerCard } from '@/components/biomarkers/BiomarkerCard'
 import { EmptyStateOnboarding } from '@/components/biomarkers/EmptyStateOnboarding'
 import { PatternPanel } from '@/components/biomarkers/PatternPanel'
 import { GenomeSidebar } from '@/components/biomarkers/GenomeSidebar'
+import { ContextPanel } from '@/components/biomarkers/ContextPanel'
+import { loadContext, saveContext } from '@/lib/biomarkers/context'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
 
@@ -42,11 +44,13 @@ export default function BiomarkersClient() {
   const [ready, setReady] = useState(false)
   const [report, setReport] = useState(null)
   const [sex, setSex] = useState('male')
+  const [context, setContext] = useState({})
 
-  // Hydrate localStorage (values + sex) + sessionStorage (genome) on mount.
+  // Hydrate localStorage (values + sex + context) + sessionStorage (genome) on mount.
   useEffect(() => {
     setValues(getBiomarkerValues())
     setReport(getGenomeResults())
+    setContext(loadContext())
     try {
       const stored = localStorage.getItem(SEX_STORAGE_KEY)
       if (stored === 'female' || stored === 'male') setSex(stored)
@@ -67,6 +71,12 @@ export default function BiomarkersClient() {
     const t = setTimeout(() => saveBiomarkerValues(values), 250)
     return () => clearTimeout(t)
   }, [values, ready])
+
+  useEffect(() => {
+    if (!ready) return
+    const t = setTimeout(() => saveContext(context), 200)
+    return () => clearTimeout(t)
+  }, [context, ready])
 
   const biomarkersForSex = useMemo(() => getBiomarkersForSex(sex), [sex])
   const evaluated = useMemo(() => evaluateAllBiomarkers(values, sex), [values, sex])
@@ -190,6 +200,12 @@ export default function BiomarkersClient() {
           </span>
         </div>
 
+        {/* Optional draw-context chips (fasting / time / illness / training / cycle).
+            Collapsed by default; expanded state is per-session. */}
+        <div className="mt-4">
+          <ContextPanel context={context} sex={sex} onChange={setContext} />
+        </div>
+
         <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr,320px]">
           {/* ============ MAIN COLUMN ============ */}
           <section>
@@ -198,7 +214,7 @@ export default function BiomarkersClient() {
 
             {/* Cross-marker pattern detection (hidden when no clusters have
                 enough entered data to evaluate). */}
-            <PatternPanel evaluated={evaluated} onScrollToMarker={scrollToBiomarker} />
+            <PatternPanel evaluated={evaluated} onScrollToMarker={scrollToBiomarker} context={context} />
 
             {/* Category-grouped biomarker cards */}
             <div className="mt-8 space-y-10">
