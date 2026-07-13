@@ -19,8 +19,9 @@ import { ArrowRight, Lightbulb, RefreshCcw, Stethoscope, TestTube2 } from 'lucid
 import { STATUS, evaluateBiomarker, resolveForSex } from '@/lib/biomarkers/status'
 import RangeBar from './RangeBar'
 import EvidenceDrawer from './EvidenceDrawer'
+import GenomeLinks from './GenomeLinks'
 
-export function BiomarkerCard({ biomarker, sex = 'male', value, onChange, onScrollToRelated }) {
+export function BiomarkerCard({ biomarker, sex = 'male', value, onChange, onScrollToRelated, report = null }) {
   const resolved = useMemo(() => resolveForSex(biomarker, sex), [biomarker, sex])
   const evalResult = useMemo(() => evaluateBiomarker(resolved, value), [resolved, value])
   const statusMeta = STATUS[evalResult.status]
@@ -141,6 +142,9 @@ export function BiomarkerCard({ biomarker, sex = 'male', value, onChange, onScro
       <div className="mt-4">
         <EvidenceDrawer biomarker={resolved} />
       </div>
+
+      {/* Genome links (only when user has a genome AND covered variants exist) */}
+      {report && <GenomeLinks biomarkerId={resolved.id} report={report} />}
 
       {/* Next steps */}
       <NextStepsGrid steps={resolved.nextSteps} />

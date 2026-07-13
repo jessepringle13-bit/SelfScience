@@ -33,6 +33,7 @@ import { PanelSummary } from '@/components/biomarkers/PanelSummary'
 import { BiomarkerCard } from '@/components/biomarkers/BiomarkerCard'
 import { EmptyStateOnboarding } from '@/components/biomarkers/EmptyStateOnboarding'
 import { PatternPanel } from '@/components/biomarkers/PatternPanel'
+import { GenomeSidebar } from '@/components/biomarkers/GenomeSidebar'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
 
@@ -221,6 +222,7 @@ export default function BiomarkersClient() {
                         value={values[b.id] ?? ''}
                         onChange={setField}
                         onScrollToRelated={scrollToBiomarker}
+                        report={report}
                       />
                     ))}
                   </div>
@@ -249,39 +251,19 @@ export default function BiomarkersClient() {
 
           {/* ============ SIDEBAR ============ */}
           <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-            {/* Genetic Context (Phase 2 will formalize; this preserves the existing preview) */}
-            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-ss-teal">Genetic Context</h3>
-                {report && (
-                  <span className="inline-flex items-center rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-semibold text-ss-teal">
-                    Linked to genome
-                  </span>
-                )}
-              </div>
+            {/* NEW: schema-driven genome cross-reference (Phase 2b).
+                Shows ~18 curated SNP\u2192biomarker matches with evidence tiers. */}
+            <GenomeSidebar report={report} onScrollToMarker={scrollToBiomarker} />
 
-              {!ready ? (
-                <div className="mt-4 flex items-center gap-2 text-xs text-ss-muted">
-                  <Loader2 size={12} className="animate-spin" /> Loading…
-                </div>
-              ) : !report ? (
-                <div className="mt-4 rounded-lg bg-ss-bg p-3 text-xs text-ss-muted">
-                  Upload a genome to cross-reference biomarkers with published SNP associations
-                  (MTHFR→homocysteine, HFE→ferritin, APOE→lipids, etc.). Coming with full evidence
-                  tiers in Phase 2.
-                  <div className="mt-2">
-                    <Link href="/genome" className="inline-flex items-center gap-1 font-semibold text-ss-teal hover:underline">
-                      Upload genome <ArrowRight size={11} />
-                    </Link>
-                  </div>
-                </div>
-              ) : correlations.length === 0 ? (
-                <p className="mt-4 text-xs text-ss-muted">
-                  No correlations triggered yet — enter more biomarker values, or your genome may
-                  not carry the variants covered by the current rule set.
-                </p>
-              ) : (
-                <ul className="mt-4 space-y-3">
+            {/* Legacy correlations panel \u2014 hand-tuned narrative rules that
+                combine biomarker status with genome haplotypes (kept here
+                so nothing pre-existing regresses). */}
+            {ready && report && correlations.length > 0 && (
+              <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-ss-teal">
+                  Editorial context
+                </h3>
+                <ul className="mt-3 space-y-3">
                   {correlations.map((c) => (
                     <li key={c.id} className={`rounded-lg border-l-4 p-3 text-xs leading-relaxed text-ss-text ${
                       c.tone === 'priority'  ? 'border-l-ss-teal   bg-ss-teal/5' :
@@ -293,8 +275,8 @@ export default function BiomarkersClient() {
                     </li>
                   ))}
                 </ul>
-              )}
-            </div>
+              </div>
+            )}
 
             {report && (
               <Link
