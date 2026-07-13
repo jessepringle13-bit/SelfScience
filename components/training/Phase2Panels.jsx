@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { EVIDENCE_LEVELS } from '@/lib/training/supplements'
 import { PRIORITY_META } from '@/lib/training/equipment'
+import { OnlyFull, useViewMode } from '@/lib/training/viewMode'
 
 // ─────────────────── Small primitives ───────────────────
 
@@ -67,6 +68,7 @@ export function MobilityPanel({ mobility }) {
     <Panel icon={Wind} title="Stretching & Mobility Protocol" eyebrow="3E" accent="#0EA5A4">
       {mobility.note && <Callout tone="orange" icon={AlertCircle}><span className="font-semibold">{mobility.note}</span></Callout>}
 
+      <OnlyFull>
       {days.map(({ key, label }) => (
         <div key={key} className="mt-4 avoid-break">
           <Sub>{label}</Sub>
@@ -99,6 +101,7 @@ export function MobilityPanel({ mobility }) {
           </div>
         </div>
       ))}
+      </OnlyFull>
 
       <Sub>Weekly full-body mobility session (20–30 min)</Sub>
       <p className="mt-1 text-[11px] italic text-ss-muted">Slot into one rest / active-recovery day per week. Do slowly. Breathe.</p>
@@ -157,26 +160,34 @@ export function RecoveryPanel({ recovery }) {
         <div><span className="font-semibold text-ss-teal">Duration:</span> {recovery.sleep.duration}</div>
         <div><span className="font-semibold text-ss-teal">Timing:</span> {recovery.sleep.timing}</div>
       </div>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-[11.5px] text-ss-text">
-        {recovery.sleep.protocol.map((s, i) => <li key={i}>{s}</li>)}
-      </ul>
+      <OnlyFull>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-[11.5px] text-ss-text">
+          {recovery.sleep.protocol.map((s, i) => <li key={i}>{s}</li>)}
+        </ul>
+      </OnlyFull>
       {recovery.sleep.genotypeNotes.map((n, i) => (
         <Callout key={i} tone="orange" icon={AlertCircle}><span className="font-semibold">Genotype note:</span> {n}</Callout>
       ))}
 
       <Sub>Heart-rate variability (HRV) and daily readiness</Sub>
-      <p className="mt-1 text-[11.5px] text-ss-text">{recovery.hrv.summary}</p>
+      <OnlyFull>
+        <p className="mt-1 text-[11.5px] text-ss-text">{recovery.hrv.summary}</p>
+      </OnlyFull>
       <div className="mt-2 space-y-1 text-[11.5px]">
-        <div><span className="font-semibold text-ss-teal">Baseline:</span> {recovery.hrv.baseline}</div>
         <div><span className="font-semibold text-ss-teal">Rule:</span> {recovery.hrv.rule}</div>
-        <div><span className="font-semibold text-ss-teal">Tools:</span> {recovery.hrv.tools}</div>
+        <OnlyFull>
+          <div><span className="font-semibold text-ss-teal">Baseline:</span> {recovery.hrv.baseline}</div>
+          <div><span className="font-semibold text-ss-teal">Tools:</span> {recovery.hrv.tools}</div>
+        </OnlyFull>
       </div>
 
       <Sub>Deload cadence</Sub>
       <div className="mt-1 space-y-1 text-[11.5px]">
         <div><span className="font-semibold text-ss-teal">Cadence:</span> {recovery.deload.cadence}</div>
-        <div><span className="font-semibold text-ss-teal">Protocol:</span> {recovery.deload.protocol}</div>
-        <div className="italic text-ss-muted">{recovery.deload.reason}</div>
+        <OnlyFull>
+          <div><span className="font-semibold text-ss-teal">Protocol:</span> {recovery.deload.protocol}</div>
+          <div className="italic text-ss-muted">{recovery.deload.reason}</div>
+        </OnlyFull>
       </div>
     </Panel>
   )
@@ -207,19 +218,27 @@ export function SupplementPanel({ supplements }) {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="text-[13px] font-extrabold text-ss-teal">{s.name}</div>
-                  <div className="mt-0.5 text-[11px] italic text-ss-muted">{s.form}</div>
+                  <OnlyFull>
+                    <div className="mt-0.5 text-[11px] italic text-ss-muted">{s.form}</div>
+                  </OnlyFull>
                 </div>
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: ev.color }}>
                   {ev.label} evidence
                 </span>
               </div>
-              <div className="mt-2 text-[11.5px] leading-relaxed text-ss-text">{s.reasoning}</div>
+              <OnlyFull>
+                <div className="mt-2 text-[11.5px] leading-relaxed text-ss-text">{s.reasoning}</div>
+              </OnlyFull>
               <div className="mt-2 grid grid-cols-2 gap-2 text-[11.5px] sm:grid-cols-4">
                 <div><span className="font-semibold text-ss-teal">Dose:</span> {s.dose}</div>
                 <div><span className="font-semibold text-ss-teal">Timing:</span> {s.timing}</div>
-                <div className="sm:col-span-2"><span className="font-semibold text-ss-teal">What to expect:</span> {s.expect}</div>
+                <OnlyFull>
+                  <div className="sm:col-span-2"><span className="font-semibold text-ss-teal">What to expect:</span> {s.expect}</div>
+                </OnlyFull>
               </div>
-              <div className="mt-1 text-[11px] text-ss-muted"><span className="font-semibold">Watch:</span> {s.watch}</div>
+              <OnlyFull>
+                <div className="mt-1 text-[11px] text-ss-muted"><span className="font-semibold">Watch:</span> {s.watch}</div>
+              </OnlyFull>
             </div>
           )
         })}
@@ -249,10 +268,14 @@ export function EquipmentPanel({ items }) {
                 <div className="text-[12.5px] font-extrabold text-ss-teal">{e.name}</div>
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: p.color }}>{p.label}</span>
               </div>
-              <div className="mt-1 text-[11.5px] leading-relaxed text-ss-text">{e.why}</div>
+              <OnlyFull>
+                <div className="mt-1 text-[11.5px] leading-relaxed text-ss-text">{e.why}</div>
+              </OnlyFull>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-ss-muted">
                 <span><span className="font-semibold">Cost:</span> {e.cost}</span>
-                {e.replaces && <span><span className="font-semibold">Replaces / complements:</span> {e.replaces}</span>}
+                <OnlyFull>
+                  {e.replaces && <span><span className="font-semibold">Replaces / complements:</span> {e.replaces}</span>}
+                </OnlyFull>
               </div>
             </div>
           )
@@ -325,24 +348,30 @@ export function GoalsPanel({ goals }) {
 
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
         <Card subtitle="Weeks 1–4" title="Foundation">
-          <div><span className="font-semibold text-ss-teal">Focus:</span> {goals.foundation.focus}</div>
-          <div><span className="font-semibold text-red-700">Do not yet:</span><List items={goals.foundation.doNot} tone="red" /></div>
-          <div><span className="font-semibold text-ss-teal">Success looks like:</span><List items={goals.foundation.success} /></div>
+          <OnlyFull>
+            <div><span className="font-semibold text-ss-teal">Focus:</span> {goals.foundation.focus}</div>
+            <div><span className="font-semibold text-red-700">Do not yet:</span><List items={goals.foundation.doNot} tone="red" /></div>
+            <div><span className="font-semibold text-ss-teal">Success looks like:</span><List items={goals.foundation.success} /></div>
+          </OnlyFull>
           <div className="rounded border-l-4 border-ss-teal bg-ss-teal/5 p-2 text-[11px]">
             <span className="font-semibold text-ss-teal">Week-4 milestone:</span> {goals.foundation.milestone}
           </div>
         </Card>
         <Card subtitle="Weeks 5–12" title="Development">
-          <div><span className="font-semibold text-ss-teal">Focus:</span> {goals.development.focus}</div>
-          <div><span className="font-semibold text-ss-teal">When to progress:</span><List items={goals.development.when} /></div>
-          <div><span className="font-semibold text-ss-teal">Markers to look for:</span><List items={goals.development.markers} /></div>
+          <OnlyFull>
+            <div><span className="font-semibold text-ss-teal">Focus:</span> {goals.development.focus}</div>
+            <div><span className="font-semibold text-ss-teal">When to progress:</span><List items={goals.development.when} /></div>
+            <div><span className="font-semibold text-ss-teal">Markers to look for:</span><List items={goals.development.markers} /></div>
+          </OnlyFull>
           <div className="rounded border-l-4 border-ss-teal bg-ss-teal/5 p-2 text-[11px]">
             <span className="font-semibold text-ss-teal">Week-12 milestone:</span> {goals.development.milestone}
           </div>
         </Card>
         <Card subtitle="6 months" title="Transformation">
-          <div><span className="font-semibold text-ss-teal">Outcome:</span><List items={goals.transformation.outcome} /></div>
-          <div><span className="font-semibold text-ss-teal">Lifestyle anchors:</span><List items={goals.transformation.lifestyleAnchors} /></div>
+          <OnlyFull>
+            <div><span className="font-semibold text-ss-teal">Outcome:</span><List items={goals.transformation.outcome} /></div>
+            <div><span className="font-semibold text-ss-teal">Lifestyle anchors:</span><List items={goals.transformation.lifestyleAnchors} /></div>
+          </OnlyFull>
           <div className="italic text-ss-muted">{goals.transformation.reassess}</div>
         </Card>
       </div>

@@ -34,6 +34,7 @@ import { buildGoalsFramework } from '@/lib/training/goals'
 import { buildBeginnerContent } from '@/lib/training/beginner'
 import { buildYouthContent } from '@/lib/training/youth'
 import { saveTrainingProtocol, loadTrainingProtocol } from '@/lib/training/intake'
+import { ViewModeProvider, useViewMode } from '@/lib/training/viewMode'
 
 import TrainingIntakeForm from '@/components/training/IntakeForm'
 import VariantCard from '@/components/training/VariantCard'
@@ -47,6 +48,14 @@ import {
 } from '@/components/training/Phase2Panels'
 
 export default function TrainingProtocolClient() {
+  return (
+    <ViewModeProvider>
+      <TrainingProtocolInner />
+    </ViewModeProvider>
+  )
+}
+
+function TrainingProtocolInner() {
   const [ready, setReady] = useState(false)
   const [genome, setGenome] = useState(null)
   const [labs, setLabs] = useState({})
@@ -187,6 +196,7 @@ export default function TrainingProtocolClient() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <ViewModeToggle />
                 <button onClick={handleSave} className="inline-flex items-center gap-1 rounded-full border border-ss-teal px-3 py-1.5 text-[11px] font-semibold text-ss-teal transition hover:bg-ss-teal/10">
                   <Save size={11} /> Save
                 </button>
@@ -473,6 +483,34 @@ function formatTags(tags) {
 }
 
 // ------ Sidebar cards ------
+
+function ViewModeToggle() {
+  const { mode, setMode } = useViewMode()
+  return (
+    <div className="inline-flex overflow-hidden rounded-full bg-white p-0.5 ring-1 ring-ss-border-warm">
+      <button
+        type="button"
+        onClick={() => setMode('simple')}
+        className={`rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider transition ${
+          mode === 'simple' ? 'bg-ss-teal text-white shadow' : 'text-ss-muted hover:text-ss-teal'
+        }`}
+        title="Show only the essentials in every tab"
+      >
+        Simple
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode('full')}
+        className={`rounded-full px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider transition ${
+          mode === 'full' ? 'bg-ss-teal text-white shadow' : 'text-ss-muted hover:text-ss-teal'
+        }`}
+        title="Show all reasoning, cues, and side-notes"
+      >
+        Full
+      </button>
+    </div>
+  )
+}
 
 function PhilosophyCard() {
   return (

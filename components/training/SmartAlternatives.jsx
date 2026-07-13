@@ -4,6 +4,7 @@
 // Renders Section 3B — activity-aware alternative suggestions.
 
 import { Lightbulb, Shield, ArrowRight } from 'lucide-react'
+import { OnlyFull } from '@/lib/training/viewMode'
 
 export default function SmartAlternatives({ result }) {
   if (!result?.items?.length && !result?.protected) return null
@@ -34,11 +35,15 @@ export default function SmartAlternatives({ result }) {
           </div>
           <div className="mt-2 space-y-2 text-[12px] leading-relaxed text-ss-text">
             <Row label="What you're doing">{item.doing}</Row>
-            <Row label="The genetic consideration">{item.consideration}</Row>
+            <OnlyFull>
+              <Row label="The genetic consideration">{item.consideration}</Row>
+            </OnlyFull>
             <Row label="Smarter approach" accent>
               <span>{item.smarter}</span>
             </Row>
-            <Row label="Same goal, different path">{item.samePath}</Row>
+            <OnlyFull>
+              <Row label="Same goal, different path">{item.samePath}</Row>
+            </OnlyFull>
           </div>
         </div>
       ))}
