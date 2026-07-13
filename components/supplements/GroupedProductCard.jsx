@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import CertBadges from './CertBadges'
 import BrandProfileDrawer from './BrandProfileDrawer'
+import { getScoreStyle } from '@/lib/supplements/scoreColor'
 
 const TIER_BADGE = {
   preferred: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', label: 'Preferred form', icon: ShieldCheck },
@@ -87,11 +88,11 @@ export default function GroupedProductCard({ group, whyThisFits }) {
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              className="inline-flex items-center gap-1 rounded-full bg-white border border-[#1B474D]/20 px-2 py-0.5 text-[11px] text-[#1B474D] hover:bg-[#EEF7F7]"
-              title="Transparency score (click for profile)"
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition hover:brightness-95 ${getScoreStyle(transparencyScore).chip}`}
+              title={`Transparency score \u2014 ${getScoreStyle(transparencyScore).label} (click for profile)`}
             >
               <span className="font-semibold">{transparencyScore}</span>
-              <span className="text-[#1B474D]/60">/5</span>
+              <span className="opacity-60">/5</span>
             </button>
           )}
           {group.variantCount > 1 && (

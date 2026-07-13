@@ -4,13 +4,14 @@ import ProductCard from './ProductCard'
 import GroupedProductCard from './GroupedProductCard'
 import ViewToggle from './ViewToggle'
 import { groupProducts, buildWhyThisFits } from '@/lib/supplements/grouping'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, Award } from 'lucide-react'
 
 const VIEW_STORAGE_KEY = 'selfscience_supplements_view_v1'
 
 export default function ProductList({ category }) {
   const [state, setState] = useState({ loading: false, error: null, results: [], query: null })
   const [view, setView] = useState('curated')
+  const [goldOnly, setGoldOnly] = useState(false)
 
   // Persist view choice across category changes
   useEffect(() => {
@@ -51,6 +52,16 @@ export default function ProductList({ category }) {
 
   const groups = useMemo(() => groupProducts(state.results), [state.results])
 
+  // Gold-tier filter: keep only groups with at least one gold-tier certification.
+  const displayGroups = useMemo(() => {
+    if (!goldOnly) return groups
+    return groups.filter((g) => (g.bestCertTier ?? 0) >= 3)
+  }, [groups, goldOnly])
+  const filteredFlat = useMemo(() => {
+    if (!goldOnly) return state.results
+    return state.results.filter((p) => (p.certifications || []).some((c) => c.tier === 'gold'))
+  }, [state.results, goldOnly])
+
   if (!category) return null
 
   return (
@@ -60,20 +71,36 @@ export default function ProductList({ category }) {
           <h3 className="text-lg font-semibold text-[#1B474D]">
             {category.label}
             {view === 'curated'
-              ? (groups.length > 0 && <span className="ml-2 text-sm font-normal text-slate-500">{groups.length} trusted brands</span>)
-              : (state.results?.length > 0 && <span className="ml-2 text-sm font-normal text-slate-500">{state.results.length} products</span>)
+              ? (displayGroups.length > 0 && <span className="ml-2 text-sm font-normal text-slate-500">{displayGroups.length} trusted brands{goldOnly ? ' (gold-tier only)' : ''}</span>)
+              : (filteredFlat.length > 0 && <span className="ml-2 text-sm font-normal text-slate-500">{filteredFlat.length} products{goldOnly ? ' (gold-tier only)' : ''}</span>)
             }
           </h3>
           <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
             <span>Query: <code className="bg-slate-100 px-1.5 py-0.5 rounded">{category.dsldQuery}</code></span>
           </div>
         </div>
-        <ViewToggle
-          value={view}
-          onChange={changeView}
-          curatedCount={groups.length}
-          totalCount={state.results.length}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setGoldOnly((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+              goldOnly
+                ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-sm'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-amber-300 hover:text-amber-900'
+            }`}
+            aria-pressed={goldOnly}
+            title="Show only products with a gold-tier certification (NSF Sport, NSF Contents, USP, Informed Sport, IFOS 5-Star)"
+          >
+            <Award className="h-4 w-4" />
+            Gold-tier only
+          </button>
+          <ViewToggle
+            value={view}
+            onChange={changeView}
+            curatedCount={displayGroups.length}
+            totalCount={filteredFlat.length}
+          />
+        </div>
       </div>
 
       {state.loading && (
@@ -95,16 +122,16 @@ export default function ProductList({ category }) {
       )}
 
       {/* Curated view */}
-      {view === 'curated' && groups.length > 0 && (
+      {view === 'curated' && displayGroups.length > 0 && (
         <>
           <div className="flex items-start gap-2 rounded-lg border border-[#1B474D]/15 bg-[#F8FBFB] px-3 py-2 text-xs text-slate-600">
             <Sparkles className="h-4 w-4 text-[#1B474D] mt-0.5 shrink-0" />
             <span>
-              <strong className="text-[#1B474D]">Trusted brands to consider.</strong> Sorted by ingredient-form quality and brand diversity. Multiple dose or count options from the same brand are grouped into a single card &mdash; use the version chips to switch inside a brand.
+              <strong className="text-[#1B474D]">Trusted brands to consider.</strong> Sorted by ingredient-form quality, third-party certification, and brand-transparency score. Multiple dose or count options from the same brand are grouped into a single card &mdash; use the version chips to switch inside a brand.
             </span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {groups.map((g) => (
+            {displayGroups.map((g) => (
               <GroupedProductCard
                 key={`${g.brand}-${g.family}`}
                 group={g}
@@ -114,11 +141,21 @@ export default function ProductList({ category }) {
           </div>
         </>
       )}
+      {view === 'curated' && !state.loading && !state.error && state.results.length > 0 && displayGroups.length === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          No brands in this category currently hold a gold-tier certification (NSF Sport, NSF Contents, USP, Informed Sport, or IFOS 5-Star). Turn off the filter to see the full list, or explore adjacent categories.
+        </div>
+      )}
 
       {/* Flat view (all products) */}
-      {view === 'all' && state.results.length > 0 && (
+      {view === 'all' && filteredFlat.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {state.results.map((p) => <ProductCard key={p.id} product={p} />)}
+          {filteredFlat.map((p) => <ProductCard key={p.id} product={p} />)}
+        </div>
+      )}
+      {view === 'all' && !state.loading && !state.error && state.results.length > 0 && filteredFlat.length === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          No products in this category currently hold a gold-tier certification. Turn off the filter to see the full list.
         </div>
       )}
     </div>

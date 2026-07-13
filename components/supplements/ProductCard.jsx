@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ExternalLink, ShieldCheck, Beaker, Info, Package, AlertTriangle, ChevronDown, Search, Building2 } from 'lucide-react'
 import CertBadges from './CertBadges'
 import BrandProfileDrawer from './BrandProfileDrawer'
+import { getScoreStyle } from '@/lib/supplements/scoreColor'
 
 const TIER_BADGE = {
   preferred: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', label: 'Preferred form', icon: ShieldCheck },
@@ -65,10 +66,11 @@ export default function ProductCard({ product }) {
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full bg-white border border-[#1B474D]/20 px-2 py-0.5 text-[#1B474D] hover:bg-[#EEF7F7]"
-                  title="Transparency score"
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 transition hover:brightness-95 ${getScoreStyle(transparencyScore).chip}`}
+                  title={`Transparency score \u2014 ${getScoreStyle(transparencyScore).label}`}
                 >
-                  <span className="font-semibold">{transparencyScore}</span>/5
+                  <span className="font-semibold">{transparencyScore}</span>
+                  <span className="opacity-60">/5</span>
                 </button>
               )}
             </div>

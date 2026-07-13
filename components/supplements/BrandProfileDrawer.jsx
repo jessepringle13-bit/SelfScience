@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import { X, ExternalLink, ShieldCheck, Building2, Factory, FileCheck2, FlaskConical, MapPin, Calendar } from 'lucide-react'
 import { getBrandProfile } from '@/lib/supplements/brandProfiles'
 import { CERT_REGISTRY } from '@/lib/supplements/certifications'
+import { getScoreStyle } from '@/lib/supplements/scoreColor'
 import CertBadges from './CertBadges'
 
 export default function BrandProfileDrawer({ brandName, open, onClose }) {
@@ -60,16 +61,16 @@ export default function BrandProfileDrawer({ brandName, open, onClose }) {
               <section className="rounded-xl border border-[#1B474D]/15 bg-[#F8FBFB] p-4">
                 <div className="flex items-center justify-between">
                   <div className="text-xs uppercase tracking-wide text-[#1B474D] font-semibold">Transparency score</div>
-                  <div className="text-[11px] text-slate-500">out of 5</div>
+                  <div className={`text-[11px] font-semibold rounded-full border px-2 py-0.5 ${getScoreStyle(score).chip}`}>{getScoreStyle(score).label}</div>
                 </div>
                 <div className="mt-2 flex items-center gap-1">
                   {[1,2,3,4,5].map((n) => (
                     <span
                       key={n}
-                      className={`h-3 w-8 rounded-sm ${n <= score ? 'bg-[#1B474D]' : 'bg-slate-200'}`}
+                      className={`h-3 w-8 rounded-sm ${n <= score ? getScoreStyle(score).bar : 'bg-slate-200'}`}
                     />
                   ))}
-                  <span className="ml-2 text-lg font-semibold text-[#1B474D]">{score}</span>
+                  <span className="ml-2 text-lg font-semibold text-[#1B474D]">{score}<span className="text-sm text-[#1B474D]/60">/5</span></span>
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500 leading-snug">
                   Combines manufacturing disclosure, CoA availability, absence of proprietary blends, third-party programme enrolment, and clinical-study track record.
