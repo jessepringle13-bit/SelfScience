@@ -17,10 +17,12 @@ import {
   Dna,
   Wrench,
   X,
+  Rocket,
   Apple,
   TestTube2,
   Activity,
   Pill,
+  Award,
   Globe2,
   Compass,
   FileText,
@@ -35,10 +37,16 @@ const NAV_ITEMS = [
   { key: 'tools',    label: 'Tools',  Icon: Wrench, action: 'open-tools' },
 ]
 
-// Same list as the desktop Tools dropdown in site-nav.jsx, but with slightly
-// more descriptive blurbs suited to the mobile sheet where users have more
-// vertical real estate to read.
+// Same list as the desktop Tools dropdown in site-nav.jsx (kept in sync
+// manually — if you add a tool there, add it here too). Mobile has a bit
+// more vertical real estate so we use slightly longer blurbs.
 const TOOL_ITEMS = [
+  {
+    href: '/get-started',
+    label: 'Get Started (Kits)',
+    Icon: Rocket,
+    blurb: 'Which DNA + blood kits work with SelfScience.',
+  },
   {
     href: '/nutrition',
     label: 'Nutrition Hub',
@@ -52,10 +60,22 @@ const TOOL_ITEMS = [
     blurb: 'Log blood work and see which of your genes match each marker.',
   },
   {
-    href: '/training',
+    href: '/tools/training',
     label: 'Training Protocol',
     Icon: Activity,
     blurb: 'Personalised training zones and sport affinity based on your DNA.',
+  },
+  {
+    href: '/tools/supplements',
+    label: 'Supplements',
+    Icon: Pill,
+    blurb: 'Discover supplements by ingredient FORM. NIH label data. Brand-direct only.',
+  },
+  {
+    href: '/tools/supplements/brands',
+    label: 'Brand Leaderboard',
+    Icon: Award,
+    blurb: 'Every curated supplement brand ranked by transparency score.',
   },
   {
     href: '/drug-check',

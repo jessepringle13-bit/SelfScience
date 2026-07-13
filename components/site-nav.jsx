@@ -328,14 +328,16 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
 
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Tools</div>
-            <a href="/get-started"         onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
-            <a href="/nutrition"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
-            <a href="/biomarkers"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Biomarkers</a>
-            <a href="/tools/training"      onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training</a>
-            <a href="/drug-check"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Drug Check</a>
-            <a href="/population-compare"  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Populations</a>
-            <a href="/ancestry"            onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry</a>
-            <a href="/practitioner-report" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Practitioner Report</a>
+            <a href="/get-started"                 onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
+            <a href="/nutrition"                   onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
+            <a href="/biomarkers"                  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Biomarkers</a>
+            <a href="/tools/training"              onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training Protocol</a>
+            <a href="/tools/supplements"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Supplements</a>
+            <a href="/tools/supplements/brands"    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Brand Leaderboard</a>
+            <a href="/drug-check"                  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Drug Check</a>
+            <a href="/population-compare"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Populations</a>
+            <a href="/ancestry"                    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry</a>
+            <a href="/practitioner-report"         onClick={() => setMobileOpen(false)} className="hover:opacity-80">Practitioner Report</a>
 
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Browse</div>
             <details className="group">
