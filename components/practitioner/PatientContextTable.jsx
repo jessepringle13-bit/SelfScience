@@ -2,11 +2,13 @@
 // Print page 3 — the patient's self-reported context (from the intake form)
 // laid out as a two-column clinical table.
 
-import { ageFromDob, bmiFrom } from '@/lib/practitionerIntake'
+import { ageFromDob, bmiFrom, cmToFtIn, kgToLb } from '@/lib/practitionerIntake'
 
 export default function PatientContextTable({ intake }) {
   const age = ageFromDob(intake?.dob)
   const bmi = bmiFrom(intake?.heightCm, intake?.weightKg)
+  const ftin = cmToFtIn(intake?.heightCm)
+  const lb   = kgToLb(intake?.weightKg)
 
   const rows = [
     { label: 'Chief concern / reason for visit', value: intake?.reasonForVisit },
@@ -23,8 +25,8 @@ export default function PatientContextTable({ intake }) {
   const demo = [
     { label: 'Age', value: age != null ? `${age} yrs` : '—' },
     { label: 'Sex assigned at birth', value: intake?.sex || '—' },
-    { label: 'Height', value: intake?.heightCm ? `${intake.heightCm} cm` : '—' },
-    { label: 'Weight', value: intake?.weightKg ? `${intake.weightKg} kg` : '—' },
+    { label: 'Height', value: intake?.heightCm ? `${intake.heightCm} cm${ftin ? ` (${ftin.ft}'${ftin.in}")` : ''}` : '—' },
+    { label: 'Weight', value: intake?.weightKg ? `${intake.weightKg} kg${lb != null ? ` (${lb} lb)` : ''}` : '—' },
     { label: 'BMI', value: bmi ? `${bmi.bmi} (${bmi.category})` : '—' },
   ]
 

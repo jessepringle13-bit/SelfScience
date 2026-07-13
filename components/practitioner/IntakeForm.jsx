@@ -5,8 +5,11 @@
 // All data lives ONLY in localStorage on the user's device.
 
 import { useEffect, useState } from 'react'
-import { ClipboardList, Save, Trash2, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react'
-import { loadIntake, saveIntake, clearIntake, INTAKE_DEFAULTS } from '@/lib/practitionerIntake'
+import { ClipboardList, Save, Trash2, ChevronDown, ChevronUp, CheckCircle2, Ruler } from 'lucide-react'
+import {
+  loadIntake, saveIntake, clearIntake, INTAKE_DEFAULTS,
+  cmToFtIn, ftInToCm, kgToLb, lbToKg,
+} from '@/lib/practitionerIntake'
 
 const SEX_OPTIONS = [
   { v: '', label: 'Prefer not to say' },
@@ -109,30 +112,39 @@ export default function IntakeForm({ onChange }) {
               {SEX_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
             </select>
           </Field>
-          <Field label="Height (cm)">
-            <input
-              type="number"
-              inputMode="decimal"
-              min="50"
-              max="250"
-              value={state.heightCm}
-              onChange={(e) => update({ heightCm: e.target.value })}
-              placeholder="e.g. 172"
-              className={INPUT_CLS}
-            />
-          </Field>
-          <Field label="Weight (kg)">
-            <input
-              type="number"
-              inputMode="decimal"
-              min="20"
-              max="400"
-              value={state.weightKg}
-              onChange={(e) => update({ weightKg: e.target.value })}
-              placeholder="e.g. 68"
-              className={INPUT_CLS}
-            />
-          </Field>
+
+          {/* Unit-system toggle spans both columns */}
+          <div className="sm:col-span-2 flex flex-wrap items-center gap-2 rounded border border-ss-border-warm/70 bg-ss-bg/40 px-3 py-2">
+            <Ruler size={13} className="text-ss-teal" />
+            <span className="text-[11px] font-semibold text-ss-teal">Enter height &amp; weight in:</span>
+            <div className="ml-auto inline-flex rounded-full bg-white p-0.5 ring-1 ring-ss-border-warm">
+              <button
+                type="button"
+                onClick={() => update({ unitSystem: 'metric' })}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                  state.unitSystem === 'metric'
+                    ? 'bg-ss-teal text-white shadow-sm'
+                    : 'text-ss-muted hover:text-ss-text'
+                }`}
+              >
+                Metric (cm · kg)
+              </button>
+              <button
+                type="button"
+                onClick={() => update({ unitSystem: 'imperial' })}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                  state.unitSystem === 'imperial'
+                    ? 'bg-ss-teal text-white shadow-sm'
+                    : 'text-ss-muted hover:text-ss-text'
+                }`}
+              >
+                Imperial (ft/in · lb)
+              </button>
+            </div>
+          </div>
+
+          <HeightField state={state} update={update} />
+          <WeightField state={state} update={update} />
 
           {/* Practitioner target */}
           <Field label="Practitioner name">
@@ -294,5 +306,143 @@ function Field({ label, children, full = false }) {
       <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-ss-muted">{label}</span>
       {children}
     </label>
+  )
+}
+
+/**
+ * Height field — switches between:
+ *  • metric: single cm input, showing "= 5'6"" beside as it types
+ *  • imperial: paired ft + in inputs, showing "= 168 cm" beside as it types
+ * Canonical storage is always heightCm.
+ */
+function HeightField({ state, update }) {
+  const isImperial = state.unitSystem === 'imperial'
+  const ftin = cmToFtIn(state.heightCm)
+
+  if (!isImperial) {
+    return (
+      <Field label="Height (cm)">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            min="50"
+            max="250"
+            value={state.heightCm}
+            onChange={(e) => update({ heightCm: e.target.value })}
+            placeholder="e.g. 172"
+            className={INPUT_CLS}
+          />
+          <span className="whitespace-nowrap text-[11px] text-ss-muted">
+            = {ftin ? `${ftin.ft}'${ftin.in}"` : '—'}
+          </span>
+        </div>
+      </Field>
+    )
+  }
+
+  // Imperial mode: two side-by-side inputs.
+  const ft = ftin?.ft ?? ''
+  const inch = ftin?.in ?? ''
+  const handleFtChange = (e) => {
+    const cm = ftInToCm(e.target.value, inch || 0)
+    update({ heightCm: cm != null ? String(cm) : '' })
+  }
+  const handleInChange = (e) => {
+    const cm = ftInToCm(ft || 0, e.target.value)
+    update({ heightCm: cm != null ? String(cm) : '' })
+  }
+
+  return (
+    <Field label="Height (ft &amp; in)">
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-1">
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            max="9"
+            value={ft}
+            onChange={handleFtChange}
+            placeholder="ft"
+            className={INPUT_CLS}
+          />
+          <span className="text-[11px] text-ss-muted">ft</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            max="11"
+            value={inch}
+            onChange={handleInChange}
+            placeholder="in"
+            className={INPUT_CLS}
+          />
+          <span className="text-[11px] text-ss-muted">in</span>
+        </div>
+        <span className="whitespace-nowrap text-[11px] text-ss-muted">
+          = {state.heightCm ? `${state.heightCm} cm` : '—'}
+        </span>
+      </div>
+    </Field>
+  )
+}
+
+/**
+ * Weight field — switches between:
+ *  • metric: kg input, showing "= 149.9 lb" beside
+ *  • imperial: lb input (canonicalised to kg), showing "= 68 kg" beside
+ */
+function WeightField({ state, update }) {
+  const isImperial = state.unitSystem === 'imperial'
+
+  if (!isImperial) {
+    const lb = kgToLb(state.weightKg)
+    return (
+      <Field label="Weight (kg)">
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            min="20"
+            max="400"
+            value={state.weightKg}
+            onChange={(e) => update({ weightKg: e.target.value })}
+            placeholder="e.g. 68"
+            className={INPUT_CLS}
+          />
+          <span className="whitespace-nowrap text-[11px] text-ss-muted">
+            = {lb != null ? `${lb} lb` : '—'}
+          </span>
+        </div>
+      </Field>
+    )
+  }
+
+  // Imperial mode: input in lb, store in kg.
+  const lbShown = kgToLb(state.weightKg)
+  const handleLbChange = (e) => {
+    const kg = lbToKg(e.target.value)
+    update({ weightKg: kg != null ? String(kg) : '' })
+  }
+
+  return (
+    <Field label="Weight (lb)">
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          min="40"
+          max="900"
+          value={lbShown ?? ''}
+          onChange={handleLbChange}
+          placeholder="e.g. 150"
+          className={INPUT_CLS}
+        />
+        <span className="whitespace-nowrap text-[11px] text-ss-muted">
+          = {state.weightKg ? `${state.weightKg} kg` : '—'}
+        </span>
+      </div>
+    </Field>
   )
 }

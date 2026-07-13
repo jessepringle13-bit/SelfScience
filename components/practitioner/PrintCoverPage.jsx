@@ -3,7 +3,7 @@
 // Includes SelfScience branding, patient/practitioner/date fields,
 // the HIPAA Confidentiality & Acknowledgment block, and dual signature lines.
 
-import { ageFromDob, bmiFrom } from '@/lib/practitionerIntake'
+import { ageFromDob, bmiFrom, formatHeightBoth, formatWeightBoth } from '@/lib/practitionerIntake'
 
 export default function PrintCoverPage({ intake, reportDate, reportId }) {
   const age = ageFromDob(intake?.dob)
@@ -62,7 +62,7 @@ export default function PrintCoverPage({ intake, reportDate, reportId }) {
             <CoverField label="Date of birth" value={intake?.dob || '—'} />
             <CoverField label="Age / Sex" value={[age != null ? `${age} yrs` : null, intake?.sex || null].filter(Boolean).join(' · ') || '—'} />
             <CoverField label="Height / Weight"
-              value={[intake?.heightCm ? `${intake.heightCm} cm` : null, intake?.weightKg ? `${intake.weightKg} kg` : null].filter(Boolean).join(' · ') || '—'}
+              value={[formatHeightBoth(intake?.heightCm), formatWeightBoth(intake?.weightKg)].filter(Boolean).join(' · ') || '—'}
             />
             <CoverField label="BMI" value={bmi ? `${bmi.bmi} · ${bmi.category}` : '—'} />
           </div>
