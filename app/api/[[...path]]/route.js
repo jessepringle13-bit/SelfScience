@@ -20,6 +20,7 @@ import {
   getFeaturedArticles as supabaseGetFeaturedArticles,
   pingArticlesTable as supabasePingArticles,
 } from '@/lib/supabase/articles'
+import { loadExerciseDB, filterExercises } from '@/lib/training/exerciseDb'
 import {
   isAdminAuthenticated,
   verifyPassword,
@@ -728,6 +729,10 @@ export async function GET(request, { params }) {
     if (subRoute === 'search')   return handleEditorialSearch(request)
     if (subRoute === 'featured') return handleEditorialFeatured(request)
   }
+  if (route === 'training') {
+    if (subRoute === 'exercises')     return handleTrainingExercises(request)
+    if (subRoute === 'exercise-find') return handleTrainingExerciseFind(request)
+  }
 
   return NextResponse.json({
     status: 'ok',
@@ -1435,5 +1440,58 @@ async function handleAdminImportCsv(request) {
     errors,
     imported: data,
   })
+}
+
+
+/* ----------------------- /api/training/exercises ----------------------- */
+// Server-side pass-through to the free-exercise-db dataset.
+// Query params: muscle, equipment (comma-separated), level, limit, exclude
+async function handleTrainingExercises(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const muscle    = searchParams.get('muscle') || undefined
+    const equipment = (searchParams.get('equipment') || '').split(',').filter(Boolean)
+    const level     = searchParams.get('level') || undefined
+    const limit     = parseInt(searchParams.get('limit') || '25', 10)
+    const exclude   = (searchParams.get('exclude') || '').split(',').filter(Boolean)
+
+    const db = await loadExerciseDB()
+    const items = filterExercises(db, {
+      muscle,
+      equipment: equipment.length ? equipment : undefined,
+      level,
+      limit: Math.min(80, Math.max(1, limit)),
+      exclude,
+    })
+    return NextResponse.json({ count: items.length, items })
+  } catch (err) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 })
+  }
+}
+
+// Given a muscle + equipment + exclude list, return ONE alternative exercise.
+async function handleTrainingExerciseFind(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const muscle    = searchParams.get('muscle') || undefined
+    const equipment = (searchParams.get('equipment') || '').split(',').filter(Boolean)
+    const level     = searchParams.get('level') || undefined
+    const exclude   = (searchParams.get('exclude') || '').split(',').filter(Boolean)
+
+    const db = await loadExerciseDB()
+    const items = filterExercises(db, {
+      muscle,
+      equipment: equipment.length ? equipment : undefined,
+      level,
+      limit: 10,
+      exclude,
+    })
+    if (!items.length) return NextResponse.json({ item: null })
+    // Deterministic-ish rotation: pick a random one so "Find alternative" varies.
+    const pick = items[Math.floor(Math.random() * items.length)]
+    return NextResponse.json({ item: pick })
+  } catch (err) {
+    return NextResponse.json({ error: String(err?.message || err) }, { status: 500 })
+  }
 }
 

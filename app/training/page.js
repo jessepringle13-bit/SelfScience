@@ -1,12 +1,8 @@
-// /app/app/training/page.js
+// Legacy /training URL — redirect to the new Training Protocol Engine
+// under /tools/training so old bookmarks and internal links still work.
 
-import TrainingClient from './training-client'
+import { redirect } from 'next/navigation'
 
-export const metadata = {
-  title: 'Training Protocol · SelfScience',
-  description: 'A variant-driven, research-framed training-emphasis protocol built from your genome findings.',
-}
-
-export default function TrainingPage() {
-  return <TrainingClient />
+export default function LegacyTrainingRedirect() {
+  redirect('/tools/training')
 }

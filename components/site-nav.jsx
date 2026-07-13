@@ -120,7 +120,7 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/get-started',         label: 'Get Started',       Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
     { href: '/nutrition',           label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
     { href: '/biomarkers',         label: 'Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
-    { href: '/training',           label: 'Training Protocol', Icon: Activity,  blurb: 'Zone-based training + sport affinity.' },
+    { href: '/tools/training',     label: 'Training Protocol', Icon: Activity,  blurb: 'Genome-driven training plan for your sport.' },
     { href: '/drug-check',         label: 'Drug Check',        Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
     { href: '/population-compare', label: 'Population Compare',Icon: Globe2,    blurb: 'How your variants compare globally.' },
     { href: '/ancestry',            label: 'Ancestry Report',      Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
@@ -328,7 +328,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/get-started"         onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
             <a href="/nutrition"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
             <a href="/biomarkers"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Biomarkers</a>
-            <a href="/training"            onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training</a>
+            <a href="/tools/training"      onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training</a>
             <a href="/drug-check"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Drug Check</a>
             <a href="/population-compare"  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Populations</a>
             <a href="/ancestry"            onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry</a>
