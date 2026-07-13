@@ -1,4 +1,13 @@
 import { NextResponse } from 'next/server'
+
+// Force this catch-all API route to always be dynamic (never statically
+// rendered / never ISR-cached). Without this, `/api/editorial/featured` in
+// particular could be served from a stale build snapshot to mobile PWA
+// clients that already have long-lived HTTP entries.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+
 import {
   scoreReliability as callReliability,
   translatePlainLanguage as callPlainLanguage,
@@ -45,6 +54,20 @@ import { EDITORIAL_PILLARS } from '@/lib/supabase/pillar-map'
 const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
 const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
 const S2_BASE = 'https://api.semanticscholar.org/graph/v1'
+
+/**
+ * Response headers that instruct every layer (SW → browser HTTP cache →
+ * mobile PWA WebView → any CDN in front of the app) to NEVER cache the
+ * body. Used for editorial listing endpoints so newly-published articles
+ * appear immediately on installed-PWA / mobile-bookmark clients.
+ */
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+}
 
 /* --------------------------------- Utils ---------------------------------- */
 
@@ -911,10 +934,16 @@ async function handleEditorialSearch(request) {
 
   try {
     const results = await supabaseSearchArticles({ query: q, pillar, limit })
-    return NextResponse.json({ results, total: results.length, source: 'supabase' })
+    return NextResponse.json(
+      { results, total: results.length, source: 'supabase' },
+      { headers: NO_STORE_HEADERS },
+    )
   } catch (err) {
     console.warn('[editorial/search] error:', err?.message)
-    return NextResponse.json({ results: [], total: 0, source: 'supabase', error: err?.message })
+    return NextResponse.json(
+      { results: [], total: 0, source: 'supabase', error: err?.message },
+      { headers: NO_STORE_HEADERS },
+    )
   }
 }
 
@@ -925,10 +954,16 @@ async function handleEditorialFeatured(request) {
 
   try {
     const results = await supabaseGetFeaturedArticles(limit)
-    return NextResponse.json({ results, total: results.length, source: 'supabase' })
+    return NextResponse.json(
+      { results, total: results.length, source: 'supabase' },
+      { headers: NO_STORE_HEADERS },
+    )
   } catch (err) {
     console.warn('[editorial/featured] error:', err?.message)
-    return NextResponse.json({ results: [], total: 0, source: 'supabase', error: err?.message })
+    return NextResponse.json(
+      { results: [], total: 0, source: 'supabase', error: err?.message },
+      { headers: NO_STORE_HEADERS },
+    )
   }
 }
 

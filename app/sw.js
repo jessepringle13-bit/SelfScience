@@ -23,7 +23,9 @@ import {
 } from 'serwist'
 
 // Bump manually if we ever want to nuke every client cache in one deploy.
-const CACHE_VERSION = 'v2'
+// v3 (2026-07) — purge stale mobile-PWA HTML shells that were serving old
+// editorial listings on installed-bookmark clients.
+const CACHE_VERSION = 'v3'
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,

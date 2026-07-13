@@ -29,7 +29,7 @@ export function EditorialPicks({ query = '', pillar = '' }) {
     if (p) usp.set('pillar', p)
     usp.set('limit', '8')
 
-    fetch(`/api/editorial/search?${usp.toString()}`)
+    fetch(`/api/editorial/search?${usp.toString()}&_=${Date.now()}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { results: [] }))
       .then((j) => {
         if (cancelled) return

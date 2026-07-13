@@ -14,7 +14,12 @@ export function EditorialFeatured({ limit = 6 }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`/api/editorial/featured?limit=${limit}`)
+    // `cache: 'no-store'` + a bust param so mobile Safari / installed-PWA
+    // WebViews don't serve a stale HTTP-cached response. The API also sends
+    // Cache-Control: no-store, but some mobile clients honour a URL bust
+    // more reliably than headers.
+    const bust = Date.now()
+    fetch(`/api/editorial/featured?limit=${limit}&_=${bust}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : { results: [] }))
       .then((j) => {
         if (cancelled) return

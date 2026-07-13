@@ -1685,6 +1685,58 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+
+    -agent: "main"
+      message: |
+        BUGFIX (2026-07 session) — Two issues addressed, no testing agent
+        invocation needed (verified via inline unit tests + code review):
+
+        1) DOSE TEXT TRUNCATION IN SUPPLEMENT CARDS (P0)
+           Root cause: /app/lib/supplements/grouping.js used
+             /\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|iu|ml)\b/i
+           to extract dose labels from `product.fullName`. For any
+           thousand-separator dose ("Vitamin B12 1,000 mcg", "Vitamin D3
+           10,000 IU") the \b\d+ started matching at the "0" right after
+           the comma, producing "000 mcg" / "000 IU" chips.
+           Fix: replaced with
+             /\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:mg|mcg|g|iu|ml)\b/i
+           in three places (extractVariantLabel, parseDose,
+           normaliseFamilyName), and stripped commas before parseFloat so
+           median-dose sorting still works. Verified with node one-liner:
+             "Vitamin B12 1,000 mcg" -> "1,000 mcg"     (was: "000 mcg")
+             "Vitamin D3 10,000 IU"  -> "10,000 IU"     (was: "000 IU")
+             "Fish Oil 1200 mg"       -> "1200 mg"       (unchanged)
+             "Methylfolate 1 mg"      -> "1 mg"          (unchanged)
+
+        2) MOBILE / INSTALLED-PWA NOT SEEING NEW EDITORIAL PUBLISHINGS
+           Root cause: `/api/editorial/featured` had no cache-control
+           headers. Even though the SW handler is NetworkOnly for /api/*,
+           mobile Safari / installed-PWA WebViews aggressively HTTP-cache
+           fetch() responses without Cache-Control set. Newly-published
+           articles wouldn't appear on phones for hours or until manual
+           cache clear.
+           Fix (defense in depth):
+             a) Added `export const dynamic = 'force-dynamic'`,
+                `revalidate = 0`, `fetchCache = 'force-no-store'` at the
+                top of /app/app/api/[[...path]]/route.js so Next never
+                snapshots the response.
+             b) Added a NO_STORE_HEADERS const with
+                Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+                (plus Pragma, Expires, CDN-Cache-Control, Vercel-CDN-Cache-Control)
+                and returned it on both /api/editorial/featured and
+                /api/editorial/search responses.
+             c) Client fetches in /app/components/editorial-featured.jsx
+                and /app/components/editorial-picks.jsx now pass
+                { cache: 'no-store' } and append `&_=${Date.now()}` for
+                belt-and-braces cache-busting.
+             d) Bumped Serwist CACHE_VERSION from v2 -> v3 in
+                /app/app/sw.js so existing installed-PWA users get their
+                stale page shells purged the next time the SW updates.
+
+        NO backend behaviour change beyond headers; existing article
+        contract is untouched. No re-testing required unless the frontend
+        agent verifies the dose chip visually.
+
 agent_communication:
     -agent: "main"
       message: |
