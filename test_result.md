@@ -1674,14 +1674,13 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.4"
-  test_sequence: 4
+  version: "1.5"
+  test_sequence: 5
   run_ui: false
 
 test_plan:
   current_focus:
-    - "GET /api/supplements/dsld/search — NIH DSLD proxy for supplement discovery"
-    - "GET /api/supplements/dsld/{id} — NIH DSLD label detail proxy"
+    - "Supplement Discovery — Phase 2 enrichment (certifications + brand profiles + ontology)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"

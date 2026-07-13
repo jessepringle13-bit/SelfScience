@@ -10,8 +10,10 @@
 import { useMemo, useState } from 'react'
 import {
   ExternalLink, ShieldCheck, Beaker, Info, AlertTriangle, ChevronDown,
-  Search, Package, Sparkles,
+  Search, Package, Sparkles, Building2,
 } from 'lucide-react'
+import CertBadges from './CertBadges'
+import BrandProfileDrawer from './BrandProfileDrawer'
 
 const TIER_BADGE = {
   preferred: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', label: 'Preferred form', icon: ShieldCheck },
@@ -25,6 +27,7 @@ export default function GroupedProductCard({ group, whyThisFits }) {
   const [openTip, setOpenTip] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const variant = useMemo(
     () => group.variants.find((v) => v.id === variantId) || group.variants[0],
@@ -34,6 +37,9 @@ export default function GroupedProductCard({ group, whyThisFits }) {
   const brand = product.brand || {}
   const brandUrl = brand?.url?.url
   const brandUrlSource = brand?.url?.source
+  const transparencyScore = brand?.transparencyScore ?? group.defaultVariant?.brand?.transparencyScore ?? null
+  const hasProfile = !!(brand?.profileSlug || group.defaultVariant?.brand?.profileSlug)
+  const certifications = product?.certifications || []
 
   const loadDetail = async () => {
     if (detail?.id === product.id || loadingDetail) return
@@ -56,14 +62,37 @@ export default function GroupedProductCard({ group, whyThisFits }) {
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
-      {/* Brand header */}
+      {/* Brand header (clickable when a profile exists) */}
       <header className="p-4 md:p-5 border-b border-slate-100">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-semibold text-[#1B474D] text-sm">{group.brand}</span>
+        <div className="flex items-center gap-2 text-xs flex-wrap">
+          {hasProfile ? (
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="inline-flex items-center gap-1 font-semibold text-[#1B474D] text-sm hover:underline"
+              title="View brand transparency profile"
+            >
+              {group.brand}
+              <Building2 className="h-3.5 w-3.5 opacity-70" />
+            </button>
+          ) : (
+            <span className="font-semibold text-[#1B474D] text-sm">{group.brand}</span>
+          )}
           {group.curated && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF7F7] text-[#1B474D] border border-[#1B474D]/20 px-2 py-0.5 text-[11px] font-semibold">
               <ShieldCheck className="h-3 w-3" /> Curated brand
             </span>
+          )}
+          {typeof transparencyScore === 'number' && (
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full bg-white border border-[#1B474D]/20 px-2 py-0.5 text-[11px] text-[#1B474D] hover:bg-[#EEF7F7]"
+              title="Transparency score (click for profile)"
+            >
+              <span className="font-semibold">{transparencyScore}</span>
+              <span className="text-[#1B474D]/60">/5</span>
+            </button>
           )}
           {group.variantCount > 1 && (
             <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px]">
@@ -74,13 +103,9 @@ export default function GroupedProductCard({ group, whyThisFits }) {
         <h3 className="mt-1 text-base md:text-lg font-semibold text-slate-900 leading-snug">
           {group.family}
         </h3>
-        {group.trustBadges?.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {group.trustBadges.map((t) => (
-              <span key={t} className="inline-flex items-center gap-1 rounded-full bg-[#EEF7F7] text-[#1B474D] border border-[#1B474D]/20 px-2 py-0.5 text-[11px]">
-                <ShieldCheck className="h-3 w-3" />{t}
-              </span>
-            ))}
+        {certifications.length > 0 && (
+          <div className="mt-2">
+            <CertBadges certifications={certifications} maxVisible={5} />
           </div>
         )}
       </header>
@@ -109,7 +134,21 @@ export default function GroupedProductCard({ group, whyThisFits }) {
                         <span className="text-slate-500"> · {f.ingredient}</span>
                       </div>
                       {openTip === key && (
-                        <div className="mt-1 text-xs text-slate-700">{f.explain}</div>
+                        <div className="mt-1 text-xs text-slate-700 space-y-1">
+                          <p>{f.explain}</p>
+                          {(f.evidence || f.halfLife || f.pairWith) && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {f.evidence && <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px]">Evidence: {f.evidence}</span>}
+                              {f.halfLife && <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px]">Half-life: {f.halfLife}</span>}
+                              {f.pairWith && <span className="inline-flex items-center rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px]">Pair with: {f.pairWith}</span>}
+                            </div>
+                          )}
+                          {f.caution && (
+                            <p className="rounded bg-amber-50 border border-amber-200 text-amber-900 px-2 py-1 text-[11px] mt-1">
+                              <strong>Caution:</strong> {f.caution}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                     <ChevronDown className={`h-4 w-4 text-slate-500 transition ${openTip === key ? 'rotate-180' : ''}`} />
@@ -245,6 +284,12 @@ export default function GroupedProductCard({ group, whyThisFits }) {
           )}
         </div>
       </details>
+
+      <BrandProfileDrawer
+        brandName={group.brand}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
     </article>
   )
 }

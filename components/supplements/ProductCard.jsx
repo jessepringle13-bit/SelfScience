@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { ExternalLink, ShieldCheck, Beaker, Info, Package, AlertTriangle, ChevronDown, Search } from 'lucide-react'
+import { ExternalLink, ShieldCheck, Beaker, Info, Package, AlertTriangle, ChevronDown, Search, Building2 } from 'lucide-react'
+import CertBadges from './CertBadges'
+import BrandProfileDrawer from './BrandProfileDrawer'
 
 const TIER_BADGE = {
   preferred: { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', label: 'Preferred form', icon: ShieldCheck },
@@ -13,11 +15,15 @@ export default function ProductCard({ product }) {
   const [openTip, setOpenTip] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const brand = product?.brand || {}
   const brandUrl = brand?.url?.url
   const brandUrlSource = brand?.url?.source
   const isCurated = !!brand?.curated
+  const hasProfile = !!brand?.profileSlug
+  const transparencyScore = brand?.transparencyScore ?? null
+  const certifications = product?.certifications || []
 
   const loadDetail = async () => {
     if (detail || loadingDetail) return
@@ -36,12 +42,34 @@ export default function ProductCard({ product }) {
       <div className="p-4 md:p-5 border-b border-slate-100">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <span className="font-semibold text-[#1B474D]">{brand.name}</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+              {hasProfile ? (
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(true)}
+                  className="inline-flex items-center gap-1 font-semibold text-[#1B474D] hover:underline"
+                  title="View brand transparency profile"
+                >
+                  {brand.name}
+                  <Building2 className="h-3 w-3 opacity-70" />
+                </button>
+              ) : (
+                <span className="font-semibold text-[#1B474D]">{brand.name}</span>
+              )}
               {isCurated && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF7F7] text-[#1B474D] border border-[#1B474D]/20 px-2 py-0.5">
-                  <ShieldCheck className="h-3 w-3" /> Curated brand
+                  <ShieldCheck className="h-3 w-3" /> Curated
                 </span>
+              )}
+              {typeof transparencyScore === 'number' && (
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-full bg-white border border-[#1B474D]/20 px-2 py-0.5 text-[#1B474D] hover:bg-[#EEF7F7]"
+                  title="Transparency score"
+                >
+                  <span className="font-semibold">{transparencyScore}</span>/5
+                </button>
               )}
             </div>
             <h3 className="mt-1 text-base md:text-lg font-semibold text-slate-900 leading-snug">
@@ -106,14 +134,10 @@ export default function ProductCard({ product }) {
         ) : null}
       </div>
 
-      {/* Trust badges */}
-      {brand.trustBadges?.length > 0 && (
-        <div className="px-4 md:px-5 pb-3 flex flex-wrap gap-1.5">
-          {brand.trustBadges.map((t) => (
-            <span key={t} className="inline-flex items-center gap-1 rounded-full bg-[#EEF7F7] text-[#1B474D] border border-[#1B474D]/20 px-2 py-0.5 text-[11px]">
-              <ShieldCheck className="h-3 w-3" />{t}
-            </span>
-          ))}
+      {/* Certification badges (product-level + brand programmes) */}
+      {certifications.length > 0 && (
+        <div className="px-4 md:px-5 pb-3">
+          <CertBadges certifications={certifications} maxVisible={5} />
         </div>
       )}
 
@@ -174,6 +198,12 @@ export default function ProductCard({ product }) {
           )}
         </div>
       </details>
+
+      <BrandProfileDrawer
+        brandName={brand.name}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      />
     </article>
   )
 }
