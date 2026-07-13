@@ -842,30 +842,98 @@ frontend:
         -working: true
           agent: "main"
           comment: |
-            New /practitioner-report page renders a single-sheet clinician-
-            facing summary designed to hand to a doctor. Sections:
-              1. Overview counts (SNPs recognised, awareness, strengths, PGx
-                 genes, biomarker fields filled)
-              2. Awareness findings table (gene / rsID / genotype / note)
-              3. Strengths findings table
-              4. PGx phenotype table across 7 CPIC-relevant genes with the
-                 supporting rsID:genotype calls exposed for verification
-              5. Biomarker panel (only shows fields the user has filled)
-              6. Additional neutral findings (compact)
-              7. Raw genotype appendix — every recognised rsID + call for
-                 cross-referencing against clinical panels
-            Header includes editable patient name, practitioner name, and
-            report date (persisted in sessionStorage). Everything else derives
-            from the existing genome report + biomarker localStorage.
-            Print stylesheet: SiteNav + on-screen action buttons are marked
-            .ss-screen-only and hidden on print; new .ss-print-sheet scope
-            overrides the aggressive global "header/footer/button hidden"
-            print rules so the report letterhead + disclaimer footer survive.
-            Verified: screen render, filled name inputs, and print-media
-            emulation all look clean; biomarker section populates when
-            localStorage 'selfscience_biomarker_values' has values.
-            Also added to Tools dropdown (desktop nav), mobile drawer, and
-            Dashboard "Deep-Dive Tools" grid.
+            [ORIGINAL] Basic single-sheet practitioner report with letterhead,
+            overview counts, awareness/strengths tables, PGx phenotype table,
+            biomarker table, raw appendix, and educational disclaimer.
+        -working: true
+          agent: "main"
+          comment: |
+            [FULL ENHANCEMENT — June 2026] Complete restructure into a
+            two-view experience (on-screen controls + print layout).
+
+            New components:
+              • /app/lib/practitionerIntake.js — localStorage schema + helpers
+                (loadIntake, saveIntake, clearIntake, loadPrintSections,
+                savePrintSections, ageFromDob, bmiFrom).
+              • /app/components/practitioner/IntakeForm.jsx — 16-field
+                pre-report intake form (patient name, DOB, sex, height,
+                weight, practitioner name/role, reason for visit, medications,
+                supplements, allergies, family history, lifestyle, symptoms
+                timeline, prior labs, goals + two consent checkboxes).
+                Auto-saves to localStorage on every keystroke; auto-collapses
+                when critical fields are filled.
+              • /app/components/practitioner/SectionToggles.jsx — Screen-only
+                checkbox panel. Cover + HIPAA and Legal Disclaimer are LOCKED
+                ON (never toggle-able). Biomarker toggle auto-disables + hides
+                when no biomarker data exists.
+              • /app/components/practitioner/TellYourDoctorTips.jsx —
+                Orange-accent tips card ("What to tell your doctor").
+              • /app/components/practitioner/PrintCoverPage.jsx — Print
+                page 1 with SelfScience logo/name/tagline, report metadata,
+                patient/practitioner demographic table, HIPAA Confidentiality
+                & Acknowledgment block (4 paragraphs), and dual signature
+                lines (patient + practitioner).
+              • /app/components/practitioner/ClinicianNote.jsx — Print
+                page 2, professional note explaining SelfScience methodology
+                and limitations to a first-time clinician.
+              • /app/components/practitioner/PatientContextTable.jsx —
+                Print page 3, demographic strip + 9-row self-reported
+                context table.
+              • /app/components/practitioner/BiomarkerSummary.jsx — Print
+                page 4, pulls LATEST snapshot from biomarker history
+                (fallback to single-panel values), evaluates each marker
+                against schema-driven ranges, renders as clinical table
+                with Standard clinical range + Optimization target +
+                colour-coded status (In target / Borderline / Outside).
+              • /app/components/practitioner/GeneticVariantSummary.jsx —
+                Print page 5, composes 3a Awareness / 3b Strengths /
+                3c PGx phenotype snapshot / 3d Additional neutral variants /
+                3e (optional) Raw genotype appendix.
+              • /app/components/practitioner/DisclaimerPage.jsx — Final
+                print page, 9-clause full legal disclaimer (no medical
+                advice, not diagnostic, single-SNP inference caveat,
+                self-reported data, population-frequency caveat, warranty
+                disclaimer, privacy, emergency care, governing terms).
+
+            /app/app/globals.css — added @media print rules:
+              .no-print / .print-only / .page-break-before / .page-break-after /
+              .avoid-break utility classes; @page Letter with 0.5-0.6in margins;
+              ss-print-sheet base font-size 11px for print.
+
+            /app/app/practitioner-report/practitioner-report-client.jsx —
+            complete rewrite to compose all the above. Uses "Preview print
+            layout" toggle to show the print sheet on-screen for QA.
+            "Print / Save as PDF" button calls window.print() with a small
+            setTimeout to let React finish flushing state.
+
+            CRITICAL BUG FIX during implementation: the legacy shim at
+            /app/lib/biomarkers.js overrides evaluateBiomarker() to return a
+            STRING (legacy 3-tier vocabulary) whereas the new schema-driven
+            evaluator at /app/lib/biomarkers/status.js returns an OBJECT
+            { status, isClinicallyAbnormal, value }. Since @/lib/biomarkers
+            resolves to the legacy file first, BiomarkerSummary was
+            incorrectly showing "Insufficient context" for every marker.
+            Fixed by importing directly from '@/lib/biomarkers/status'.
+
+            Screenshot verified end-to-end with seeded genome + biomarker +
+            intake data:
+              • Cover page renders logo, tagline, report ID, patient +
+                practitioner blocks, HIPAA acknowledgment, dual signature
+                lines with printed names.
+              • Clinician note renders with methodology + 5 key limitations.
+              • Patient context table renders demographic strip + 9
+                self-reported rows with "Not provided" fallback.
+              • Biomarker summary correctly shows HbA1c 5.4→Borderline,
+                HDL 62→In target, hs-CRP 0.6→In target, Vitamin D 42→In
+                target with proper colour-coded status and legend.
+              • Genetic variant summary shows 3a/3b/3c with PGx snapshot.
+              • Final disclaimer page renders all 9 numbered clauses.
+              • Section toggles hide/show sections correctly.
+              • Biomarker section auto-hides when hasBiomarkers = false.
+
+            Privacy compliance: NO backend calls added. All intake, biomarker,
+            genome data stays in localStorage/sessionStorage. Print uses
+            window.print(). NO PHI transmitted anywhere.
 
   - task: "Ancestry — External services card + AIM marker expansion"
     implemented: true

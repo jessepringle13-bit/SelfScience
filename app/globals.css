@@ -120,8 +120,28 @@ html.ss-print-mode .ss-tab-hidden { display: block !important; }
 /* Elements marked ss-screen-only should NEVER appear in a printed report.
    Used for the app nav + on-page action buttons. */
 @media print {
-  .ss-screen-only { display: none !important; }
+  .ss-screen-only,
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  /* Explicit page-break utilities used throughout the Practitioner Report. */
+  .page-break,
+  .page-break-before { page-break-before: always !important; break-before: page !important; }
+  .page-break-after  { page-break-after: always !important; break-after: page !important; }
+  .avoid-break       { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+  /* A4 / Letter margins for the practitioner PDF export. */
+  @page {
+    size: Letter;
+    margin: 0.6in 0.5in 0.55in 0.5in;
+  }
+
+  /* Ensure the practitioner sheet body font is a smidge tighter for print. */
+  .ss-print-sheet { font-size: 11px; line-height: 1.45; }
 }
+
+/* On-screen: .print-only content should be hidden. */
+.print-only { display: none; }
 
 /* PWA: leave clearance below content so the MobileNav bottom bar (max-width
  * 767px) doesn't cover footer / action buttons. `env(safe-area-inset-bottom)`
