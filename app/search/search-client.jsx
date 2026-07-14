@@ -207,16 +207,33 @@ export default function SearchClient() {
   // browser Back button acts as an undo for the pillar filter. We use
   // replace (not push) so a series of pillar toggles doesn't clutter the
   // history stack.
+  //
+  // We ALSO clear activeGenes whenever the pillar CHANGES (not on first
+  // mount): a gene selected under one pillar is almost never relevant to
+  // the new pillar's context, and leaving it selected caused a confusing
+  // "why are these old genes still highlighted?" UX bug (reported by user).
+  const prevPillarRef = useRef(initialPillar)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const usp = new URLSearchParams(window.location.search)
     const current = usp.get('pillar') || ''
-    if (current === pillar) return
-    if (pillar) usp.set('pillar', pillar)
-    else usp.delete('pillar')
+    if (current !== pillar) {
+      if (pillar) usp.set('pillar', pillar)
+      else usp.delete('pillar')
+    }
+    // Clear any previously-selected gene chips when the pillar actually
+    // transitions to a different value. Skip on first mount (prevPillar
+    // is set from the URL, so it starts equal to `pillar`).
+    if (prevPillarRef.current !== pillar) {
+      prevPillarRef.current = pillar
+      setActiveGenes([])
+      usp.delete('genes')
+    }
     const qs = usp.toString()
     const next = `${window.location.pathname}${qs ? `?${qs}` : ''}`
-    window.history.replaceState({}, '', next)
+    if (`${window.location.pathname}${window.location.search}` !== next) {
+      window.history.replaceState({}, '', next)
+    }
   }, [pillar])
   const [activeGenes, setActiveGenes] = useState(initialGenes)
   // Default date filter: 10 years when any structured hand-off is active
