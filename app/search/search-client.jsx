@@ -201,6 +201,23 @@ export default function SearchClient() {
   const [submittedQ, setSubmittedQ] = useState(initialQ)
   const [sourceType, setSourceType] = useState('all')
   const [pillar, setPillar] = useState(initialPillar)
+  // Keep the URL's ?pillar= query param in sync with the local state so that
+  // (a) the shared usePillarFilter() hook on Dashboard/Genome picks up the
+  // same selection, (b) sharing the URL preserves the pillar, and (c) the
+  // browser Back button acts as an undo for the pillar filter. We use
+  // replace (not push) so a series of pillar toggles doesn't clutter the
+  // history stack.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const usp = new URLSearchParams(window.location.search)
+    const current = usp.get('pillar') || ''
+    if (current === pillar) return
+    if (pillar) usp.set('pillar', pillar)
+    else usp.delete('pillar')
+    const qs = usp.toString()
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ''}`
+    window.history.replaceState({}, '', next)
+  }, [pillar])
   const [activeGenes, setActiveGenes] = useState(initialGenes)
   // Default date filter: 10 years when any structured hand-off is active
   // (pillar, or pillar+genes, or explicit gene set) — else All Time so
