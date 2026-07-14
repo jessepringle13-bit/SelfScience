@@ -16,7 +16,7 @@ import { ResultCard } from '@/components/result-card'
 import { EditorialPicks } from '@/components/editorial-picks'
 import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { trackEvent, EVENTS } from '@/lib/analytics'
-import { getPillarQuery, isYouthQuery } from '@/lib/pillars'
+import { getPillarQuery, isYouthQuery, normalizePillarName } from '@/lib/pillars'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 
@@ -241,11 +241,18 @@ export default function SearchClient() {
     // De-duplicate gene symbols across all classified cards. We stable-sort
     // "awareness > strengths > neutral" so the chip row leads with findings
     // the user most likely wants to research first.
+    // When a pillar is active we ONLY surface genes tagged with that pillar
+    // (via the classifier's `.pillar` field, normalised so classifier names
+    // like "Brain & Neurochemistry" map to canonical UI PILLARS).
     const rank = { awareness: 0, strength: 1, positive: 1, neutral: 2 }
     const seen = new Map()
     for (const c of flattenReportCards(genomeReport)) {
       const g = (c.gene || '').trim()
       if (!g || /^rs\d/i.test(g)) continue
+      if (pillar) {
+        const norm = normalizePillarName((c.pillar || '').trim())
+        if (norm !== pillar) continue
+      }
       // Split combined gene labels like "MTHFR (C677T)" or "APOE ε3/ε4" into
       // just the primary gene symbol.
       const symbol = g.split(/[\s(/·+,]/)[0].toUpperCase()
@@ -255,7 +262,7 @@ export default function SearchClient() {
       if (!prev || r < prev.rank) seen.set(symbol, { symbol, rank: r, classification: c.classification })
     }
     return [...seen.values()].sort((a, b) => a.rank - b.rank || a.symbol.localeCompare(b.symbol))
-  }, [genomeReport])
+  }, [genomeReport, pillar])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -655,6 +662,26 @@ export default function SearchClient() {
               eating vertical real estate. */}
           {yourGenes.length > 0 && (
             <div className="mx-auto mt-4 max-w-4xl">
+              {/* Pillar-filter context banner. Only shown when a pillar is
+                  active AND we have genes to display. Matches the tone of
+                  the "Showing genes relevant to: X" copy used on Dashboard. */}
+              {pillar && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] text-white/90">
+                  <span>
+                    Showing genes relevant to:{' '}
+                    <strong className="font-bold">
+                      {PILLARS.find((p) => p.name === pillar)?.short || pillar}
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPillar('')}
+                    className="rounded-full border border-white/30 px-2 py-0.5 text-[10px] font-semibold text-white/90 hover:bg-white/10"
+                  >
+                    Show all
+                  </button>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-ss-orange" />

@@ -38,6 +38,8 @@ import YourProtocolTab from '@/components/YourProtocolTab'
 import { saveGenomeResults, clearGenomeResults, notifyGenomeResultsChanged } from '@/lib/genomeSession'
 import GenomeSupplementLinks from '@/components/genome/GenomeSupplementLinks'
 import { YOUTH_VARIANT_CROSSREFS } from '@/lib/youth-content'
+import { normalizePillarName } from '@/lib/pillars'
+import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -736,11 +738,22 @@ function OverviewTab({ report, onSearch }) {
   const a = report?.overview?.areasToExplore || []
   const sys = report?.overview?.systemView
   const [filter, setFilter] = useState('all')
+  // Pillar filter — bound to the ?pillar= URL param so it stays in sync
+  // with the Dashboard + Search page filters (persistent across all three
+  // pages via the shared URL, as agreed with the user).
+  const { pillar: activePillar, setPillar, clear: clearPillar, isFiltering } = usePillarFilter()
+  const matchesPillar = (card) => {
+    if (!activePillar) return true
+    const norm = normalizePillarName((card?.pillar || '').trim())
+    return norm === activePillar
+  }
   // Combined pool for filter/sort operations. When filter is 'all' we render
   // the two original sections (Strengths + Areas) intact. Otherwise we render
   // a single unified grid so the filter feels honest — "Positive" shouldn't
   // still have an empty "Areas to Explore" header underneath it.
-  const allCards = [...s, ...a]
+  const rawStrengths = activePillar ? s.filter(matchesPillar) : s
+  const rawAreas     = activePillar ? a.filter(matchesPillar) : a
+  const allCards = [...rawStrengths, ...rawAreas]
   const counts = {
     all:       allCards.length,
     strength:  allCards.filter((c) => c.classification === 'Strength').length,
@@ -752,6 +765,21 @@ function OverviewTab({ report, onSearch }) {
 
   return (
     <div className="space-y-10">
+      {/* Pillar filter + banner */}
+      <div>
+        <div className="flex flex-wrap items-center gap-3">
+          <PillarFilter value={activePillar} onChange={setPillar} />
+          {!isFiltering && (
+            <span className="text-[11px] italic text-ss-muted">
+              Filter your variants by a specific pillar.
+            </span>
+          )}
+        </div>
+        {isFiltering && (
+          <PillarFilterBanner pillar={activePillar} onClear={clearPillar} className="mt-3" />
+        )}
+      </div>
+
       <YouthCrossRefPanel cards={allCards} />
       <ClassificationFilter value={filter} onChange={setFilter} counts={counts} />
 
@@ -778,11 +806,11 @@ function OverviewTab({ report, onSearch }) {
           <div>
             <SectionHeader
               icon={<ShieldCheck size={16} className="text-ss-green" />}
-              title={`Your Genetic Strengths${s.length ? ` (${s.length})` : ''}`}
+              title={`Your Genetic Strengths${rawStrengths.length ? ` (${rawStrengths.length})` : ''}`}
               hint="Variants generally associated with favorable traits in the literature."
             />
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {s.map((it, i) => (
+              {rawStrengths.map((it, i) => (
                 <OverviewCard key={i} item={it} tone="strength" onSearch={onSearch} />
               ))}
             </div>
@@ -790,11 +818,11 @@ function OverviewTab({ report, onSearch }) {
           <div>
             <SectionHeader
               icon={<Sparkles size={16} className="text-ss-amber" />}
-              title={`Areas to Explore${a.length ? ` (${a.length})` : ''}`}
+              title={`Areas to Explore${rawAreas.length ? ` (${rawAreas.length})` : ''}`}
               hint="Every recognized variant worth understanding better — not a diagnosis or warning."
             />
             <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-              {a.map((it, i) => (
+              {rawAreas.map((it, i) => (
                 <OverviewCard key={i} item={it} tone="aware" onSearch={onSearch} />
               ))}
             </div>

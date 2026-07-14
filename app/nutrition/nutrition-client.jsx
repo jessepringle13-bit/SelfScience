@@ -792,6 +792,10 @@ function ScannerTab({ activeRules, hasGenome }) {
   const [onlyOrganic, setOnlyOrganic] = useState(false)
   const [hideSeedOils, setHideSeedOils] = useState(false)
   const [hideArtSweetener, setHideArtSweetener] = useState(false)
+  // Collapsed by default so the aisle grid doesn't push the results
+  // below the fold on first paint. Auto-opens if we detect the user
+  // arrived without any prior search state.
+  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false)
 
   const [lastSearch, setLastSearch] = useState(null) // { barcode?, q?, category? }
 
@@ -957,29 +961,106 @@ function ScannerTab({ activeRules, hasGenome }) {
             </div>
           )}
 
-          {/* Category quick-browse — grouped by aisle. Each aisle renders as
-              its own fixed-column grid so labels align cleanly instead of
-              wrapping into a jagged block. */}
+          {/* Category quick-browse — collapsed by default so it doesn't
+              eat vertical space above the fold. When a category is
+              already selected we surface a compact chip next to the
+              toggle so the user knows what's active without having to
+              expand the panel. */}
           <div className="mt-5">
-            <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-ss-muted">Browse by category</div>
-            <div className="space-y-3">
-              {CATEGORY_GROUPS.map((group) => (
-                <div key={group}>
-                  <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ss-muted/80">{group}</div>
-                  <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-                    {QUICK_CATEGORIES.filter((c) => c.group === group).map((c) => (
-                      <button
-                        key={c.key}
-                        onClick={() => runSearch({ category: c.key })}
-                        className="truncate rounded-lg border border-ss-border-warm bg-white px-2 py-1.5 text-center text-[11px] font-semibold text-ss-teal transition hover:bg-ss-bg"
-                        title={c.label}
+            <div className="rounded-2xl border border-ss-border-warm bg-white shadow-sm">
+              <button
+                type="button"
+                onClick={() => setCategoryPanelOpen((v) => !v)}
+                className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+                aria-expanded={categoryPanelOpen}
+                aria-controls="category-panel"
+              >
+                <div className="flex flex-1 items-center gap-2 min-w-0">
+                  <div className="text-xs font-bold uppercase tracking-widest text-ss-teal">
+                    Browse by category
+                  </div>
+                  {lastSearch?.category && (() => {
+                    const c = QUICK_CATEGORIES.find((x) => x.key === lastSearch.category)
+                    if (!c) return null
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-ss-teal/10 px-2 py-0.5 text-[11px] font-semibold text-ss-teal"
+                        title={`Currently browsing: ${c.label}`}
                       >
-                        {c.label}
-                      </button>
+                        <span className="max-w-[140px] truncate">{c.label}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Clear ${c.label} category`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setLastSearch(null)
+                            setProducts([])
+                            setSelectedProduct(null)
+                            setNotice(null)
+                            setError(null)
+                            setHasMore(false)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              setLastSearch(null)
+                              setProducts([])
+                              setSelectedProduct(null)
+                              setNotice(null)
+                              setError(null)
+                              setHasMore(false)
+                            }
+                          }}
+                          className="inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-ss-teal/20"
+                        >
+                          <X size={10} />
+                        </span>
+                      </span>
+                    )
+                  })()}
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 text-ss-muted transition ${categoryPanelOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {categoryPanelOpen && (
+                <div id="category-panel" className="border-t border-ss-border-warm px-4 pb-4 pt-3">
+                  <div className="space-y-3">
+                    {CATEGORY_GROUPS.map((group) => (
+                      <div key={group}>
+                        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ss-muted/80">{group}</div>
+                        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+                          {QUICK_CATEGORIES.filter((c) => c.group === group).map((c) => {
+                            const isActive = lastSearch?.category === c.key
+                            return (
+                              <button
+                                key={c.key}
+                                onClick={() => {
+                                  runSearch({ category: c.key })
+                                  // Auto-collapse after selection so results
+                                  // get the whole viewport.
+                                  setCategoryPanelOpen(false)
+                                }}
+                                className={`truncate rounded-lg border px-2 py-1.5 text-center text-[11px] font-semibold transition ${
+                                  isActive
+                                    ? 'border-ss-teal bg-ss-teal text-white'
+                                    : 'border-ss-border-warm bg-white text-ss-teal hover:bg-ss-bg'
+                                }`}
+                                title={c.label}
+                              >
+                                {c.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

@@ -18,9 +18,11 @@ import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants, flattenReportCards } from '@/lib/supplementProtocol'
 import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
+import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
 
 export default function Dashboard() {
   const [report, setReport] = useState(null)
+  const { pillar: activePillar, setPillar, clear: clearPillar, isFiltering } = usePillarFilter()
 
   // Hydrate from sessionStorage after mount so we don't hit SSR issues.
   useEffect(() => {
@@ -30,30 +32,24 @@ export default function Dashboard() {
     return () => window.removeEventListener('selfscience:genome-changed', onChange)
   }, [])
 
-  const strengths = (report?.overview?.strengths || []).slice(0, 3)
-  const areas     = (report?.overview?.areasToExplore || []).slice(0, 3)
+  const allStrengths = report?.overview?.strengths || []
+  const allAreas     = report?.overview?.areasToExplore || []
 
-  // Derive top 3 gene symbols from strengths + areas for research matching.
-  const topGenes = useMemo(() => {
-    const genes = []
-    const seen = new Set()
-    for (const c of [...areas, ...strengths]) {
-      const raw = (c?.gene || '').trim()
-      // Skip rsID-list style gene fields from haplotypes.
-      if (!raw || /^rs\d/i.test(raw) || raw.includes(' + ') || raw.includes(',')) continue
-      if (seen.has(raw)) continue
-      seen.add(raw)
-      genes.push(raw)
-      if (genes.length >= 3) break
-    }
-    return genes
-  }, [report])
+  // Filter strengths + areas by the active pillar. When no pillar is
+  // selected, we behave exactly like before (top 3 of everything).
+  // Card `.pillar` names come from the classifier and may not match the
+  // canonical UI names — route them through normalizePillarName first.
+  const matchesPillar = useCallback(
+    (card) => {
+      if (!activePillar) return true
+      const norm = normalizePillarName((card?.pillar || '').trim())
+      return norm === activePillar
+    },
+    [activePillar],
+  )
 
-  const protocolPreview = useMemo(() => {
-    if (!report) return []
-    const g = matchProtocolToUserVariants(report)
-    return [...g.priority, ...g.lifestyle, ...g.awareness].slice(0, 3)
-  }, [report])
+  const strengths = useMemo(() => allStrengths.filter(matchesPillar).slice(0, 3), [allStrengths, matchesPillar])
+  const areas     = useMemo(() => allAreas.filter(matchesPillar).slice(0, 3), [allAreas, matchesPillar])
 
   const pillarSummary = report?.step1?.pillar_summary || {}
 
@@ -88,6 +84,49 @@ export default function Dashboard() {
     return out
   }, [report])
 
+  // Fast lookup Set of the active pillar's gene symbols (uppercased).
+  // Empty Set when no pillar selected.
+  const pillarGeneSetForActive = useMemo(() => {
+    if (!activePillar) return new Set()
+    return new Set((pillarGenes[activePillar] || []).map((g) => g.toUpperCase()))
+  }, [activePillar, pillarGenes])
+
+  // Derive top 3 gene symbols for research matching.
+  //   * No pillar → union of strengths + areas (legacy behaviour)
+  //   * Pillar    → first 3 of the pillar's tagged gene set so the
+  //                 "Research Matched to You" cards mirror the filter.
+  const topGenes = useMemo(() => {
+    if (activePillar) {
+      return (pillarGenes[activePillar] || []).slice(0, 3)
+    }
+    const genes = []
+    const seen = new Set()
+    for (const c of [...areas, ...strengths]) {
+      const raw = (c?.gene || '').trim()
+      if (!raw || /^rs\d/i.test(raw) || raw.includes(' + ') || raw.includes(',')) continue
+      if (seen.has(raw)) continue
+      seen.add(raw)
+      genes.push(raw)
+      if (genes.length >= 3) break
+    }
+    return genes
+  }, [activePillar, pillarGenes, areas, strengths])
+
+  const protocolPreview = useMemo(() => {
+    if (!report) return []
+    const g = matchProtocolToUserVariants(report)
+    const merged = [...g.priority, ...g.lifestyle, ...g.awareness]
+    if (!activePillar) return merged.slice(0, 3)
+    // When pillar is active, prefer entries whose gene belongs to that
+    // pillar's classifier-tagged gene set. Fall back to the untagged mix
+    // if nothing matches so this card isn't empty on sparse reports.
+    const filtered = merged.filter((e) => {
+      const symbol = String(e?.gene || '').split(/[\s(/·+,]/)[0].toUpperCase()
+      return pillarGeneSetForActive.has(symbol)
+    })
+    return (filtered.length ? filtered : merged).slice(0, 3)
+  }, [report, activePillar, pillarGeneSetForActive])
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#DCEDED] via-[#EAF5F5] to-[#F5FAFA] pb-20">
       <SiteNav />
@@ -113,6 +152,22 @@ export default function Dashboard() {
             See full results <ArrowRight size={14} />
           </Link>
         </div>
+
+        {/* Pillar filter — persists to URL as ?pillar=<name>. Filters the
+            findings, strengths, protocol preview and research-matched
+            sections below. The PillarFilterBanner surfaces the active
+            filter with a clear button. */}
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <PillarFilter value={activePillar} onChange={setPillar} />
+          {!isFiltering && (
+            <span className="text-[11px] italic text-ss-muted">
+              Filter your findings by a specific pillar.
+            </span>
+          )}
+        </div>
+        {isFiltering && (
+          <PillarFilterBanner pillar={activePillar} onClear={clearPillar} className="mt-3" />
+        )}
       </div>
 
       <div className="container mt-10 space-y-14">
