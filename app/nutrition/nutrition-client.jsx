@@ -1187,8 +1187,27 @@ function ProductGridCard({ product, activeRules, onSelect }) {
 
 // -------- Big detailed product card with two scores + ingredient chips --------
 function ProductCard({ product, activeRules, hasGenome, onIngredientClick, onSearchAlternative }) {
-  const q = useMemo(() => analyzeProduct(product, activeRules), [product, activeRules])
-  const n = product.nutriments
+  // Wrap analysis in try/catch so a single malformed ingredient / rule never
+  // brings the whole scanner page down through the global error boundary.
+  // The user still sees the product name, nutriments and ingredients — just
+  // without the two colour-coded scores.
+  const q = useMemo(() => {
+    try {
+      return analyzeProduct(product, activeRules)
+    } catch (err) {
+      if (typeof window !== 'undefined') {
+        console.warn('[ProductCard] analyzeProduct failed:', err)
+      }
+      return {
+        universal: { grade: 'A', flags: [], positives: [], penalty: 0, nova: 0 },
+        genomic:   { grade: 'A', flags: [] },
+      }
+    }
+  }, [product, activeRules])
+  // Defensive: OFF occasionally returns a product record with no nutriments
+  // object at all (very sparse label). Falling back to {} lets the ?? chain
+  // below render "–" placeholders instead of crashing the whole page.
+  const n = product?.nutriments || {}
   const perServing = n.protein_g_serving != null || n.energy_kcal_serving != null
   const macros = perServing
     ? `${n.protein_g_serving ?? '–'}g protein · ${n.carbs_g_serving ?? '–'}g carbs · ${n.fat_g_serving ?? '–'}g fat · ${n.energy_kcal_serving ?? '–'} kcal`
