@@ -327,6 +327,10 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/search" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Search</a>
             <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
 
+            <a href="/genome"                      onClick={() => setMobileOpen(false)} className="hover:opacity-80">Genome (upload)</a>
+            <a href="/genome/overview"             onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Overview</a>
+            <a href="/genome/findings"             onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Findings</a>
+            <a href="/genome/strengths"            onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Strengths</a>
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Tools</div>
             <a href="/get-started"                 onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
             <a href="/nutrition"                   onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>

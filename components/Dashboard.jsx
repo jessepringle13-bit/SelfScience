@@ -146,7 +146,7 @@ export default function Dashboard() {
             </p>
           </div>
           <Link
-            href="/genome"
+            href="/genome/overview"
             className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
           >
             See full results <ArrowRight size={14} />
@@ -178,7 +178,7 @@ export default function Dashboard() {
           ) : (
             <CardRow items={areas} tone="aware" />
           )}
-          <SeeAllLink href="/genome" label="See all findings" />
+          <SeeAllLink href="/genome/findings" label="See all findings" />
         </DashSection>
 
         {/* 2. STRENGTHS */}
@@ -188,7 +188,7 @@ export default function Dashboard() {
           ) : (
             <CardRow items={strengths} tone="strength" />
           )}
-          <SeeAllLink href="/genome" label="See all strengths" />
+          <SeeAllLink href="/genome/strengths" label="See all strengths" />
         </DashSection>
 
         {/* 3. PILLAR SCORE OVERVIEW */}
