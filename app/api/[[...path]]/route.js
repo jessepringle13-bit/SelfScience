@@ -1022,10 +1022,12 @@ async function handleSearch(request) {
     (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, oaN)             : Promise.resolve([]),
     (sourceFilter === 'all' || sourceFilter === 'crossref') ? searchCrossref(effectiveQuery, crossrefN)       : Promise.resolve([]),
     (sourceFilter === 'all' || sourceFilter === 'europepmc')? searchEuropePMC(searchPool, europepmcN)         : Promise.resolve([]),
-    // ClinicalTrials.gov returns its own strip; not merged into literature.
-    // Only fires when we have a real user query (skips empty pillar-only).
-    (effectiveInputQ && (sourceFilter === 'all' || sourceFilter === 'trials'))
-      ? searchClinicalTrials(effectiveInputQ, 12)
+    // ClinicalTrials.gov ALWAYS fires in parallel (no conditional). Uses
+    // whatever query text or pillar keyword is available; returns [] when
+    // nothing meaningful is present. This ensures every search page has the
+    // trials strip populated whenever trials exist for the topic.
+    (sourceFilter === 'all' || sourceFilter === 'trials')
+      ? searchClinicalTrials(effectiveInputQ || effectiveQuery || '', 20)
       : Promise.resolve([]),
     // OMIM + DisGeNET are gene-only registries. Only fire when the query is
     // gene-shaped (see the geneShaped guard above). Both no-op when their

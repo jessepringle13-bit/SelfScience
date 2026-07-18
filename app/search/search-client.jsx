@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { ResultCard } from '@/components/result-card'
+import ClinicalTrialsSection from '@/components/search/ClinicalTrialsSection'
 import { EditorialPicks } from '@/components/editorial-picks'
 import PgxDisclaimer from '@/components/PgxDisclaimer'
 import { trackEvent, EVENTS } from '@/lib/analytics'
@@ -1185,70 +1186,22 @@ export default function SearchClient() {
                 Fetches in parallel; hides itself if there are no matches. */}
             <EditorialPicks query={submittedQ} pillar={pillar} />
 
-            {/* Active & Completed Clinical Trials strip \u2014 from
-                ClinicalTrials.gov. Rendered above the literature list
-                because "is there ongoing research on this?" is often the
-                most important thing a user cares about. */}
+            {/* Clinical Trials — collapsible section above literature.
+                ALWAYS present when trials exist, so users know research is
+                happening RIGHT NOW even if they don't need to enroll.
+                Recruiting trials get a green left-border accent + a
+                "potentially enrolling" note. Every card carries an add-to-
+                practitioner-report button and a genome-relevance tag when
+                a matched gene is in the user's variants. Section is
+                collapsible with a count badge so a page with 20 trials
+                doesn't overwhelm the literature below. Zero-result state
+                skips rendering entirely. */}
             {Array.isArray(data?.clinicalTrials) && data.clinicalTrials.length > 0 && (
-              <div className="mb-6 rounded-2xl border border-ss-teal/30 bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-ss-teal">
-                      Active & Completed Trials
-                    </div>
-                    <h3 className="mt-0.5 text-sm font-bold text-ss-text">
-                      Clinical trials for &ldquo;{submittedQ || pillar || 'your query'}&rdquo; ({data.clinicalTrials.length})
-                    </h3>
-                  </div>
-                  <a
-                    href={`https://clinicaltrials.gov/search?term=${encodeURIComponent(submittedQ || '')}`}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-ss-teal hover:underline"
-                  >
-                    See all on ClinicalTrials.gov \u2192
-                  </a>
-                </div>
-                <div className="grid gap-2 md:grid-cols-2">
-                  {data.clinicalTrials.slice(0, 6).map((t) => (
-                    <a
-                      key={t.id}
-                      href={t.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="group flex flex-col rounded-lg border border-ss-border-warm bg-ss-bg/50 p-3 transition hover:border-ss-teal hover:bg-white"
-                    >
-                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
-                            t.status === 'RECRUITING'
-                              ? 'bg-ss-green/15 text-ss-green'
-                              : t.status === 'COMPLETED'
-                              ? 'bg-ss-teal/15 text-ss-teal'
-                              : 'bg-ss-muted/15 text-ss-muted'
-                          }`}
-                        >
-                          {(t.status || 'unknown').replace(/_/g, ' ').toLowerCase()}
-                        </span>
-                        {t.phase && (
-                          <span className="rounded-full bg-ss-orange/15 px-2 py-0.5 text-ss-orange">
-                            {t.phase}
-                          </span>
-                        )}
-                        {t.year && <span className="text-ss-muted">{t.year}</span>}
-                      </div>
-                      <div className="mt-1 line-clamp-2 text-sm font-semibold text-ss-teal group-hover:underline">
-                        {t.title}
-                      </div>
-                      {t.journal && (
-                        <div className="mt-0.5 line-clamp-1 text-[11px] text-ss-muted">
-                          {t.journal}
-                        </div>
-                      )}
-                    </a>
-                  ))}
-                </div>
-              </div>
+              <ClinicalTrialsSection
+                trials={data.clinicalTrials}
+                query={submittedQ || pillar || 'your query'}
+                userGenes={activeGenes}
+              />
             )}
 
             {/* Evidence tier quick-filter (Strong / Moderate / Limited).
