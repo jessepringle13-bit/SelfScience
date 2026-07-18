@@ -94,10 +94,53 @@ function writeCache(item, data) {
 }
 
 /**
+ * Fetch with retries. Retries only on 5xx and network errors (not on 4xx
+ * client-side rejections which are permanent). Exponential backoff:
+ * attempt 1 immediately, attempt 2 after 800ms, attempt 3 after 1600ms.
+ * Returns parsed JSON on success or `null` after all attempts fail.
+ */
+async function fetchWithRetry(url, opts, { attempts = 3 } = {}) {
+  let lastErr = null
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, opts)
+      if (res.ok) return await res.json()
+      // 4xx (except 429): don't retry — it's a permanent client error.
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+        return null
+      }
+      lastErr = new Error(`HTTP ${res.status}`)
+    } catch (err) {
+      lastErr = err
+    }
+    if (i < attempts - 1) {
+      // Backoff: 800ms, 1600ms
+      await new Promise((r) => setTimeout(r, 800 * (i + 1)))
+    }
+  }
+  if (lastErr && typeof console !== 'undefined') {
+    console.warn('[fetchWithRetry] gave up after', attempts, 'attempts:', lastErr.message)
+  }
+  return null
+}
+
+/**
  * Analyze a list of items via /api/analyze, capped at `concurrency` in-flight requests.
  * Fires reliability + plain-language in PARALLEL per item (they don't depend on each other).
+ *
+ * Behaviour (2026-07 tightening):
+ *   * Concurrency capped at 3 (was 5) — prevents the LLM-side rate-limit
+ *     cascade that produced "Score unavailable" for entire pages.
+ *   * Each network call retries up to 3 attempts with exponential backoff
+ *     before the item is marked as analysis-failed.
+ *   * Items that hit the analysis-failed branch do NOT overwrite a previous
+ *     good score if one exists (the merger honours the earliest successful
+ *     write via analyzedRef).
  */
 async function analyzeInPool(items, concurrency, onResult, onCount) {
+  // Hard-cap the caller's concurrency to protect the LLM budget. Callers
+  // used to pass 5; we now clamp to 3 regardless.
+  const cap = Math.min(concurrency, 3)
   const queue = [...items]
   let inFlight = 0
   const kick = () => onCount && onCount(inFlight)
@@ -109,7 +152,7 @@ async function analyzeInPool(items, concurrency, onResult, onCount) {
         resolve()
         return
       }
-      while (inFlight < concurrency && queue.length > 0) {
+      while (inFlight < cap && queue.length > 0) {
         const item = queue.shift()
         inFlight++
         kick()
@@ -127,32 +170,36 @@ async function analyzeInPool(items, concurrency, onResult, onCount) {
         }
 
         // Fire both endpoints in PARALLEL — they don't depend on each other.
-        // Previously plain-language waited for reliability; that added a full round-trip
-        // per item. Now they run simultaneously, ~halving per-item wall time.
-        const reliabilityP = fetch('/api/score-reliability', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            id: item.id, doi: item.doi, pmid: item.pmid,
-            title: item.title, journal: item.journal,
-            year: item.year, source: item.source,
-            authorsShort: item.authorsShort, abstract: item.abstract,
-          }),
-        })
-          .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-          .catch(() => null)
+        // Each has its own retry envelope so a transient blip on ONE endpoint
+        // doesn't force the other to redo work.
+        const reliabilityP = fetchWithRetry(
+          '/api/score-reliability',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: item.id, doi: item.doi, pmid: item.pmid,
+              title: item.title, journal: item.journal,
+              year: item.year, source: item.source,
+              authorsShort: item.authorsShort, abstract: item.abstract,
+            }),
+          },
+          { attempts: 3 },
+        )
 
-        const plainP = fetch('/api/translate-plain-language', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: item.title,
-            abstract: item.abstract,
-            source: item.source,
-          }),
-        })
-          .then((r) => (r.ok ? r.json() : { plain: '', plainTitle: '', sections: null, relatedSearches: [] }))
-          .catch(() => ({ plain: '', plainTitle: '', sections: null, relatedSearches: [] }))
+        const plainP = fetchWithRetry(
+          '/api/translate-plain-language',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: item.title,
+              abstract: item.abstract,
+              source: item.source,
+            }),
+          },
+          { attempts: 3 },
+        ).then((j) => j || { plain: '', plainTitle: '', sections: null, relatedSearches: [] })
 
         Promise.all([reliabilityP, plainP])
           .then(([rel, plainResp]) => {
@@ -344,7 +391,10 @@ export default function SearchClient() {
         // of grouping all Gene-A hits before Gene-B hits.
         // Cap per-gene fetch so heavy sets (8+ genes) don't overwhelm
         // upstream APIs while still surfacing enough breadth.
-        const perGeneLimit = Math.max(5, Math.min(15, Math.floor(60 / genes.length)))
+        // Fan-out: 100 total budget across genes, min 10 per gene, max 30
+        // per gene. With 3 genes we hit 30/30/30; with 10 genes we hit
+        // 10/10/10/10... which keeps each side ~40-80 items in the pool.
+        const perGeneLimit = Math.max(10, Math.min(30, Math.floor(100 / genes.length)))
         const anchor = trimmed || pillarQuery || ''
         const requests = genes.map((g) => {
           const url = new URL('/api/search', window.location.origin)
@@ -405,7 +455,9 @@ export default function SearchClient() {
       } else {
         const url = new URL('/api/search', window.location.origin)
         if (trimmed) url.searchParams.set('q', trimmed)
-        url.searchParams.set('limit', trimmed ? '40' : '20')
+        // Ask for 80 up front so infinite-scroll (40 initial + 20/batch)
+        // has real headroom without another network round-trip.
+        url.searchParams.set('limit', trimmed ? '80' : '40')
         if (pill) url.searchParams.set('pillar', pill)
         const res = await fetch(url.toString())
         if (!res.ok) throw new Error(`Search failed (${res.status})`)
@@ -605,17 +657,20 @@ export default function SearchClient() {
     return () => obs.disconnect()
   }, [hasMore, filtered.length])
 
-  // Kick off AI analysis for the visible page (only items not yet analyzed)
+  // Kick off AI analysis for the visible page. We now analyze the FULL
+  // initial batch (40) instead of just the top 8 — with concurrency capped
+  // at 3 and per-endpoint retries, this stays inside the LLM budget while
+  // eliminating the "Score unavailable" state that appeared when 40 cards
+  // were visible but only 8 were ever scored.
   useEffect(() => {
     if (!paged.length) return
     const targets = paged
-      .slice(0, 8) // analyze top 8 of the visible page
       .filter((it) => !analyzedRef.current.has(it.id) && !analyses[it.id])
     if (!targets.length) return
     targets.forEach((t) => analyzedRef.current.add(t.id))
     analyzeInPool(
       targets,
-      5,
+      3,
       (id, analysis) => setAnalyses((prev) => ({ ...prev, [id]: analysis })),
       setAnalyzing
     )
@@ -628,7 +683,7 @@ export default function SearchClient() {
     remaining.forEach((t) => analyzedRef.current.add(t.id))
     analyzeInPool(
       remaining,
-      5,
+      3,
       (id, analysis) => setAnalyses((prev) => ({ ...prev, [id]: analysis })),
       setAnalyzing
     )

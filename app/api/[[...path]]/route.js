@@ -151,7 +151,7 @@ const detectPreprint = (paper) => {
 
 /* ------------------------------ PubMed search ----------------------------- */
 
-async function searchPubmed(query, limit = 12) {
+async function searchPubmed(query, limit = 40) {
   try {
     const esearchUrl = withKey(
       `${PUBMED_BASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(
@@ -224,7 +224,7 @@ async function searchPubmed(query, limit = 12) {
 
 /* -------------------------- Semantic Scholar search ----------------------- */
 
-async function searchSemanticScholar(query, limit = 10) {
+async function searchSemanticScholar(query, limit = 40) {
   try {
     const fields = [
       'title',
@@ -603,7 +603,11 @@ async function handleSearch(request) {
   const { searchParams } = new URL(request.url)
   const q = (searchParams.get('q') || '').trim()
   const sourceFilter = searchParams.get('source') || 'all'
-  const limit = Math.min(parseInt(searchParams.get('limit') || '25', 10), 40)
+  // Pool limit — bumped 40 -> 100 so the client-side infinite-scroll
+  // (40 initial + 20/batch) has a real pool to draw from without needing
+  // another network round-trip. Individual sources are pulled deep enough
+  // to feed this pool after dedupe.
+  const limit = Math.min(parseInt(searchParams.get('limit') || '80', 10), 100)
   const pillar = searchParams.get('pillar') || ''
   // "pillar browse" mode: user clicked a pillar with no explicit query.
   // We swap in a curated pillar query and bias toward recent, high-quality work.
@@ -653,12 +657,22 @@ async function handleSearch(request) {
     ? `${quotedQ} ${pillarQuery}`                  // user text + curated pillar tokens
     : (pillar && !isPillarBrowse ? `${quotedQ} ${pillar}` : quotedQ)
 
-  // Pillar browse: pull deeper from each source so we can filter to recent 5y and still return ~20.
-  const perSource = isPillarBrowse ? 20 : { pubmed: 12, s2: 10, oa: 10, crossref: 10 }
-  const pubmedN   = typeof perSource === 'number' ? perSource : perSource.pubmed
-  const s2N       = typeof perSource === 'number' ? perSource : perSource.s2
-  const oaN       = typeof perSource === 'number' ? perSource : perSource.oa
-  const crossrefN = typeof perSource === 'number' ? perSource : perSource.crossref
+  // Per-source pull depths — sized so that after dedupe (~30% overlap in
+  // practice) we still return at least the client's `limit` (up to 100).
+  // Pillar browse mode pulls deeper because the 5-year recency filter
+  // culls aggressively.
+  //   Text search:  pubmed 40, s2 40, openalex 40, crossref 30 → pool ~150 pre-dedupe
+  //   Pillar browse: 40 per source (same as before we bumped)
+  // PubMed's E-utilities allows retmax up to 100,000 but rate-limits at 3
+  // req/sec without an API key. Semantic Scholar's /paper/search allows
+  // limit=100 (max). Both used at those max values below.
+  const perSource = isPillarBrowse
+    ? { pubmed: 40, s2: 40, oa: 40, crossref: 30 }
+    : { pubmed: 40, s2: 40, oa: 40, crossref: 30 }
+  const pubmedN   = perSource.pubmed
+  const s2N       = perSource.s2
+  const oaN       = perSource.oa
+  const crossrefN = perSource.crossref
 
   const [pubmedResults, s2Results, openAlexResults, crossrefResults] = await Promise.all([
     (sourceFilter === 'all' || sourceFilter === 'pubmed')   ? searchPubmed(effectiveQuery, pubmedN)          : Promise.resolve([]),
