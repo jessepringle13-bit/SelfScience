@@ -59,7 +59,9 @@ const PAGE_SIZE = 20
  */
 const CACHE_KEY_PREFIX = 'ss:analysis:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
-const CACHE_VERSION = 3 // bump to invalidate all cached entries after schema change
+// v4 (2026-07) — added `plainTitle` to the plain-language response schema.
+// Older v3 entries still parse but will re-fetch to pick up the new field.
+const CACHE_VERSION = 4
 
 function cacheKeyFor(item) {
   const raw = item.doi || item.pmid || item.id || (item.title || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 120)
@@ -149,8 +151,8 @@ async function analyzeInPool(items, concurrency, onResult, onCount) {
             source: item.source,
           }),
         })
-          .then((r) => (r.ok ? r.json() : { plain: '', sections: null, relatedSearches: [] }))
-          .catch(() => ({ plain: '', sections: null, relatedSearches: [] }))
+          .then((r) => (r.ok ? r.json() : { plain: '', plainTitle: '', sections: null, relatedSearches: [] }))
+          .catch(() => ({ plain: '', plainTitle: '', sections: null, relatedSearches: [] }))
 
         Promise.all([reliabilityP, plainP])
           .then(([rel, plainResp]) => {
@@ -161,6 +163,7 @@ async function analyzeInPool(items, concurrency, onResult, onCount) {
             const merged = {
               ...rel,
               plain: plainResp?.plain || '',
+              plainTitle: plainResp?.plainTitle || '',
               sections: plainResp?.sections || null,
               relatedSearches: plainResp?.relatedSearches || [],
             }
@@ -250,6 +253,19 @@ export default function SearchClient() {
       : (isInitialPillarBrowse || isInitialTextPillar) ? '10' : 'any'
   )
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
+  // Evidence-tier multi-select filter (new, 2026-07). Set of tier keys:
+  // { 'strong' | 'moderate' | 'limited' }. Empty = all tiers shown.
+  // Studies still analyzing (no numeric score) are always visible so the
+  // filter never hides work-in-progress cards.
+  const [evidenceTiers, setEvidenceTiers] = useState(() => new Set())
+  const toggleEvidenceTier = useCallback((key) => {
+    setEvidenceTiers((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
   // For pillar+gene fan-outs we default to Most-Cited so the strongest
   // signals surface first across a mixed round-robin merge.
   const [sortMode, setSortMode] = useState(
@@ -536,6 +552,16 @@ export default function SearchClient() {
       const min = reliabilityFilter === 'excellent' ? 5 : 4
       list = list.filter((r) => typeof r.reliability === 'number' && r.reliability >= min)
     }
+    // Evidence-tier multi-select (Strong / Moderate / Limited). Items that
+    // haven't finished analysis (no numeric score) are always kept in the
+    // list so nothing is silently hidden while the AI catches up.
+    if (evidenceTiers.size > 0) {
+      list = list.filter((r) => {
+        if (typeof r.reliability !== 'number' || r.reliability <= 0) return true
+        const tier = r.reliability >= 4 ? 'strong' : r.reliability === 3 ? 'moderate' : 'limited'
+        return evidenceTiers.has(tier)
+      })
+    }
     // Sort — relevance keeps provider order, citations descends by
     // citationCount (missing values treated as 0), newest descends by year.
     if (sortMode === 'citations') {
@@ -544,16 +570,40 @@ export default function SearchClient() {
       list = [...list].sort((a, b) => (b.year || 0) - (a.year || 0))
     }
     return list
-  }, [merged, sourceType, dateRange, reliabilityFilter, sortMode])
+  }, [merged, sourceType, dateRange, reliabilityFilter, evidenceTiers, sortMode])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages - 1)
-  const paged = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
+  // Infinite-scroll cursor. Starts at INITIAL_BATCH (40), grows by PAGE_SIZE
+  // (20) each time the sentinel below the last card scrolls into view.
+  // Reset whenever filters or the query change so the user always starts at
+  // the top of a fresh result set.
+  const INITIAL_BATCH = 40
+  const [visibleCount, setVisibleCount] = useState(INITIAL_BATCH)
+  const paged = filtered.slice(0, visibleCount)
+  const hasMore = visibleCount < filtered.length
 
-  // Reset to page 0 when filters change
+  // Reset visible count when filters/query change.
   useEffect(() => {
-    setPage(0)
-  }, [sourceType, dateRange, reliabilityFilter, sortMode, pillar, submittedQ])
+    setVisibleCount(INITIAL_BATCH)
+  }, [sourceType, dateRange, reliabilityFilter, evidenceTiers, sortMode, pillar, submittedQ])
+
+  // IntersectionObserver-based auto-loader. Triggers when a sentinel ~80%
+  // down the current results list becomes visible.
+  const loadSentinelRef = useRef(null)
+  useEffect(() => {
+    if (!hasMore) return
+    const el = loadSentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((n) => Math.min(filtered.length, n + PAGE_SIZE))
+        }
+      },
+      { rootMargin: '400px 0px 400px 0px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [hasMore, filtered.length])
 
   // Kick off AI analysis for the visible page (only items not yet analyzed)
   useEffect(() => {
@@ -911,9 +961,59 @@ export default function SearchClient() {
             {/* Editorial Picks (Supabase) \u2014 above external results.
                 Fetches in parallel; hides itself if there are no matches. */}
             <EditorialPicks query={submittedQ} pillar={pillar} />
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+            {/* Evidence tier quick-filter (Strong / Moderate / Limited).
+                Multi-select. Active pills are teal-filled; inactive are
+                outlined. Studies still analyzing bypass this filter. */}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="mr-1 text-[10px] font-bold uppercase tracking-widest text-ss-muted">
+                Evidence
+              </span>
+              {[
+                { key: 'strong',   label: 'Strong',   dot: 'bg-ss-green' },
+                { key: 'moderate', label: 'Moderate', dot: 'bg-ss-amber' },
+                { key: 'limited',  label: 'Limited',  dot: 'bg-[#c2513a]' },
+              ].map((t) => {
+                const active = evidenceTiers.has(t.key)
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => toggleEvidenceTier(t.key)}
+                    aria-pressed={active}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      active
+                        ? 'border-ss-teal bg-ss-teal text-white shadow-sm'
+                        : 'border-ss-border-warm bg-white text-ss-muted hover:border-ss-teal hover:text-ss-teal'
+                    }`}
+                  >
+                    <span className={`inline-block h-2 w-2 rounded-full ${t.dot}`} />
+                    {t.label}
+                  </button>
+                )
+              })}
+              {evidenceTiers.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEvidenceTiers(new Set())}
+                  className="ml-1 text-[11px] font-semibold text-ss-muted underline hover:text-ss-teal"
+                >
+                  Clear
+                </button>
+              )}
+              <span className="ml-auto text-[11px] text-ss-muted">
+                Showing {paged.length} of {filtered.length}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {paged.map((item) => (
-                <ResultCard key={item.id} item={item} highlightGenes={activeGenes} />
+                <ResultCard
+                  key={item.id}
+                  item={item}
+                  highlightGenes={activeGenes}
+                  corpus={filtered}
+                />
               ))}
             </div>
 
@@ -930,36 +1030,22 @@ export default function SearchClient() {
               </div>
             )}
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-10 flex items-center justify-center gap-2">
-                <button
-                  onClick={() => setPage(Math.max(0, currentPage - 1))}
-                  disabled={currentPage === 0}
-                  className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-xs font-semibold text-ss-text ring-1 ring-ss-border-warm disabled:opacity-40 hover:ring-ss-teal"
-                >
-                  <ChevronLeft size={12} /> Prev
-                </button>
-                {Array.from({ length: totalPages }).map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setPage(i)}
-                    className={`h-8 min-w-8 rounded-full px-3 text-xs font-bold transition ${
-                      i === currentPage
-                        ? 'bg-ss-teal text-white'
-                        : 'bg-white text-ss-muted ring-1 ring-ss-border-warm hover:text-ss-teal'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage(Math.min(totalPages - 1, currentPage + 1))}
-                  disabled={currentPage >= totalPages - 1}
-                  className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-xs font-semibold text-ss-text ring-1 ring-ss-border-warm disabled:opacity-40 hover:ring-ss-teal"
-                >
-                  Next <ChevronRight size={12} />
-                </button>
+            {/* Infinite-scroll sentinel + loading indicator */}
+            {hasMore && (
+              <div
+                ref={loadSentinelRef}
+                className="mt-8 flex justify-center py-6 text-xs text-ss-muted"
+                aria-live="polite"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ss-teal border-t-transparent" />
+                  Loading more studies…
+                </span>
+              </div>
+            )}
+            {!hasMore && filtered.length > INITIAL_BATCH && (
+              <div className="mt-8 text-center text-[11px] italic text-ss-muted">
+                End of results — {filtered.length} studies shown.
               </div>
             )}
           </>

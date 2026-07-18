@@ -1032,11 +1032,23 @@ async function handleTranslatePlainLanguage(request) {
     const sections = parsed?.sections && typeof parsed.sections === 'object' ? parsed.sections : null
     // Use "What Did They Find?" as the card preview when sections are present
     const plain = sections?.whatTheyFound?.toString?.().trim?.() || plainRaw
+    // Plain-English title — new field from the extended prompt. Hard-cap at
+    // 10 words defensively in case the model over-generates. Strip trailing
+    // punctuation per prompt rules. Fallback: empty string; card falls back
+    // to the academic title.
+    let plainTitle = (parsed?.plainTitle || '').toString().trim()
+    if (plainTitle) {
+      // Strip trailing period, exclamation, question mark
+      plainTitle = plainTitle.replace(/[.!?]+$/, '').trim()
+      // Enforce 10-word cap
+      const words = plainTitle.split(/\s+/)
+      if (words.length > 10) plainTitle = words.slice(0, 10).join(' ')
+    }
     let relatedSearches = []
     if (Array.isArray(parsed?.relatedSearches)) {
       relatedSearches = parsed.relatedSearches.filter((x) => typeof x === 'string' && x.length).slice(0, 5)
     }
-    return NextResponse.json({ plain, sections, relatedSearches, aiProvider: provider, aiModel: model })
+    return NextResponse.json({ plain, plainTitle, sections, relatedSearches, aiProvider: provider, aiModel: model })
   } catch (err) {
     console.error('translate-plain-language error:', err?.message)
     return NextResponse.json(

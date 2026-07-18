@@ -1688,6 +1688,140 @@ test_plan:
 
     -agent: "main"
       message: |
+        SEARCH RESULTS REFACTOR (2026-07 session) — 8-point overhaul of the
+        study card + search page. All shipped in preview; no backend logic
+        changes beyond the new `plainTitle` field.
+
+        1) PLAIN-ENGLISH TITLES (LLM-generated)
+           * Extended /lib/prompts.js -> buildPlainLanguagePrompt to also
+             return a `plainTitle` (10-word max, high-school reading level,
+             active voice, no trailing period).
+           * /api/translate-plain-language now extracts, trims, and 10-word-
+             caps `plainTitle` before returning it alongside `plain`.
+           * Search-client cache bumped v3 -> v4 so all cards re-fetch to
+             pick up the new field. Cached entries missing plainTitle still
+             work; card gracefully falls back to the academic title.
+
+        2) COMPACT CARD LAYOUT
+           * result-card.jsx: full rewrite of the ResultCard component.
+           * Collapsed state now shows only:
+               - Badge strip (SourceBadge + +N sources + Free full text +
+                 reliability DOT, not the full progress bar)
+               - Plain-English title (bold, large)
+               - Original academic title (small italic muted, hidden on
+                 mobile until expand)
+               - Journal + Year one-liner
+               - "Matches your [GENE] gene" teal tag if genome loaded
+               - Share + Save icons (44x44 mobile touch targets)
+               - Show more chevron toggle
+           * Expanded state adds full reliability badge, flags, funding
+             panel, plain-language summary or abstract, Related Studies
+             cluster, and the action row (View / Share / Save / Export).
+
+        3) EVIDENCE TIER MULTI-SELECT FILTER
+           * New evidenceTiers state (Set<'strong' | 'moderate' | 'limited'>).
+           * Mapping (agreed with user): score >= 4 -> strong, == 3 ->
+             moderate, <= 2 -> limited. Studies still analyzing (no score)
+             are NEVER hidden.
+           * Pill row appears above results with green/amber/red dots.
+             Multi-select. "Clear" button when active. Counts shown on the
+             right ("Showing X of Y").
+
+        4) INFINITE SCROLL
+           * Removed the numbered-page pagination.
+           * INITIAL_BATCH = 40, PAGE_SIZE = 20.
+           * IntersectionObserver-based sentinel below results with
+             rootMargin: '400px 0px 400px 0px' (~80% threshold on the
+             average viewport). Auto-loads next 20 when it scrolls into
+             view.
+           * "End of results — N studies shown" note when everything is
+             visible.
+
+        5) SAVE TO READING LIST
+           * New /app/lib/savedStudies.js — localStorage-backed API:
+             isSaved, getSavedStudies, saveStudy, unsaveStudy,
+             toggleSaveStudy, clearSavedStudies. Fires a
+             `selfscience:saved-studies-changed` CustomEvent on mutation
+             so any subscriber (bookmark icon, list badge) stays in sync.
+           * Storage caps at 500 entries to protect the ~5MB quota.
+           * Reading List page (/reading-list) now renders a
+             "Your Saved Studies" section above the book collection. Each
+             row: reliability dot, plain title + original, journal/year,
+             genome-match tag, open + remove buttons. Only appears when
+             the list has >= 1 saved study.
+
+        6) PER-CARD SHARE
+           * navigator.clipboard.writeText copies /study/[id] URL to the
+             clipboard. Copy icon flips to a green Check with "Copied!"
+             tooltip for 2 seconds.
+           * Fallback path (rare): textarea + execCommand('copy').
+
+        7) GENOME RELEVANCE TAG
+           * Small teal tag rendered right below the badge strip whenever
+             the card has at least one matchedGene. Copy: "Matches your
+             MTHFR gene" for one gene, "Matches your MTHFR + APOE genes
+             +2" for many.
+           * Uses the same matchedGenes computation as before (fan-out +
+             in-text scan), so no genome data is sent server-side.
+
+        8) RELATED STUDIES CLUSTER
+           * On expand, ResultCard runs `findRelated(current, corpus,
+             matchedGenes)`. Ranks sibling studies by:
+               shared gene overlap (weight 3)
+               same journal    (weight 2)
+               title keyword overlap (weight 1 per shared ≥5-char word)
+           * Top 3 shown as a compact sub-list (reliability dot + plain
+             title + year). Rendered inside a bordered box labelled
+             "Related Studies".
+           * search-client now passes `corpus={filtered}` into every
+             ResultCard so the matcher has data to work with.
+
+        9) MOBILE OPTIMIZATION
+           * Badge strip flex-wrap collapses to a single scrollable row
+             on <768px via `overflow-x-auto whitespace-nowrap` +
+             `md:flex-wrap md:overflow-visible`.
+           * Plain title clamps to 2 lines on mobile via `line-clamp-2
+             md:line-clamp-none`.
+           * Original academic title hidden by default on mobile (`hidden
+             ... md:block`), still shown on desktop.
+           * Reliability dot label ("Strong") hidden on <sm; dot alone
+             remains.
+           * Share + Save icons are 44x44 on mobile (`h-11 w-11`) and
+             shrink to 32x32 on desktop (`md:h-8 md:w-8`) for the sleeker
+             desktop look.
+
+        DESIGN-SYSTEM CONSISTENCY
+           * All new elements use ss-teal, ss-orange, ss-amber, ss-green,
+             ss-muted, ss-border-warm design tokens.
+           * Card container migrated from `rounded-lg` -> `rounded-2xl
+             border border-ss-border-warm bg-white shadow-sm` matching the
+             rest of SelfScience.
+           * No new third-party libs introduced.
+
+        VERIFIED IN PREVIEW:
+           * GET /search -> 200
+           * GET /reading-list -> 200
+           * GET / -> 200
+           * result-card.jsx compiles clean; no orphaned imports.
+
+        FRONTEND TESTING RECOMMENDATIONS (optional, at user's request):
+           * Run a search that returns known results (e.g. "vitamin D" or
+             "creatine") and verify the compact card layout, plain title
+             cache-warm behaviour, and infinite scroll sentinel.
+           * Bookmark 2-3 studies; visit /reading-list; verify the Saved
+             Studies section appears with correct entries and the
+             count badge matches.
+           * Click Share on a card; verify clipboard contains the
+             `/study/[id]` URL.
+           * Toggle evidence-tier pills; verify filter is multi-select
+             and reversible.
+           * At 390x844 mobile viewport: verify chip strip scrolls
+             horizontally, plain title clamps to 2 lines, original title
+             is hidden by default, touch targets are >= 44px.
+
+
+    -agent: "main"
+      message: |
         FRONTEND UX UPDATE (2026-07 session) — TWO CHANGES, FRONTEND TEST
         REQUESTED. No backend changes in this batch.
 
