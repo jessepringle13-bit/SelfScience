@@ -304,6 +304,32 @@ export default function SearchClient() {
   // reliability `flags` array. Studies still analyzing (no flags yet) are
   // never hidden — nothing gets silently removed while scoring is in flight.
   const [hideNonHuman, setHideNonHuman] = useState(false)
+  // Smart Search toggle — enables the semantic expansion + rerank layer.
+  // Default ON. Persisted to localStorage so the user's preference sticks
+  // across sessions.
+  const [smartSearch, setSmartSearch] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('ss:smart-search')
+    return v === null ? true : v === '1'
+  })
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('ss:smart-search', smartSearch ? '1' : '0')
+  }, [smartSearch])
+  // Ref mirror of smartSearch so the memoized runSearch (deps: []) reads
+  // the latest value without needing to be re-created on every toggle.
+  const smartSearchRef = useRef(smartSearch)
+  useEffect(() => { smartSearchRef.current = smartSearch }, [smartSearch])
+  // Recency toggle — "Last 5y" (default) vs "All time". Weights recent
+  // research higher by narrowing the date range unless the user opts out.
+  const [recentOnly, setRecentOnly] = useState(true)
+  // Semantic rerank state — order of ids (or null) + a "refining" indicator
+  // shown while the LLM re-rank is in flight.
+  const [semanticOrder, setSemanticOrder] = useState(null)
+  const [refining, setRefining] = useState(false)
+  // Sibling state for the derived expansion terms (shown as a subtle strip
+  // above the results so users understand why extra papers appear).
+  const [semanticExpansions, setSemanticExpansions] = useState([])
   // Evidence-tier multi-select filter (new, 2026-07). Set of tier keys:
   // { 'strong' | 'moderate' | 'limited' }. Empty = all tiers shown.
   // Studies still analyzing (no numeric score) are always visible so the
@@ -469,6 +495,116 @@ export default function SearchClient() {
       }
 
       setData(merged)
+
+      // ==== Semantic Search layer (Option C: expansion + rerank) ====
+      // Only fires when Smart Search is ON, we have a real text query, and
+      // there are enough results to make reranking worthwhile.
+      if (smartSearchRef.current && trimmed && Array.isArray(merged?.results) && merged.results.length >= 4) {
+        try {
+          // Try the cache first (24h TTL keyed by normalised query).
+          const normQ = trimmed.toLowerCase().trim()
+          const cacheKey = `ss:sem-expand:${normQ}`
+          let expansions = null
+          try {
+            const cached = window.localStorage.getItem(cacheKey)
+            if (cached) {
+              const parsed = JSON.parse(cached)
+              if (parsed?.expiresAt > Date.now() && Array.isArray(parsed.expansions)) {
+                expansions = parsed.expansions
+              }
+            }
+          } catch { /* corrupt cache — refetch */ }
+
+          if (!expansions) {
+            const expRes = await fetch('/api/semantic-expand', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: trimmed }),
+            }).then((r) => (r.ok ? r.json() : { expansions: [] }))
+            expansions = expRes?.expansions || []
+            try {
+              window.localStorage.setItem(cacheKey, JSON.stringify({
+                expansions,
+                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+              }))
+            } catch { /* quota — skip cache */ }
+          }
+          setSemanticExpansions(expansions)
+
+          // Fire off expansion queries in parallel (non-blocking — user
+          // already sees initial results). Merge new hits into the pool.
+          if (expansions.length > 0) {
+            setRefining(true)
+            Promise.all(
+              expansions.map((term) => {
+                const u = new URL('/api/search', window.location.origin)
+                u.searchParams.set('q', term)
+                u.searchParams.set('limit', '20')
+                return fetch(u.toString())
+                  .then((r) => (r.ok ? r.json() : null))
+                  .catch(() => null)
+              }),
+            ).then((responses) => {
+              const extra = []
+              for (const r of responses) {
+                if (r?.results?.length) extra.push(...r.results)
+              }
+              if (extra.length) {
+                setData((prev) => {
+                  if (!prev) return prev
+                  const existing = new Set((prev.results || []).map((x) => x.id))
+                  const uniques = extra.filter((x) => !existing.has(x.id))
+                  return { ...prev, results: [...prev.results, ...uniques] }
+                })
+              }
+            })
+          }
+
+          // Rerank pass — reorder the initial + expansion pool by semantic
+          // relevance. Cache-key includes the query so different queries
+          // don't collide.
+          const rerankCacheKey = `ss:sem-rerank:${normQ}`
+          let rerankOrder = null
+          try {
+            const cached = window.localStorage.getItem(rerankCacheKey)
+            if (cached) {
+              const parsed = JSON.parse(cached)
+              if (parsed?.expiresAt > Date.now() && Array.isArray(parsed.order)) {
+                rerankOrder = parsed.order
+              }
+            }
+          } catch { /* corrupt — refetch */ }
+
+          if (!rerankOrder) {
+            // Wait ~1s so expansion results have a chance to merge into `data`
+            // before we send them to the reranker.
+            await new Promise((r) => setTimeout(r, 1200))
+            // Snapshot current merged pool
+            const snapshot = (window.__ssLatestResults || merged.results)
+              .slice(0, 40)
+              .map((it) => ({ id: it.id, title: it.title, journal: it.journal, year: it.year }))
+            const rr = await fetch('/api/semantic-rerank', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: trimmed, items: snapshot }),
+            }).then((r) => (r.ok ? r.json() : { order: null }))
+            rerankOrder = rr?.order || null
+            if (rerankOrder) {
+              try {
+                window.localStorage.setItem(rerankCacheKey, JSON.stringify({
+                  order: rerankOrder,
+                  expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                }))
+              } catch { /* quota */ }
+            }
+          }
+          if (rerankOrder) setSemanticOrder(rerankOrder)
+        } catch (semErr) {
+          console.warn('[smart search] failed silently:', semErr?.message)
+        } finally {
+          setRefining(false)
+        }
+      }
     } catch (e) {
       setError(e.message || 'Something went wrong')
       setData(null)
@@ -635,8 +771,26 @@ export default function SearchClient() {
     } else if (sortMode === 'newest') {
       list = [...list].sort((a, b) => (b.year || 0) - (a.year || 0))
     }
+    // Recency weighting — when recentOnly is ON we filter to last 5 years.
+    // Studies without a year (some Crossref/Semantic Scholar records) are
+    // ALWAYS kept so we never drop metadata-poor but relevant papers.
+    if (recentOnly && sortMode !== 'newest') {
+      const cutoff = new Date().getFullYear() - 5
+      list = list.filter((r) => !r.year || r.year >= cutoff)
+    }
+    // Semantic reorder — if the LLM returned an ordering, apply it. Items
+    // not in the ordering (from expansion queries that arrived after the
+    // reranker snapshot) are appended in their existing order.
+    if (semanticOrder && semanticOrder.length) {
+      const rankMap = new Map(semanticOrder.map((id, i) => [id, i]))
+      list = [...list].sort((a, b) => {
+        const ra = rankMap.has(a.id) ? rankMap.get(a.id) : 1e9
+        const rb = rankMap.has(b.id) ? rankMap.get(b.id) : 1e9
+        return ra - rb
+      })
+    }
     return list
-  }, [merged, sourceType, dateRange, reliabilityFilter, evidenceTiers, hideNonHuman, sortMode])
+  }, [merged, sourceType, dateRange, reliabilityFilter, evidenceTiers, hideNonHuman, sortMode, recentOnly, semanticOrder])
 
   // Infinite-scroll cursor. Starts at INITIAL_BATCH (40), grows by PAGE_SIZE
   // (20) each time the sentinel below the last card scrolls into view.
@@ -1150,10 +1304,62 @@ export default function SearchClient() {
                 Hide animal / in-vitro
               </label>
 
+              {/* Recency toggle \u2014 default ON (last 5 years). Turn off to
+                  include foundational + older mechanistic research. */}
+              <label className="ml-2 inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-ss-muted">
+                <input
+                  type="checkbox"
+                  checked={recentOnly}
+                  onChange={(e) => setRecentOnly(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ss-teal"
+                />
+                Last 5y
+              </label>
+
+              {/* Smart Search toggle \u2014 default ON. Turns on the semantic
+                  expansion + rerank pass. */}
+              <label
+                className="ml-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ss-teal/40 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ss-teal"
+                title="Uses AI to expand your query with related terms and reorder results by meaning"
+              >
+                <input
+                  type="checkbox"
+                  checked={smartSearch}
+                  onChange={(e) => setSmartSearch(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ss-teal"
+                />
+                Smart Search
+              </label>
+
+              {refining && (
+                <span className="ml-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-ss-teal">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-ss-teal border-t-transparent" />
+                  Refining results\u2026
+                </span>
+              )}
+
               <span className="ml-auto text-[11px] text-ss-muted">
                 Showing {paged.length} of {filtered.length}
               </span>
             </div>
+
+            {/* Semantic expansion pills \u2014 shown under the filter bar
+                so the user understands why extra papers appeared. */}
+            {smartSearch && semanticExpansions.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ss-muted">
+                  Also searching:
+                </span>
+                {semanticExpansions.map((t) => (
+                  <span
+                    key={t}
+                    className="inline-flex items-center rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-semibold text-ss-teal"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {paged.map((item) => (

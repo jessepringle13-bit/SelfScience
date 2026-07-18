@@ -439,6 +439,17 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
               ● Free
             </a>
           ) : null}
+          {/* Animal / in-vitro badge — pulled from the LLM-scored flags.
+              Renders in amber to be visually distinct from the reliability
+              tier dot. Users can hide these entirely via the toolbar filter. */}
+          {Array.isArray(item.flags) && item.flags.some((f) => /animal|in.?vitro|cell study|mouse|rat|mice/i.test(f?.label || '')) && (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ss-amber/15 px-2 py-0.5 text-[10px] font-semibold text-ss-amber ring-1 ring-ss-amber/30"
+              title="Findings from animal or in-vitro (lab dish) research — may not apply directly to humans"
+            >
+              🧫 Non-human
+            </span>
+          )}
           {hasReliability ? (
             <ReliabilityDot score={item.reliability} label={item.reliabilityLabel} className="shrink-0" />
           ) : analysisError ? (

@@ -11,6 +11,8 @@ export const fetchCache = 'force-no-store'
 import {
   scoreReliability as callReliability,
   translatePlainLanguage as callPlainLanguage,
+  expandSemantic,
+  rerankSemantic,
   extractJson,
 } from '@/lib/ai'
 import {
@@ -151,7 +153,7 @@ const detectPreprint = (paper) => {
 
 /* ------------------------------ PubMed search ----------------------------- */
 
-async function searchPubmed(query, limit = 40) {
+async function searchPubmed(query, limit = 100) {
   try {
     const esearchUrl = withKey(
       `${PUBMED_BASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(
@@ -224,7 +226,7 @@ async function searchPubmed(query, limit = 40) {
 
 /* -------------------------- Semantic Scholar search ----------------------- */
 
-async function searchSemanticScholar(query, limit = 40) {
+async function searchSemanticScholar(query, limit = 100) {
   try {
     const fields = [
       'title',
@@ -418,6 +420,210 @@ async function searchClinicalTrials(query, limit = 20) {
     console.error('ClinicalTrials.gov error:', err)
     return []
   }
+}
+
+/* -------------------------- OMIM + DisGeNET (gene registries) ------------- */
+
+// Both are gene-centric registries. They provide *disease associations* for a
+// gene rather than free-text literature. We surface them as informational
+// records in the merged pool so the user can jump straight to authoritative
+// gene-disease context without leaving Search. Rendered like a study card
+// with a distinct `omim` / `disgenet` source so downstream filters treat
+// them separately.
+//
+// OMIM key: set OMIM_API_KEY in env (https://omim.org/api). Missing key ->
+//   returns [] silently so the pipeline never blocks.
+// DisGeNET key: set DISGENET_API_KEY in env
+//   (https://www.disgenet.org/api). Missing key -> returns [] silently.
+
+async function searchOMIM(gene) {
+  const key = process.env.OMIM_API_KEY
+  if (!key || !gene) return []
+  try {
+    const url =
+      `https://api.omim.org/api/entry/search` +
+      `?search=approved_gene_symbol:${encodeURIComponent(gene)}` +
+      `&limit=8&format=json&apiKey=${encodeURIComponent(key)}`
+    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 10_000)
+    if (!res.ok) return []
+    const data = await safeJson(res)
+    const rows = data?.omim?.searchResponse?.entryList || []
+    return rows.map((r) => {
+      const e = r?.entry || {}
+      const mimNumber = e.mimNumber || ''
+      const title = (e.titles?.preferredTitle || `OMIM ${mimNumber}`).replace(/\.$/, '')
+      return {
+        id: `omim:${mimNumber}`,
+        provider: 'OMIM',
+        source: 'omim',
+        title: `${gene}: ${title}`,
+        journal: 'Online Mendelian Inheritance in Man',
+        year: null,
+        authors: [],
+        authorsShort: '',
+        abstract: e.textSection?.[0]?.textSectionContent || '',
+        doi: null,
+        url: `https://www.omim.org/entry/${mimNumber}`,
+        pmid: null,
+        reliability: null,
+        reliabilityLabel: null,
+        reliabilityNote: null,
+        plain: null,
+        flags: [],
+        _matchedGenes: [gene.toUpperCase()],
+      }
+    })
+  } catch (err) {
+    console.error('OMIM error:', err?.message)
+    return []
+  }
+}
+
+async function searchDisGeNET(gene) {
+  const key = process.env.DISGENET_API_KEY
+  if (!key || !gene) return []
+  try {
+    const url =
+      `https://www.disgenet.org/api/gda/gene/symbol/${encodeURIComponent(gene)}` +
+      `?limit=15&format=json`
+    const res = await fetchWithTimeout(url, {
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${key}` },
+    }, 10_000)
+    if (!res.ok) return []
+    const rows = (await safeJson(res)) || []
+    return rows.slice(0, 12).map((r) => ({
+      id: `disgenet:${r.diseaseid}-${gene}`,
+      provider: 'DisGeNET',
+      source: 'disgenet',
+      title: `${gene}: ${r.disease_name || 'Disease association'}`,
+      journal: 'DisGeNET (gene-disease evidence score)',
+      year: r.year_finalist || null,
+      authors: [],
+      authorsShort: '',
+      abstract: `${r.disease_name || ''}. Evidence score: ${r.score || 'n/a'} (out of 1.0). Reported in ${r.nof_pmids || 0} PubMed article(s), ${r.nof_snps || 0} SNP-level record(s).`,
+      doi: null,
+      url: `https://www.disgenet.org/browser/1/1/0/${gene}`,
+      pmid: null,
+      reliability: null,
+      reliabilityLabel: null,
+      reliabilityNote: null,
+      plain: null,
+      flags: [],
+      _matchedGenes: [gene.toUpperCase()],
+      _disgenetScore: r.score,
+    }))
+  } catch (err) {
+    console.error('DisGeNET error:', err?.message)
+    return []
+  }
+}
+
+/* ---------------------- Semantic query expansion (LLM) ------------------- */
+
+/**
+ * Ask the LLM for 3-5 semantically related biomedical terms for the query.
+ * Cached per-query on the CLIENT (localStorage) — this endpoint does no
+ * server-side caching. Returns the expansions as a plain array of strings.
+ * Bails to [] on any error so search never blocks.
+ */
+async function llmExpandQuery(query) {
+  try {
+    const prompt =
+      `Expand this biomedical search query into 3-5 additional semantically related search terms. ` +
+      `Focus on synonyms, related pathways, and clinically-linked concepts a research literature search would use. ` +
+      `Return ONLY a JSON array of strings, no prose, no markdown, no wrapping object. ` +
+      `Example: query="energy" -> ["ATP production","mitochondrial function","cellular respiration","fatigue","aerobic metabolism"]. ` +
+      `Query: "${query}"`
+    const result = await expandSemantic(prompt)
+    if (!result?.text) return []
+    let s = String(result.text).trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
+    let arr = null
+    try {
+      const j = JSON.parse(s)
+      if (Array.isArray(j)) {
+        arr = j
+      } else if (j && typeof j === 'object') {
+        // Model wrapped it — grab the first array-valued property.
+        for (const v of Object.values(j)) {
+          if (Array.isArray(v)) { arr = v; break }
+        }
+      }
+    } catch { /* leave arr null */ }
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((x) => typeof x === 'string' && x.length && x.length < 80)
+      .slice(0, 5)
+  } catch (err) {
+    console.warn('[semantic-expand] failed:', err?.message)
+    return []
+  }
+}
+
+async function llmRerankResults(query, items) {
+  try {
+    if (!Array.isArray(items) || items.length < 2) return null
+    // Limit to 40 to keep the prompt small.
+    const truncated = items.slice(0, 40)
+    const lines = truncated.map((it, i) => {
+      const t = String(it.title || '').slice(0, 200)
+      const j = it.journal ? ` [${String(it.journal).slice(0, 60)}]` : ''
+      const y = it.year ? ` (${it.year})` : ''
+      return `${i + 1}. ${t}${j}${y}`
+    }).join('\n')
+    const prompt =
+      `Given the query "${query}", rank the following ${truncated.length} papers from most to least semantically relevant. ` +
+      `Consider: exact topic match, methodology fit, and clinical/mechanistic relevance. ` +
+      `Return ONLY a JSON array of integers (1-indexed) matching the input line numbers, in ranked order. Example: [3,1,7,2,4,...]. No prose. No markdown. No wrapping object.\n\n${lines}`
+    const result = await rerankSemantic(prompt)
+    if (!result?.text) return null
+    let s = String(result.text).trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
+    let arr = null
+    try {
+      const j = JSON.parse(s)
+      if (Array.isArray(j)) {
+        arr = j
+      } else if (j && typeof j === 'object') {
+        for (const v of Object.values(j)) {
+          if (Array.isArray(v)) { arr = v; break }
+        }
+      }
+    } catch { /* leave arr null */ }
+    if (!Array.isArray(arr)) return null
+    const seen = new Set()
+    const ordered = []
+    for (const n of arr) {
+      const idx = parseInt(n, 10) - 1
+      if (Number.isInteger(idx) && idx >= 0 && idx < truncated.length && !seen.has(idx)) {
+        seen.add(idx)
+        ordered.push(truncated[idx].id)
+      }
+    }
+    for (let i = 0; i < truncated.length; i++) {
+      if (!seen.has(i)) ordered.push(truncated[i].id)
+    }
+    return ordered
+  } catch (err) {
+    console.warn('[semantic-rerank] failed:', err?.message)
+    return null
+  }
+}
+
+async function handleSemanticExpand(request) {
+  const body = await request.json().catch(() => ({}))
+  const q = String(body?.query || '').trim()
+  if (!q) return NextResponse.json({ expansions: [] }, { headers: NO_STORE_HEADERS })
+  const expansions = await llmExpandQuery(q)
+  return NextResponse.json({ expansions }, { headers: NO_STORE_HEADERS })
+}
+
+async function handleSemanticRerank(request) {
+  const body = await request.json().catch(() => ({}))
+  const q = String(body?.query || '').trim()
+  const items = Array.isArray(body?.items) ? body.items : []
+  if (!q || !items.length) return NextResponse.json({ order: null }, { headers: NO_STORE_HEADERS })
+  const order = await llmRerankResults(q, items)
+  return NextResponse.json({ order }, { headers: NO_STORE_HEADERS })
 }
 
 /* ------------------------------ OpenAlex ---------------------------------- */
@@ -790,7 +996,9 @@ async function handleSearch(request) {
   // Europe PMC added 2026-07 — it's a PubMed superset so it dedupes heavily
   // against PubMed but adds preprint + agricola coverage. ClinicalTrials
   // returns a separate strip and is not merged into the literature pool.
-  const perSource = { pubmed: 40, s2: 40, oa: 40, crossref: 30, europepmc: 40 }
+  // OMIM + DisGeNET added 2026-07 for gene queries only (they don't have
+  // free-text search parity; they're gene-centric registries).
+  const perSource = { pubmed: 100, s2: 100, oa: 50, crossref: 40, europepmc: 50 }
   const pubmedN    = perSource.pubmed
   const s2N        = perSource.s2
   const oaN        = perSource.oa
@@ -808,7 +1016,7 @@ async function handleSearch(request) {
     ? `${effectiveQuery} OR "${effectiveInputQ} gene" OR "${effectiveInputQ} variant" OR "${effectiveInputQ} polymorphism"`
     : effectiveQuery
 
-  const [pubmedResults, s2Results, openAlexResults, crossrefResults, europePMCResults, ctResults] = await Promise.all([
+  const [pubmedResults, s2Results, openAlexResults, crossrefResults, europePMCResults, ctResults, omimResults, disgenetResults] = await Promise.all([
     (sourceFilter === 'all' || sourceFilter === 'pubmed')   ? searchPubmed(searchPool, pubmedN)               : Promise.resolve([]),
     (sourceFilter === 'all' || sourceFilter === 's2')       ? searchSemanticScholar(effectiveQuery, s2N)      : Promise.resolve([]),
     (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, oaN)             : Promise.resolve([]),
@@ -819,13 +1027,19 @@ async function handleSearch(request) {
     (effectiveInputQ && (sourceFilter === 'all' || sourceFilter === 'trials'))
       ? searchClinicalTrials(effectiveInputQ, 12)
       : Promise.resolve([]),
+    // OMIM + DisGeNET are gene-only registries. Only fire when the query is
+    // gene-shaped (see the geneShaped guard above). Both no-op when their
+    // respective API key env var is missing, keeping the pipeline safe.
+    geneShaped ? searchOMIM(effectiveInputQ)     : Promise.resolve([]),
+    geneShaped ? searchDisGeNET(effectiveInputQ) : Promise.resolve([]),
   ])
 
   // Merge + relevance filter + sort in one pass. NOTE: ctResults are NOT
   // merged into `merged` — they render as a distinct "Active & Completed
-  // Trials" strip above the literature list on the client.
+  // Trials" strip above the literature list on the client. OMIM + DisGeNET
+  // ARE merged so they compete for a slot in the top results.
   let merged = mergeResults(
-    [pubmedResults, s2Results, openAlexResults, crossrefResults, europePMCResults],
+    [pubmedResults, s2Results, openAlexResults, crossrefResults, europePMCResults, omimResults, disgenetResults],
     isPillarBrowse ? null : parsed
   )
 
@@ -870,6 +1084,8 @@ async function handleSearch(request) {
       openAlex: openAlexResults.length,
       crossref: crossrefResults.length,
       europePMC: europePMCResults.length,
+      omim: omimResults.length,
+      disgenet: disgenetResults.length,
       clinicalTrials: ctResults.length,
     },
     results: merged,
@@ -1494,6 +1710,8 @@ export async function POST(request, { params }) {
   // New endpoints per spec
   if (route === 'score-reliability') return handleScoreReliability(request)
   if (route === 'translate-plain-language') return handleTranslatePlainLanguage(request)
+  if (route === 'semantic-expand') return handleSemanticExpand(request)
+  if (route === 'semantic-rerank') return handleSemanticRerank(request)
   if (route === 'interpret-genome') return handleInterpretGenome(request)
 
   // Backward-compat aliases so existing clients keep working during migration
