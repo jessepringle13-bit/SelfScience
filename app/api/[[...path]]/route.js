@@ -292,6 +292,134 @@ async function searchSemanticScholar(query, limit = 40) {
   }
 }
 
+/* ------------------------------ Europe PMC ------------------------------- */
+
+/**
+ * Europe PMC free-text search. No API key required. Covers PubMed +
+ * additional biomedical literature (preprints, agricola, patents) that
+ * PubMed alone misses. Response schema documented at
+ * https://europepmc.org/RestfulWebService.
+ */
+async function searchEuropePMC(query, limit = 40) {
+  try {
+    const url =
+      `https://www.ebi.ac.uk/europepmc/webservices/rest/search` +
+      `?query=${encodeURIComponent(query)}` +
+      `&format=json&pageSize=${Math.min(limit, 100)}` +
+      `&resultType=core`
+    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 12_000)
+    if (!res.ok) {
+      console.warn('Europe PMC returned', res.status)
+      return []
+    }
+    const data = await safeJson(res)
+    const rows = data?.resultList?.result || []
+    return rows.map((r) => {
+      const authors = (r.authorList?.author || []).map((a) => a.fullName || a.lastName).filter(Boolean)
+      const doi = r.doi || null
+      const isPreprint = r.source === 'PPR' || /preprint|biorxiv|medrxiv|arxiv/i.test(r.journalTitle || '')
+      // Prefer full-text HTML URL when marked as open access.
+      const oaUrl = r.hasPDF === 'Y' && r.pmcid
+        ? `https://europepmc.org/article/PMC/${r.pmcid}`
+        : null
+      // Stable-ish id: EuPMC uses combined `source:id`. Fall back to PMID / DOI.
+      const rawId = r.pmid ? `pubmed:${r.pmid}` : r.doi ? `doi:${r.doi}` : `eupmc:${r.id}`
+      return {
+        id: rawId,
+        provider: 'Europe PMC',
+        source: isPreprint ? 'preprint' : 'peer-reviewed',
+        title: (r.title || '(untitled)').replace(/\.$/, ''),
+        journal: r.journalTitle || (isPreprint ? 'Preprint' : ''),
+        year: parseInt(r.pubYear, 10) || null,
+        authors,
+        authorsShort:
+          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
+        abstract: r.abstractText || '',
+        doi,
+        url: doi ? `https://doi.org/${doi}` : (r.pmid ? `https://europepmc.org/article/MED/${r.pmid}` : `https://europepmc.org/article/${r.source}/${r.id}`),
+        pmid: r.pmid || null,
+        citationCount: r.citedByCount ?? null,
+        oaUrl,
+        oaStatus: r.isOpenAccess === 'Y' ? 'gold' : null,
+        reliability: null,
+        reliabilityLabel: null,
+        reliabilityNote: null,
+        plain: null,
+        flags: [],
+      }
+    })
+  } catch (err) {
+    console.error('Europe PMC error:', err)
+    return []
+  }
+}
+
+/* --------------------------- ClinicalTrials.gov -------------------------- */
+
+/**
+ * Free public API v2. Returns active + completed trials matching a gene
+ * or condition. Rendered as a distinct "Active Trials" strip above the
+ * PubMed literature results, so users see trials happening RIGHT NOW.
+ * Docs: https://clinicaltrials.gov/data-api/api
+ */
+async function searchClinicalTrials(query, limit = 20) {
+  try {
+    const url =
+      `https://clinicaltrials.gov/api/v2/studies` +
+      `?query.term=${encodeURIComponent(query)}` +
+      `&pageSize=${Math.min(limit, 50)}` +
+      `&fields=protocolSection.identificationModule,protocolSection.statusModule,protocolSection.designModule,protocolSection.sponsorCollaboratorsModule,protocolSection.descriptionModule,protocolSection.conditionsModule,protocolSection.armsInterventionsModule`
+    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 12_000)
+    if (!res.ok) {
+      console.warn('ClinicalTrials.gov returned', res.status)
+      return []
+    }
+    const data = await safeJson(res)
+    const rows = data?.studies || []
+    return rows.map((s) => {
+      const p = s?.protocolSection || {}
+      const nctId = p.identificationModule?.nctId || ''
+      const title = p.identificationModule?.briefTitle || p.identificationModule?.officialTitle || 'Clinical Trial'
+      const status = p.statusModule?.overallStatus || ''
+      const phase = (p.designModule?.phases || []).join(', ') || null
+      const sponsor = p.sponsorCollaboratorsModule?.leadSponsor?.name || ''
+      const summary = p.descriptionModule?.briefSummary || ''
+      const conditions = p.conditionsModule?.conditions || []
+      const interventions = (p.armsInterventionsModule?.interventions || [])
+        .map((i) => i.name).filter(Boolean)
+      const startDate = p.statusModule?.startDateStruct?.date || null
+      const year = startDate ? parseInt(String(startDate).slice(0, 4), 10) : null
+      return {
+        id: `nct:${nctId}`,
+        provider: 'ClinicalTrials.gov',
+        source: 'clinical-trial',
+        title,
+        journal: sponsor || 'Clinical Trial',
+        year,
+        authors: [sponsor].filter(Boolean),
+        authorsShort: sponsor,
+        abstract: summary,
+        doi: null,
+        url: nctId ? `https://clinicaltrials.gov/study/${nctId}` : 'https://clinicaltrials.gov',
+        pmid: null,
+        nctId,
+        status,
+        phase,
+        conditions,
+        interventions,
+        reliability: null,
+        reliabilityLabel: null,
+        reliabilityNote: null,
+        plain: null,
+        flags: [],
+      }
+    })
+  } catch (err) {
+    console.error('ClinicalTrials.gov error:', err)
+    return []
+  }
+}
+
 /* ------------------------------ OpenAlex ---------------------------------- */
 
 /**
@@ -659,34 +787,45 @@ async function handleSearch(request) {
 
   // Per-source pull depths — sized so that after dedupe (~30% overlap in
   // practice) we still return at least the client's `limit` (up to 100).
-  // Pillar browse mode pulls deeper because the 5-year recency filter
-  // culls aggressively.
-  //   Text search:  pubmed 40, s2 40, openalex 40, crossref 30 → pool ~150 pre-dedupe
-  //   Pillar browse: 40 per source (same as before we bumped)
-  // PubMed's E-utilities allows retmax up to 100,000 but rate-limits at 3
-  // req/sec without an API key. Semantic Scholar's /paper/search allows
-  // limit=100 (max). Both used at those max values below.
-  const perSource = isPillarBrowse
-    ? { pubmed: 40, s2: 40, oa: 40, crossref: 30 }
-    : { pubmed: 40, s2: 40, oa: 40, crossref: 30 }
-  const pubmedN   = perSource.pubmed
-  const s2N       = perSource.s2
-  const oaN       = perSource.oa
-  const crossrefN = perSource.crossref
+  // Europe PMC added 2026-07 — it's a PubMed superset so it dedupes heavily
+  // against PubMed but adds preprint + agricola coverage. ClinicalTrials
+  // returns a separate strip and is not merged into the literature pool.
+  const perSource = { pubmed: 40, s2: 40, oa: 40, crossref: 30, europepmc: 40 }
+  const pubmedN    = perSource.pubmed
+  const s2N        = perSource.s2
+  const oaN        = perSource.oa
+  const crossrefN  = perSource.crossref
+  const europepmcN = perSource.europepmc
 
-  const [pubmedResults, s2Results, openAlexResults, crossrefResults] = await Promise.all([
-    (sourceFilter === 'all' || sourceFilter === 'pubmed')   ? searchPubmed(effectiveQuery, pubmedN)          : Promise.resolve([]),
-    (sourceFilter === 'all' || sourceFilter === 's2')       ? searchSemanticScholar(effectiveQuery, s2N)     : Promise.resolve([]),
-    (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, oaN)            : Promise.resolve([]),
-    (sourceFilter === 'all' || sourceFilter === 'crossref') ? searchCrossref(effectiveQuery, crossrefN)      : Promise.resolve([]),
+  // MeSH-ish gene expansion. When the effective query looks gene-shaped
+  // (all-caps letter+digit token like MTHFR, APOE, CYP1A2, BRCA1), append
+  // synonym broadening to widen recall on PubMed / Europe PMC without
+  // clobbering the exact-match semantics of quoted searches. This is a
+  // lightweight substitute for a full MeSH xref lookup — good enough for
+  // 90% of the "gene alone" query pattern.
+  const geneShaped = /\b[A-Z][A-Z0-9]{1,7}\b/.test(effectiveInputQ) && !isPillarBrowse
+  const searchPool = geneShaped
+    ? `${effectiveQuery} OR "${effectiveInputQ} gene" OR "${effectiveInputQ} variant" OR "${effectiveInputQ} polymorphism"`
+    : effectiveQuery
+
+  const [pubmedResults, s2Results, openAlexResults, crossrefResults, europePMCResults, ctResults] = await Promise.all([
+    (sourceFilter === 'all' || sourceFilter === 'pubmed')   ? searchPubmed(searchPool, pubmedN)               : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 's2')       ? searchSemanticScholar(effectiveQuery, s2N)      : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'openalex') ? searchOpenAlex(effectiveQuery, oaN)             : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'crossref') ? searchCrossref(effectiveQuery, crossrefN)       : Promise.resolve([]),
+    (sourceFilter === 'all' || sourceFilter === 'europepmc')? searchEuropePMC(searchPool, europepmcN)         : Promise.resolve([]),
+    // ClinicalTrials.gov returns its own strip; not merged into literature.
+    // Only fires when we have a real user query (skips empty pillar-only).
+    (effectiveInputQ && (sourceFilter === 'all' || sourceFilter === 'trials'))
+      ? searchClinicalTrials(effectiveInputQ, 12)
+      : Promise.resolve([]),
   ])
 
-  // Merge + relevance filter + sort in one pass.
+  // Merge + relevance filter + sort in one pass. NOTE: ctResults are NOT
+  // merged into `merged` — they render as a distinct "Active & Completed
+  // Trials" strip above the literature list on the client.
   let merged = mergeResults(
-    [pubmedResults, s2Results, openAlexResults, crossrefResults],
-    // In pillar-browse mode we skip the strict relevance filter — the curated
-    // pillar query is meant to be broad, and we want a representative sweep
-    // of the topic, not a phrase-matched exact hit.
+    [pubmedResults, s2Results, openAlexResults, crossrefResults, europePMCResults],
     isPillarBrowse ? null : parsed
   )
 
@@ -730,8 +869,13 @@ async function handleSearch(request) {
       semanticScholar: s2Results.length,
       openAlex: openAlexResults.length,
       crossref: crossrefResults.length,
+      europePMC: europePMCResults.length,
+      clinicalTrials: ctResults.length,
     },
     results: merged,
+    // Clinical trials render as a separate strip on the client; kept out
+    // of `results` so the tier/relevance/date filters don't apply to them.
+    clinicalTrials: ctResults,
   }
 
   // Only cache non-empty responses. If ALL four upstream APIs failed / 429'd

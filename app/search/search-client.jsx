@@ -300,6 +300,10 @@ export default function SearchClient() {
       : (isInitialPillarBrowse || isInitialTextPillar) ? '10' : 'any'
   )
   const [reliabilityFilter, setReliabilityFilter] = useState('all')
+  // Hide-animal-and-in-vitro toggle (2026-07). Reads from the LLM-scored
+  // reliability `flags` array. Studies still analyzing (no flags yet) are
+  // never hidden — nothing gets silently removed while scoring is in flight.
+  const [hideNonHuman, setHideNonHuman] = useState(false)
   // Evidence-tier multi-select filter (new, 2026-07). Set of tier keys:
   // { 'strong' | 'moderate' | 'limited' }. Empty = all tiers shown.
   // Studies still analyzing (no numeric score) are always visible so the
@@ -614,6 +618,16 @@ export default function SearchClient() {
         return evidenceTiers.has(tier)
       })
     }
+    // Hide animal / in-vitro studies when toggled. We check the LLM-scored
+    // flags array for label matches: "Animal Study", "In-Vitro Study",
+    // "Cell Study", etc. If flags haven't been populated yet (scoring
+    // still in flight), we leave the item visible.
+    if (hideNonHuman) {
+      list = list.filter((r) => {
+        if (!Array.isArray(r.flags) || r.flags.length === 0) return true
+        return !r.flags.some((f) => /animal|in.?vitro|cell study|mouse|rat|mice/i.test(f?.label || ''))
+      })
+    }
     // Sort — relevance keeps provider order, citations descends by
     // citationCount (missing values treated as 0), newest descends by year.
     if (sortMode === 'citations') {
@@ -622,7 +636,7 @@ export default function SearchClient() {
       list = [...list].sort((a, b) => (b.year || 0) - (a.year || 0))
     }
     return list
-  }, [merged, sourceType, dateRange, reliabilityFilter, evidenceTiers, sortMode])
+  }, [merged, sourceType, dateRange, reliabilityFilter, evidenceTiers, hideNonHuman, sortMode])
 
   // Infinite-scroll cursor. Starts at INITIAL_BATCH (40), grows by PAGE_SIZE
   // (20) each time the sentinel below the last card scrolls into view.
@@ -636,7 +650,7 @@ export default function SearchClient() {
   // Reset visible count when filters/query change.
   useEffect(() => {
     setVisibleCount(INITIAL_BATCH)
-  }, [sourceType, dateRange, reliabilityFilter, evidenceTiers, sortMode, pillar, submittedQ])
+  }, [sourceType, dateRange, reliabilityFilter, evidenceTiers, hideNonHuman, sortMode, pillar, submittedQ])
 
   // IntersectionObserver-based auto-loader. Triggers when a sentinel ~80%
   // down the current results list becomes visible.
@@ -1017,6 +1031,72 @@ export default function SearchClient() {
                 Fetches in parallel; hides itself if there are no matches. */}
             <EditorialPicks query={submittedQ} pillar={pillar} />
 
+            {/* Active & Completed Clinical Trials strip \u2014 from
+                ClinicalTrials.gov. Rendered above the literature list
+                because "is there ongoing research on this?" is often the
+                most important thing a user cares about. */}
+            {Array.isArray(data?.clinicalTrials) && data.clinicalTrials.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-ss-teal/30 bg-white p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-ss-teal">
+                      Active & Completed Trials
+                    </div>
+                    <h3 className="mt-0.5 text-sm font-bold text-ss-text">
+                      Clinical trials for &ldquo;{submittedQ || pillar || 'your query'}&rdquo; ({data.clinicalTrials.length})
+                    </h3>
+                  </div>
+                  <a
+                    href={`https://clinicaltrials.gov/search?term=${encodeURIComponent(submittedQ || '')}`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-ss-teal hover:underline"
+                  >
+                    See all on ClinicalTrials.gov \u2192
+                  </a>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {data.clinicalTrials.slice(0, 6).map((t) => (
+                    <a
+                      key={t.id}
+                      href={t.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="group flex flex-col rounded-lg border border-ss-border-warm bg-ss-bg/50 p-3 transition hover:border-ss-teal hover:bg-white"
+                    >
+                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${
+                            t.status === 'RECRUITING'
+                              ? 'bg-ss-green/15 text-ss-green'
+                              : t.status === 'COMPLETED'
+                              ? 'bg-ss-teal/15 text-ss-teal'
+                              : 'bg-ss-muted/15 text-ss-muted'
+                          }`}
+                        >
+                          {(t.status || 'unknown').replace(/_/g, ' ').toLowerCase()}
+                        </span>
+                        {t.phase && (
+                          <span className="rounded-full bg-ss-orange/15 px-2 py-0.5 text-ss-orange">
+                            {t.phase}
+                          </span>
+                        )}
+                        {t.year && <span className="text-ss-muted">{t.year}</span>}
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-sm font-semibold text-ss-teal group-hover:underline">
+                        {t.title}
+                      </div>
+                      {t.journal && (
+                        <div className="mt-0.5 line-clamp-1 text-[11px] text-ss-muted">
+                          {t.journal}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Evidence tier quick-filter (Strong / Moderate / Limited).
                 Multi-select. Active pills are teal-filled; inactive are
                 outlined. Studies still analyzing bypass this filter. */}
@@ -1056,6 +1136,20 @@ export default function SearchClient() {
                   Clear
                 </button>
               )}
+
+              {/* Hide animal / in-vitro filter \u2014 checks the reliability
+                  flags array populated by the LLM scorer. Studies still
+                  analyzing (no flags yet) are never hidden. */}
+              <label className="ml-3 inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-ss-muted">
+                <input
+                  type="checkbox"
+                  checked={hideNonHuman}
+                  onChange={(e) => setHideNonHuman(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-ss-teal"
+                />
+                Hide animal / in-vitro
+              </label>
+
               <span className="ml-auto text-[11px] text-ss-muted">
                 Showing {paged.length} of {filtered.length}
               </span>
