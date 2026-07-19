@@ -454,12 +454,21 @@ export default function SearchClient() {
         // per gene. With 3 genes we hit 30/30/30; with 10 genes we hit
         // 10/10/10/10... which keeps each side ~40-80 items in the pool.
         const perGeneLimit = Math.max(10, Math.min(30, Math.floor(100 / genes.length)))
-        const anchor = trimmed || pillarQuery || ''
+        // IMPORTANT: send ONLY the gene (+ any user text) as q, and pass
+        // the pillar name as a separate param. This lets the server's
+        // isTextPillar branch inject the curated pillar tokens into the
+        // upstream API query for topical recall, WITHOUT them counting as
+        // required tokens in the relevance filter. Previously we packed
+        // the pillar query text into q (e.g. "COMT depression
+        // neurotransmitter") which caused the 3-token relevance filter to
+        // drop any paper that didn't mention every pillar keyword \u2014
+        // silently cutting recall for the Dashboard pillar hand-off by ~80%.
         const requests = genes.map((g) => {
           const url = new URL('/api/search', window.location.origin)
-          const qStr = anchor ? `${g} ${anchor}` : g
+          const qStr = trimmed ? `${g} ${trimmed}` : g
           url.searchParams.set('q', qStr)
           url.searchParams.set('limit', String(perGeneLimit))
+          if (pill) url.searchParams.set('pillar', pill)
           return fetch(url.toString())
             .then((r) => (r.ok ? r.json() : {}))
             .then((j) => ({ gene: g, results: (j?.results || []), sources: j?.sources || {} }))

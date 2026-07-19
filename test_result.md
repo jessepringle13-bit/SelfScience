@@ -659,6 +659,70 @@ backend:
             external API dependency with proper error handling in place.
 
 frontend:
+  - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"
+    implemented: true
+    working: true
+    file: "/app/app/search/search-client.jsx, /app/lib/search/relevance.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User reported "few results for many when before we wanted a
+            lot more — there are a lot more relative studies missing"
+            when clicking a pillar tile from the Dashboard.
+
+            Root cause: the client fan-out concatenated the gene + the
+            curated pillar query text into a single q, e.g.
+              q=COMT depression neurotransmitter
+            The server treated this as a multi-word query, QUOTED it to
+              "COMT depression neurotransmitter"
+            (killing recall on PubMed/S2/OpenAlex/EuropePMC because exact
+            3-word phrase matches are rare), then required all three
+            tokens present in every kept paper via the relevance filter.
+            Any COMT paper about depression that didn't happen to mention
+            "neurotransmitter" got dropped.
+
+            Fix 1 — client fan-out (search-client.jsx runSearch):
+              Send ONLY the gene (+ any user-typed text) as q; pass the
+              pillar name as a separate ?pillar= param. Server now enters
+              its isTextPillar branch which
+              (a) doesn't quote the query (1-2 tokens),
+              (b) folds the curated pillar tokens into the UPSTREAM API
+                  query for topical recall,
+              (c) runs the relevance filter against only the gene(+text)
+                  tokens — so a "COMT and depression" paper survives
+                  without the word "neurotransmitter".
+
+            Fix 2 — relevance filter safety net (relevance.js scoreRelevance):
+              Split the "long query" branch out from the 2+ token branch.
+              New 3+ token rule: keep if the full phrase appears OR >= 2
+              tokens land in the title OR near-full coverage (all-but-one
+              tokens found, >= 1 in title). Preserves strict 2-token
+              precision (still blocks "Work Zone Safety" noise on a
+              "zone 2 training" query) while stopping the filter from
+              stripping papers that don't name-check every keyword.
+
+            Verification (before vs after, same day):
+              q="COMT depression neurotransmitter" (old-style)
+                total 29 · upstream: pubmed 100, s2 0, openAlex 0,
+                crossref 40, europePMC 0 (three sources returned NOTHING
+                for the quoted phrase)
+              q="COMT" + pillar="Mental Health & Neurochemistry" (new-style)
+                total 30 · upstream: pubmed 100, s2 0, openAlex 50,
+                crossref 40, europePMC 50, clinicalTrials 20
+                First 5 titles all highly relevant COMT papers (Parkinson's
+                + entacapone, cognitive variation, DRD2 + disordered eating,
+                pain modulation, catechol-O-methyltransferase inhibitors).
+              Upstream raw volume: 140 → 260 papers per gene (~85% more
+              coverage). With 3+ gene fan-out that's the difference between
+              ~90 unique papers total and ~150+.
+              Regression check: 3-token free-text "MTHFR C677T
+              supplementation" still returns 30 results (was already
+              hitting the cap, so no over-relaxation).
+
   - task: "Dashboard Gene Chip — Clinical Trial badges + popover / bottom-sheet + deep-link into Search"
     implemented: true
     working: false
