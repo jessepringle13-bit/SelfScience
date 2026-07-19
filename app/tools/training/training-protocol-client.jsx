@@ -40,6 +40,9 @@ import { ViewModeProvider, useViewMode } from '@/lib/training/viewMode'
 import TrainingIntakeForm from '@/components/training/IntakeForm'
 import VariantCard from '@/components/training/VariantCard'
 import WeeklyBlueprint from '@/components/training/WeeklyBlueprint'
+import WorkoutHistory from '@/components/training/WorkoutHistory'
+import ReadinessCheckIn from '@/components/training/ReadinessCheckIn'
+import MobileTabBar from '@/components/training/MobileTabBar'
 import SmartAlternatives from '@/components/training/SmartAlternatives'
 import WorkoutSession from '@/components/training/WorkoutSession'
 import TabNav from '@/components/training/TabNav'
@@ -210,14 +213,16 @@ function TrainingProtocolInner() {
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="ss-screen-only no-print">
+            {/* Tabs (desktop / tablet — hidden on mobile in favour of the
+                fixed bottom MobileTabBar rendered below) */}
+            <div className="ss-screen-only no-print hidden md:block">
               <TabNav
                 tabs={[
                   { id: 'overview',    label: 'Overview' },
                   { id: 'profile',     label: 'Genetic Profile' },
                   { id: 'blueprint',   label: 'Weekly Blueprint' },
                   { id: 'workouts',    label: 'Workouts' },
+                  { id: 'history',     label: 'History' },
                   { id: 'mobility',    label: 'Mobility' },
                   { id: 'recovery',    label: 'Recovery' },
                   { id: 'supplements', label: 'Supplements' },
@@ -348,7 +353,13 @@ function TrainingProtocolInner() {
 
             {/* ------------ Phase 2 tabs ------------ */}
             {tab === 'mobility'    && <MobilityPanel   mobility={protocol.mobility} />}
-            {tab === 'recovery'    && <RecoveryPanel   recovery={protocol.recovery} />}
+            {tab === 'recovery'    && (
+              <div className="space-y-4">
+                <ReadinessCheckIn />
+                <RecoveryPanel recovery={protocol.recovery} />
+              </div>
+            )}
+            {tab === 'history'     && <WorkoutHistory />}
             {tab === 'supplements' && (
               <div className="space-y-4">
                 <SupplementPanel supplements={protocol.supplements} />
@@ -377,6 +388,11 @@ function TrainingProtocolInner() {
           </div>
         )}
       </div>
+      {/* Mobile bottom tab bar — replaces the horizontal tab scroller on
+          <768px. Adds bottom padding to the outer wrapper so content isn't
+          hidden under the fixed nav. */}
+      {protocol && <MobileTabBar active={tab} onChange={setTab} />}
+      <div aria-hidden="true" className="h-20 md:hidden" />
     </div>
   )
 }
