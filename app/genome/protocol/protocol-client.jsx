@@ -55,17 +55,19 @@ import {
 // ---------------------------------------------------------------------------
 // UTIL: Turn a supplement rule + user's cards into a compact protocol card.
 // ---------------------------------------------------------------------------
-function supplementRuleToCard(match) {
-  const { rule, cards } = match
-  const gene = rule?.gene || (cards?.[0]?.gene) || ''
+function supplementRuleToCard(rule) {
+  // matchProtocolToUserVariants returns rule entries directly (not wrapped
+  // in { rule, cards }) — so `rule` here is the raw SUPPLEMENT_PROTOCOL_MAP
+  // entry.
+  const gene = rule?.gene || ''
   const primary = rule?.recommendations?.[0]
   return {
     id: rule?.id || `supp-${gene}`,
-    title: primary?.name || `${gene} support`,
+    title: primary?.name || (gene ? `${gene} — targeted support` : 'Supplement support'),
     dose: primary?.dose || null,
     reasoning:
       primary?.mechanism ||
-      `${gene} variants can benefit from ${primary?.name || 'targeted support'}.`,
+      (gene ? `Your ${gene} variant(s) may benefit from targeted support.` : ''),
     gene,
     genotypePattern: rule?.genotypePattern || '',
     category: rule?.category || 'priority',
@@ -92,9 +94,9 @@ function priorityBadge(category) {
 function generateDoctorQuestions({ groups, pgx, biomarkers }) {
   const qs = []
   for (const m of groups.priority.slice(0, 4)) {
-    const rec = m.rule?.recommendations?.[0]
-    const gene = m.rule?.gene
-    const pattern = m.rule?.genotypePattern
+    const rec = m?.recommendations?.[0]
+    const gene = m?.gene
+    const pattern = m?.genotypePattern
     if (rec && gene) {
       qs.push({
         gene,
@@ -103,7 +105,7 @@ function generateDoctorQuestions({ groups, pgx, biomarkers }) {
     }
   }
   for (const m of groups.awareness.slice(0, 2)) {
-    const gene = m.rule?.gene
+    const gene = m?.gene
     if (gene) {
       qs.push({
         gene,
@@ -119,11 +121,11 @@ function generateDoctorQuestions({ groups, pgx, biomarkers }) {
       })
     }
   }
-  for (const p of Object.values(pgx || {}).slice(0, 2)) {
-    if (p?.phenotype && p.phenotype !== 'unknown' && p.gene) {
+  for (const [gene, p] of Object.entries(pgx || {}).slice(0, 2)) {
+    if (p?.phenotype && p.phenotype !== 'unknown' && gene) {
       qs.push({
-        gene: p.gene,
-        text: `I'm classified as a ${p.phenotype} for ${p.gene}. Are any of my current or future medications affected?`,
+        gene,
+        text: `I'm classified as a ${p.phenotype} for ${gene}. Are any of my current or future medications affected?`,
       })
     }
   }
@@ -219,14 +221,14 @@ export default function ProtocolClient() {
   const addAllToPractitioner = () => {
     const items = []
     for (const m of [...groups.priority, ...groups.awareness]) {
-      const first = m.rule?.recommendations?.[0]
+      const first = m?.recommendations?.[0]
       items.push({
-        id: `protocol:${m.rule?.id || m.rule?.gene}`,
-        title: `${m.rule?.gene || 'Gene'} — ${first?.name || 'support'}`,
-        gene: m.rule?.gene || '',
-        rsid: m.rule?.rsids?.[0] || '',
+        id: `protocol:${m?.id || m?.gene}`,
+        title: `${m?.gene || 'Gene'} — ${first?.name || 'support'}`,
+        gene: m?.gene || '',
+        rsid: m?.rsids?.[0] || '',
         pillar: 'Protocol',
-        note: first?.mechanism || m.rule?.disclaimerNote || '',
+        note: first?.mechanism || m?.disclaimerNote || '',
         source: 'Full protocol',
       })
     }
@@ -241,12 +243,12 @@ export default function ProtocolClient() {
         source: 'Full protocol',
       })
     }
-    for (const p of Object.values(pgx || {})) {
-      if (!p?.phenotype || p.phenotype === 'unknown') continue
+    for (const [gene, p] of Object.entries(pgx || {})) {
+      if (!p?.phenotype || p.phenotype === 'unknown' || !gene) continue
       items.push({
-        id: `pgx:${p.gene}`,
-        title: `${p.gene} — ${p.phenotype}`,
-        gene: p.gene,
+        id: `pgx:${gene}`,
+        title: `${gene} — ${p.phenotype}`,
+        gene,
         rsid: '',
         pillar: 'Pharmacogenomics',
         note: p.note || '',
@@ -567,8 +569,8 @@ function NutritionSection({ nutrition, groups }) {
           Surfaces from the supplement engine's priority recs so the
           Nutrition section can advise on the correct FORM. */}
       {groups.priority.map((m, i) => {
-        const gene = m.rule?.gene
-        const rec = m.rule?.recommendations?.[0]
+        const gene = m?.gene
+        const rec = m?.recommendations?.[0]
         if (!rec?.name || !gene) return null
         return (
           <ProtocolCard
@@ -589,10 +591,8 @@ function SupplementsSection({ groups }) {
   if (all.length === 0) return <EmptyRow copy="No supplement recommendations for your current variants." />
   return (
     <div className="space-y-3">
-      {all.map((m, idx) => {
-        const rule = m.rule
-        return (
-          <div key={rule?.id || idx} className="rounded-xl border border-ss-border-warm/60 bg-ss-bg p-3">
+      {all.map((rule, idx) => (
+        <div key={rule?.id || idx} className="rounded-xl border border-ss-border-warm/60 bg-ss-bg p-3">
             <div className="flex flex-wrap items-center justify-between gap-1">
               <div>
                 <div className="text-sm font-bold text-ss-text">{rule?.gene} · {rule?.genotypePattern}</div>
@@ -615,12 +615,11 @@ function SupplementsSection({ groups }) {
                 </li>
               ))}
             </ul>
-            {rule?.disclaimerNote && (
-              <p className="mt-2 text-xs italic text-ss-muted">{rule.disclaimerNote}</p>
-            )}
-          </div>
-        )
-      })}
+          {rule?.disclaimerNote && (
+            <p className="mt-2 text-xs italic text-ss-muted">{rule.disclaimerNote}</p>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -668,7 +667,11 @@ function TrainingSection({ cards }) {
 
 // --- 4. Medications & Drug Interactions -----------------------------------
 function MedicationsSection({ pgx }) {
-  const rows = Object.values(pgx || {}).filter((p) => p?.phenotype && p.phenotype !== 'unknown')
+  // pgx is a map { GENE: { phenotype, note, ... } } — the gene name is the
+  // KEY, not a property on the value. Convert to rows attaching the key.
+  const rows = Object.entries(pgx || {})
+    .map(([gene, p]) => ({ ...(p || {}), gene }))
+    .filter((p) => p?.phenotype && p.phenotype !== 'unknown')
   if (rows.length === 0) return <EmptyRow copy="No pharmacogenomic phenotypes derived from your report." />
   return (
     <div className="space-y-3">
