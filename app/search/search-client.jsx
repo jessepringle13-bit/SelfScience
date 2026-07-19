@@ -511,7 +511,7 @@ export default function SearchClient() {
         }
 
         merged = {
-          query: anchor,
+          query: trimmed || pillarQuery || '',
           pillar: pill,
           isPillarBrowse: !!pillarQuery,
           isFanout: true,
