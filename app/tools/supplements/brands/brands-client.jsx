@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import SiteNav from '@/components/site-nav'
 import SiteFooter from '@/components/site-footer'
 import BrandProfileDrawer from '@/components/supplements/BrandProfileDrawer'
@@ -8,7 +8,11 @@ import { BRAND_PROFILES } from '@/lib/supplements/brandProfiles'
 import { CERT_REGISTRY } from '@/lib/supplements/certifications'
 import { getScoreStyle } from '@/lib/supplements/scoreColor'
 import { BRAND_CATEGORIES, inferBrandCategories } from '@/lib/supplements/brandCategories'
-import { Trophy, ArrowLeft, Award, Search, ExternalLink, Filter } from 'lucide-react'
+import {
+  getBrandExtras, computeGenomeFit, activeGenomeFormsFromContext, COST_TIER_STYLE,
+} from '@/lib/supplements/brandExtras'
+import { getGenomeResults } from '@/lib/genomeSession'
+import { Trophy, ArrowLeft, Award, Search, ExternalLink, Filter, Dna, DollarSign } from 'lucide-react'
 
 const FILTER_TAGS = [
   { id: 'all',     label: 'All' },
@@ -21,39 +25,98 @@ const FILTER_TAGS = [
   { id: 'usda-organic',  label: 'Organic' },
 ]
 
+const COST_FILTERS = [
+  { id: 'all',  label: 'All' },
+  { id: '$',    label: '$ Budget' },
+  { id: '$$',   label: '$$ Mid' },
+  { id: '$$$',  label: '$$$ Premium' },
+]
+
+const GENOME_FILTER_KEY = 'ss_genome_filter_on'
+
 export default function BrandsLeaderboardClient() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const [category, setCategory] = useState('all')
+  const [costFilter, setCostFilter] = useState('all')
   const [drawerBrand, setDrawerBrand] = useState(null)
+  const [genomeFilterOn, setGenomeFilterOn] = useState(false)
+  const [variantsByGene, setVariantsByGene] = useState({})
+  const [hasGenome, setHasGenome] = useState(false)
 
-  // Pre-compute categories per brand once
-  const brandsWithCats = useMemo(() => {
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(GENOME_FILTER_KEY)
+      if (raw === '1') setGenomeFilterOn(true)
+    } catch { /* noop */ }
+    try {
+      const g = getGenomeResults()
+      if (g) {
+        // Build a compact variantsByGene map from whatever fields are available.
+        const map = {}
+        for (const v of g.variants_recognized || []) {
+          if (v?.gene) map[v.gene.toUpperCase()] = { genotype: v.genotype_called, gene: v.gene }
+        }
+        for (const grp of g.fullReport || []) {
+          for (const v of grp.variants || []) {
+            if (v?.gene) map[v.gene.toUpperCase()] = { genotype: v.genotype, gene: v.gene }
+          }
+        }
+        setVariantsByGene(map)
+        setHasGenome(Object.keys(map).length > 0 || !!(g.cards?.length))
+      }
+    } catch { /* noop */ }
+  }, [])
+
+  const activeForms = useMemo(
+    () => activeGenomeFormsFromContext({ variantsByGene }),
+    [variantsByGene],
+  )
+
+  const toggleGenomeFilter = () => {
+    setGenomeFilterOn((prev) => {
+      const next = !prev
+      try { localStorage.setItem(GENOME_FILTER_KEY, next ? '1' : '0') } catch { /* noop */ }
+      return next
+    })
+  }
+
+  // Pre-compute categories + extras per brand once
+  const brandsWithMeta = useMemo(() => {
     return Object.values(BRAND_PROFILES).map((b) => ({
       ...b,
       _categories: inferBrandCategories(b),
+      _extras: getBrandExtras(b.slug),
+      _genomeFit: computeGenomeFit(b, activeForms),
     }))
-  }, [])
+  }, [activeForms])
 
-  // Only show categories that actually contain at least one brand
   const availableCategories = useMemo(() => {
     const present = new Set()
-    for (const b of brandsWithCats) b._categories.forEach((c) => present.add(c))
+    for (const b of brandsWithMeta) b._categories.forEach((c) => present.add(c))
     return BRAND_CATEGORIES.filter((c) => present.has(c.id))
-  }, [brandsWithCats])
+  }, [brandsWithMeta])
 
   const brands = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const filtered = brandsWithCats.filter((b) => {
+    const filtered = brandsWithMeta.filter((b) => {
       if (q && !b.name.toLowerCase().includes(q) && !(b.focus || '').toLowerCase().includes(q)) return false
       if (filter !== 'all' && !(b.programmes || []).includes(filter)) return false
       if (category !== 'all' && !b._categories.includes(category)) return false
+      if (costFilter !== 'all' && b._extras.costTier !== costFilter) return false
+      if (genomeFilterOn && hasGenome && b._genomeFit === 0) return false
       return true
     })
-    // Sort by score desc, then name asc
-    filtered.sort((a, b) => (b.score - a.score) || a.name.localeCompare(b.name))
+    // Sort: genome filter on → genomeFit desc first, then score desc, then name.
+    filtered.sort((a, b) => {
+      if (genomeFilterOn && hasGenome) {
+        const diff = b._genomeFit - a._genomeFit
+        if (diff !== 0) return diff
+      }
+      return (b.score - a.score) || a.name.localeCompare(b.name)
+    })
     return filtered
-  }, [brandsWithCats, query, filter, category])
+  }, [brandsWithMeta, query, filter, category, costFilter, genomeFilterOn, hasGenome])
 
   return (
     <div className="min-h-screen bg-[#F7F6F2] text-[#28251D]">
@@ -132,6 +195,46 @@ export default function BrandsLeaderboardClient() {
               )
             })}
           </div>
+
+          {/* Cost tier + Best-for-my-genome */}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <DollarSign className="h-3 w-3" /> Cost
+            </span>
+            {COST_FILTERS.map((c) => {
+              const active = costFilter === c.id
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCostFilter(c.id)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                    active
+                      ? 'bg-[#1B474D] text-white border-[#1B474D] shadow-sm'
+                      : 'bg-white border-slate-300 text-slate-700 hover:border-[#1B474D] hover:text-[#1B474D]'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              )
+            })}
+            {hasGenome && (
+              <button
+                type="button"
+                onClick={toggleGenomeFilter}
+                className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                  genomeFilterOn
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                    : 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                }`}
+                title="Reorder + filter brands that carry the specific forms your variants prefer (methylfolate, methylcobalamin, chelated minerals, etc.)"
+              >
+                <Dna className="h-3 w-3" />
+                Best for my genome
+                {genomeFilterOn && <span className="rounded-full bg-white/20 px-1.5 text-[10px]">ON</span>}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Table */}
@@ -147,6 +250,8 @@ export default function BrandsLeaderboardClient() {
                   <th className="text-left px-4 py-2 font-semibold">Score</th>
                   <th className="text-left px-4 py-2 font-semibold hidden md:table-cell">Focus</th>
                   <th className="text-left px-4 py-2 font-semibold">Certifications</th>
+                  <th className="text-left px-4 py-2 font-semibold">Cost</th>
+                  {hasGenome && <th className="text-left px-4 py-2 font-semibold">Genome</th>}
                   <th className="text-right px-4 py-2 font-semibold">Visit</th>
                 </tr>
               </thead>
@@ -154,6 +259,14 @@ export default function BrandsLeaderboardClient() {
                 {brands.map((b, idx) => {
                   const style = getScoreStyle(b.score)
                   const certs = (b.programmes || []).map((id) => CERT_REGISTRY[id]).filter(Boolean)
+                  const costStyle = COST_TIER_STYLE[b._extras.costTier] || COST_TIER_STYLE['$$']
+                  const genomeFit = b._genomeFit
+                  const genomeLabel = genomeFit >= 3 ? 'High' : genomeFit >= 1 ? 'Med' : '—'
+                  const genomeChip = genomeFit >= 3
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                    : genomeFit >= 1
+                      ? 'bg-sky-100 text-sky-800 border-sky-300'
+                      : 'bg-slate-100 text-slate-500 border-slate-200'
                   return (
                     <tr key={b.slug} className="border-t border-slate-100 hover:bg-slate-50/70">
                       <td className="px-4 py-3 text-slate-500 font-semibold">{idx + 1}</td>
@@ -180,6 +293,20 @@ export default function BrandsLeaderboardClient() {
                       <td className="px-4 py-3">
                         <CertBadges certifications={certs} compact maxVisible={3} />
                       </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${costStyle.chip}`}>
+                          {b._extras.costTier}
+                          <span className="hidden lg:inline text-[10px] font-medium opacity-70">· {costStyle.label}</span>
+                        </span>
+                      </td>
+                      {hasGenome && (
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${genomeChip}`}>
+                            <Dna className="h-2.5 w-2.5" />
+                            {genomeLabel}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-right">
                         <a
                           href={b.officialUrl}

@@ -50,6 +50,7 @@ import {
   INGREDIENT_DICTIONARY,
 } from '@/lib/ingredientDictionary'
 import { getAlternatives } from '@/lib/productAlternatives'
+import TimingRulesBanner from '@/components/nutrition/TimingRulesBanner'
 
 const LOG_KEY = 'selfscience_food_log_v1'
 
@@ -176,6 +177,7 @@ function YourFoodsTab({ activeRules, hasGenome }) {
 
   return (
     <div className="space-y-8">
+      <TimingRulesBanner activeRules={activeRules} />
       {showPgx && <PgxDisclaimer />}
 
       {!hasGenome && (
@@ -263,11 +265,14 @@ function NutritionRuleCard({ rule }) {
         )}
 
         {rule.avoid_foods?.length > 0 && (
-          <div className="mt-6">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ss-orange">
-              <AlertTriangle size={13} /> Consider limiting
+          <div className="mt-6 overflow-hidden rounded-xl border-2 border-ss-amber/30 bg-ss-amber/10">
+            <div className="flex items-center gap-2 border-b-2 border-ss-amber/30 bg-ss-amber/20 px-4 py-2.5">
+              <AlertTriangle size={15} className="text-ss-amber" />
+              <span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-ss-amber">
+                Consider limiting for your variants
+              </span>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2">
               {rule.avoid_foods.map((f, i) => (
                 <FoodTile key={i} food={f} tone="warn" />
               ))}
@@ -458,7 +463,14 @@ function FoodJournalTab({ activeRules, hasGenome }) {
         const { product } = await res.json()
         if (product) {
           const { flags } = scanIngredients(`${product.name} ${product.ingredients_text}`, activeRules)
-          addEntry({ name: `${product.brand ? product.brand + ' — ' : ''}${product.name}`, flags, source: 'barcode', barcode: code, image: product.image })
+          addEntry({
+            name: `${product.brand ? product.brand + ' — ' : ''}${product.name}`,
+            flags,
+            source: 'barcode',
+            barcode: code,
+            image: product.image,
+            nutriments: product.nutriments || null,
+          })
         } else {
           addEntry({ name: `Barcode ${code}`, flags: [], source: 'barcode_notfound', barcode: code })
         }
@@ -478,10 +490,14 @@ function FoodJournalTab({ activeRules, hasGenome }) {
   }
 
   const summary = useMemo(() => summarizeDay(today, activeRules), [today, activeRules])
+  const macroTotals = useMemo(() => computeMacroTotals(today), [today])
+  const macroNote = useMemo(() => macroNoteFor(activeRules), [activeRules])
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr,360px]">
       <section>
+        <TimingRulesBanner activeRules={activeRules} className="mb-4" />
+        <MacroStrip totals={macroTotals} note={macroNote} entryCount={today.length} />
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-ss-teal">Today — {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</h2>
           {entries.length > 0 && (
@@ -680,6 +696,113 @@ function summarizeDay(entries, activeRules) {
   }
 
   return { grade, totalFlags, caffeineTotal, slowMetabolizer, timingIssues, nutrientGaps }
+}
+
+// ---------------------------------------------------------------------------
+// Daily macro strip helpers
+// ---------------------------------------------------------------------------
+
+// Sum per-serving macros from journal entries that have nutriment data
+// attached (currently only scanner-sourced barcode entries). Manual
+// entries contribute 0 — they don't carry macros. Returns totals + a
+// count of entries that contributed.
+function computeMacroTotals(entries) {
+  let carbs = 0, protein = 0, fat = 0, kcal = 0
+  let contributing = 0
+  for (const e of entries || []) {
+    const n = e?.nutriments
+    if (!n) continue
+    // Prefer per-serving, fall back to per-100g if that's all we have.
+    const c = n.carbs_g_serving   ?? n.carbs_g   ?? 0
+    const p = n.protein_g_serving ?? n.protein_g ?? 0
+    const f = n.fat_g_serving     ?? n.fat_g     ?? 0
+    const k = n.energy_kcal_serving ?? n.energy_kcal ?? 0
+    if (!c && !p && !f && !k) continue
+    carbs   += Number(c) || 0
+    protein += Number(p) || 0
+    fat     += Number(f) || 0
+    kcal    += Number(k) || 0
+    contributing++
+  }
+  return {
+    carbs:   Math.round(carbs),
+    protein: Math.round(protein),
+    fat:     Math.round(fat),
+    kcal:    Math.round(kcal),
+    contributing,
+  }
+}
+
+// Genome-aware one-liner note about macro targets, if applicable.
+function macroNoteFor(activeRules) {
+  const keys = new Set((activeRules || []).map((r) => r.key))
+  if (keys.has('mtnr1b_risk') || keys.has('tcf7l2_risk')) {
+    return 'Your variants (MTNR1B / TCF7L2) benefit from lower-carb, higher-protein meals — especially in the second half of the day.'
+  }
+  if (keys.has('ppara_enhanced')) {
+    return 'Your PPARA GG variant metabolises dietary fat efficiently — quality fats over refined carbs suit you well.'
+  }
+  if (keys.has('apoe4') || keys.has('apoe_e4_carrier')) {
+    return 'Your APOE ε4 status suggests keeping saturated-fat intake modest — favour mono-unsaturated fats (olive oil, avocado, nuts).'
+  }
+  return null
+}
+
+function MacroStrip({ totals, note, entryCount }) {
+  const { carbs, protein, fat, kcal, contributing } = totals
+  const hasMacros = contributing > 0
+  const totalG = Math.max(1, carbs + protein + fat)
+  const carbsPct   = Math.round((carbs   / totalG) * 100)
+  const proteinPct = Math.round((protein / totalG) * 100)
+  const fatPct     = Math.round((fat     / totalG) * 100)
+  return (
+    <div className="mb-4 rounded-2xl border border-ss-border-warm/60 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-muted">
+          Today&apos;s macros
+        </div>
+        {hasMacros ? (
+          <div className="text-[11px] font-semibold text-ss-teal">
+            <span className="tabular-nums">{kcal}</span> kcal · <span className="tabular-nums">{contributing}</span> of {entryCount} entries with data
+          </div>
+        ) : (
+          <div className="text-[11px] italic text-ss-muted">Scan barcodes to log macros automatically</div>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <MacroCell label="Carbs"   value={carbs}   suffix="g" color="#0891B2" />
+        <MacroCell label="Protein" value={protein} suffix="g" color="#0F766E" />
+        <MacroCell label="Fat"     value={fat}     suffix="g" color="#B45309" />
+      </div>
+
+      {hasMacros && (
+        <div
+          className="mt-3 flex h-2 w-full overflow-hidden rounded-full bg-ss-border-warm/60"
+          aria-label={`Macros ratio — carbs ${carbsPct}%, protein ${proteinPct}%, fat ${fatPct}%`}
+        >
+          <div style={{ width: `${carbsPct}%`,   background: '#0891B2' }} />
+          <div style={{ width: `${proteinPct}%`, background: '#0F766E' }} />
+          <div style={{ width: `${fatPct}%`,     background: '#B45309' }} />
+        </div>
+      )}
+
+      {note && (
+        <p className="mt-3 text-[11.5px] italic leading-snug text-ss-muted">{note}</p>
+      )}
+    </div>
+  )
+}
+
+function MacroCell({ label, value, suffix, color }) {
+  return (
+    <div className="rounded-lg bg-ss-bg/60 px-2 py-2">
+      <div className="text-[9.5px] font-extrabold uppercase tracking-wider text-ss-muted">{label}</div>
+      <div className="mt-0.5 text-lg font-black tabular-nums" style={{ color }}>
+        {value}<span className="text-[11px] font-bold">{suffix}</span>
+      </div>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -1317,6 +1440,8 @@ function ProductCard({ product, activeRules, hasGenome, onIngredientClick, onSea
         <ScoreCard grade={q.universal.grade} title="Universal quality" subtitle={`${q.universal.flags.length} concerning ingredient${q.universal.flags.length === 1 ? '' : 's'}${q.universal.nova ? ` · NOVA ${q.universal.nova}` : ''}`} />
       </div>
 
+      <WhyThisGrade quality={q} hasGenome={hasGenome} />
+
       <div className="border-t border-ss-border-warm/60 bg-ss-surface px-6 py-5">
         {/* Macros */}
         <div className="text-xs font-bold uppercase tracking-wider text-ss-teal">{perServing ? 'Per serving' : 'Per 100g'}</div>
@@ -1455,6 +1580,104 @@ function ProductCard({ product, activeRules, hasGenome, onIngredientClick, onSea
         <p className="mt-6 text-[11px] italic text-ss-muted">{SCANNER_DISCLAIMER}</p>
       </div>
     </article>
+  )
+}
+
+function WhyThisGrade({ quality, hasGenome }) {
+  const [open, setOpen] = useState(false)
+  const genFlags = quality?.genomic?.flags || []
+  const uniFlags = quality?.universal?.flags || []
+  const positives = quality?.universal?.positives || []
+  const nova = quality?.universal?.nova || 0
+  const nothingToExplain = genFlags.length === 0 && uniFlags.length === 0 && !nova
+
+  const genSummary = hasGenome
+    ? genFlags.length === 0
+      ? 'No ingredients in this product triggered a flag against your uploaded variants.'
+      : `${genFlags.length} ingredient${genFlags.length === 1 ? '' : 's'} matched one of your variant-driven rules — see the details below.`
+    : 'Upload your genome to see which of your specific variants would flag this product.'
+
+  const uniSummary = uniFlags.length === 0 && !nova
+    ? 'No universal-quality concerns detected. Clean label.'
+    : [
+        uniFlags.length ? `${uniFlags.length} concerning ingredient${uniFlags.length === 1 ? '' : 's'}` : null,
+        nova >= 4 ? 'NOVA 4 (ultra-processed)' : nova === 3 ? 'NOVA 3 (processed)' : null,
+        positives.length ? `+${positives.length} clean-label positive${positives.length === 1 ? '' : 's'}` : null,
+      ].filter(Boolean).join(' · ')
+
+  return (
+    <div className="border-t border-ss-border-warm/60 bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full min-h-11 items-center justify-between gap-3 px-6 py-3 text-left transition hover:bg-ss-bg/50"
+      >
+        <div className="flex items-center gap-2">
+          <Info size={14} className="text-ss-teal" />
+          <span className="text-sm font-bold text-ss-teal">Why this grade?</span>
+          {nothingToExplain && (
+            <span className="rounded-full bg-ss-green/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ss-green">
+              Clean
+            </span>
+          )}
+        </div>
+        {open ? <ChevronUp size={14} className="text-ss-muted" /> : <ChevronDown size={14} className="text-ss-muted" />}
+      </button>
+      {open && (
+        <div className="grid grid-cols-1 gap-3 border-t border-ss-border-warm/40 bg-ss-surface px-6 py-4 md:grid-cols-2">
+          <div className="rounded-xl bg-white p-3 ring-1 ring-ss-border-warm/60">
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-ss-teal">Genomic fit</div>
+            <p className="mt-1 text-[12px] leading-snug text-ss-text">{genSummary}</p>
+            {genFlags.length > 0 && (
+              <ul className="mt-2 space-y-1.5 text-[11.5px] leading-snug text-ss-text">
+                {genFlags.slice(0, 6).map((f, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-ss-orange" />
+                    <span>
+                      <span className="font-semibold text-ss-orange">{f.ingredient}</span>{' '}
+                      <span className="text-ss-muted">→ {f.rule_title}:</span> {f.flag}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="rounded-xl bg-white p-3 ring-1 ring-ss-border-warm/60">
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-ss-teal">Universal quality</div>
+            <p className="mt-1 text-[12px] leading-snug text-ss-text">{uniSummary}</p>
+            {uniFlags.length > 0 && (
+              <ul className="mt-2 space-y-1.5 text-[11.5px] leading-snug text-ss-text">
+                {uniFlags.slice(0, 6).map((f, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span
+                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: f.severity === 'universal_avoid' ? '#DC2626' : f.severity === 'universal_limit' ? '#EA580C' : '#B45309' }}
+                    />
+                    <span>
+                      <span className="font-semibold text-ss-text">{f.ingredient}</span>
+                      {f.reason && <> <span className="text-ss-muted">— {f.reason}</span></>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {positives.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {positives.slice(0, 6).map((p, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-ss-green/12 px-2 py-0.5 text-[10px] font-semibold text-ss-green">
+                    <CheckCircle2 size={10} /> {p.label || p.ingredient || String(p)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <p className="md:col-span-2 text-[10.5px] italic text-ss-muted">
+            For educational purposes only. Not a substitute for professional medical advice.
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 

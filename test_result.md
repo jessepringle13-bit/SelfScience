@@ -2621,6 +2621,111 @@ test_plan:
 agent_communication:
     -agent: "main"
       message: |
+        SLICE 3 — SUPPLEMENT DISCOVERY CORE SHIPPED (partial: 3/4)
+
+        1) NEW: /app/lib/supplements/brandExtras.js
+           - BRAND_EXTRAS overlay keyed by slug — every curated brand
+             now carries costTier ('$'|'$$'|'$$$') + genomeForms tags
+             (methylfolate, methylcobalamin, chelated_minerals, active_bs,
+             preformed_retinol, hydroxy_b12).
+           - computeGenomeFit(brand, activeForms) — pure fn that scores
+             a brand 0-N based on tag intersection with user variant needs.
+           - activeGenomeFormsFromContext({variantsByGene}) — pure fn that
+             maps genotypes → required forms (MTHFR T-carriers → methyl-
+             folate + methylcobalamin + active_bs; BCMO1 TT/AA →
+             preformed_retinol; MTHFR/COMT/SLCO1B1 → chelated_minerals).
+           - COST_TIER_STYLE — Tailwind chip classes for $/$$/$$$.
+
+        2) NEW: /app/lib/supplements/interactions.js
+           - Curated SUPPLEMENT_INTERACTIONS table covering the highest-
+             impact clinical pairs: vitamin K + warfarin, fish oil +
+             anticoagulants, magnesium + antibiotics/levothyroxine, iron
+             + levothyroxine, St. John's Wort + SSRIs/warfarin, CoQ10 +
+             statins, grapefruit + statins/tacrolimus, niacin + statins,
+             melatonin + sedatives.
+           - Each entry keys off BOTH user medications (ss_my_medications,
+             Slice 5) AND PGx phenotype (VKORC1 higher_sensitivity,
+             SLCO1B1 poor_transport, CYP2C19 UM/RM, etc.).
+           - findInteractionsForSupplement(name, {userDrugs, phenotypes})
+             returns only personalised flags — never generic warnings.
+           - classifySupplement() normalises free-text ingredient names
+             to canonical supplement keys via KEY_ALIASES.
+
+        3) BRAND LEADERBOARD (/tools/supplements/brands):
+           - New Cost filter row ($ Budget / $$ Mid / $$$ Premium).
+           - New "Best for my genome" toggle (emerald pill on the right)
+             — persists in localStorage under ss_genome_filter_on.
+             When ON: filters out zero-match brands and reorders by
+             genomeFit desc, then score desc. Hidden when no genome
+             uploaded.
+           - New Cost column showing tier chip + label.
+           - New Genome column (visible only when genome uploaded) with
+             High / Med / — badges keyed to genomeFit score.
+           - Brand order verified visually: Thorne #1, Pure Encapsulations
+             #2, Seeking Health #3 when filter is ON and MTHFR TT variant
+             seeded.
+
+        4) [DEFERRED] Evidence badges on discovery product cards
+           - Held for a follow-on pass: DSLD product cards don't currently
+             carry an evidence tier field. The interactions util is
+             already wired for it, so this is a small addition — will
+             ship alongside Slice 4 (BrandScore) since both touch the
+             ProductCard structure.
+           - Slice 5 will complete the supplement-drug flag by adding
+             the "My Medications" list this needs to fully fire.
+
+        Verified visually:
+          - /tmp/brands_v1.png       (leaderboard w/ cost + genome cols)
+          - /tmp/brands_genome_on.png (filter ON — reordered by fit)
+
+        No backend changes. Only new files + brand-leaderboard client.
+        No regression to existing filter chips or drawer.
+
+
+    -agent: "main"
+      message: |
+        SLICE 2 — NUTRITION HUB QUICK WINS SHIPPED
+
+        1) TIMING RULES BANNER (new): /app/components/nutrition/TimingRulesBanner.jsx
+           - Collects all timing_rules from activeRules, sorted
+             critical > high > moderate. Hero row + stacked bullets.
+             Rendered pinned at the top of BOTH Foods and Journal tabs.
+             Not dismissable per user spec.
+
+        2) "CONSIDER LIMITING" REDESIGN (NutritionRuleCard):
+           - Replaced muted orange border with a full amber-tinted
+             section (2px amber border, amber gradient bg, warning-
+             triangle header strip labelled "CONSIDER LIMITING FOR YOUR
+             VARIANTS"). Uses only ss-amber tokens.
+
+        3) JOURNAL DAILY MACRO STRIP:
+           - New helpers computeMacroTotals() and macroNoteFor().
+           - MacroStrip renders "TODAY'S MACROS · kcal · N/M with data",
+             3-column macro grid, coloured ratio bar, and a genome-aware
+             note (MTNR1B/TCF7L2 → lower-carb, PPARA → fat-friendly,
+             APOE ε4 → modest saturated fat).
+           - handleBarcode augmented to persist product.nutriments into
+             each barcode-sourced journal entry so macros sum correctly.
+
+        4) SCANNER — "WHY THIS GRADE?" COLLAPSIBLE:
+           - New WhyThisGrade component sits directly below the two
+             ScoreCards. Two side-by-side panels (Genomic / Universal)
+             with a summary sentence, up to 6 flagged ingredients keyed
+             to the specific variant-rule that flagged them, plus
+             clean-label positive chips. Green "Clean" chip when nothing
+             flags. Educational disclaimer inline.
+
+        Verified visually:
+          - /tmp/nutr_foods_banner.png    (banner + MTNR1B hero + subs)
+          - /tmp/nutr_journal.png         (banner + macro strip + note)
+          - /tmp/nutr_scanner_why.png     (Scanner state)
+
+        No backend / third-party / DB changes. All data still lives in
+        localStorage — privacy contract preserved.
+
+
+    -agent: "main"
+      message: |
         SLICE 0 + SLICE 1 — DARK CANVAS BG + DRUG CHECK POLISH SHIPPED
 
         SLICE 0 · Darker background contrast (global):
