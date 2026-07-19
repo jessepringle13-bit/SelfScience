@@ -40,6 +40,7 @@ import {
 } from '@/lib/drugCatalog'
 import { computeDrugInteractions } from '@/lib/drugInteractions'
 import { inferAllPGxPhenotypes } from '@/lib/pgxClassifier'
+import { getPgxPlainEnglish, SEVERITY_TOKENS, getDrugGeneImplication } from '@/lib/pgxPlainEnglish'
 import DashboardBackLink from '@/components/DashboardBackLink'
 
 const POPULAR_QUERIES = ['clopidogrel', 'warfarin', 'codeine', 'omeprazole', 'simvastatin', 'escitalopram']
@@ -191,6 +192,7 @@ export default function DrugCheckClient() {
                 phenotypes={phenotypes}
                 interactionSets={interactionSets}
                 rawVariants={rawVariants}
+                onSwitchToPair={() => setMode('pair')}
               />
             )}
 
@@ -216,7 +218,13 @@ export default function DrugCheckClient() {
 function SingleDrugSection({
   query, setQuery, selected, setSelected, pickDrug, suggestions,
   showHR, onToggleHR, guidance, phenotypes, interactionSets, rawVariants,
+  onSwitchToPair,
 }) {
+  // Gene-status implication line for the currently-selected drug.
+  const implication = useMemo(
+    () => (selected && phenotypes) ? getDrugGeneImplication(selected, phenotypes) : null,
+    [selected, phenotypes],
+  )
   return (
     <>
       {/* Search input */}
@@ -304,19 +312,64 @@ function SingleDrugSection({
       )}
 
       {selected && (
-        <DrugCard
-          drug={selected}
-          guidance={guidance}
-          phenotypes={phenotypes}
-          interactionSets={interactionSets}
-          rawVariants={rawVariants}
-        />
+        <>
+          {implication && (
+            <GeneStatusBar implication={implication} drug={selected} />
+          )}
+          <DrugCard
+            drug={selected}
+            guidance={guidance}
+            phenotypes={phenotypes}
+            interactionSets={interactionSets}
+            rawVariants={rawVariants}
+          />
+        </>
       )}
 
       {phenotypes && (
-        <PhenotypeSnapshot phenotypes={phenotypes} onPickDrug={pickDrug} selectedId={selected?.id} />
+        <PhenotypeSnapshot
+          phenotypes={phenotypes}
+          onPickDrug={pickDrug}
+          selectedId={selected?.id}
+          onSwitchToPair={onSwitchToPair}
+        />
       )}
     </>
+  )
+}
+
+// Sits directly above the DrugCard whenever a drug is picked. Shows the
+// user's specific gene status + a one-line plain-English implication for
+// this drug — so a Popular Check chip tap yields an instant personalised
+// verdict before the user has to read the full card.
+function GeneStatusBar({ implication, drug }) {
+  const { gene, phenotype, severity, impact } = implication
+  const tok = SEVERITY_TOKENS[severity] || SEVERITY_TOKENS.normal
+  return (
+    <div
+      className="mt-6 flex flex-wrap items-start gap-3 overflow-hidden rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ss-border-warm/60"
+      style={{ borderLeft: `6px solid ${tok.dotHex}` }}
+      aria-label={`Your ${gene} status for ${drug.name || drug.generic}`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-muted">
+          Your gene status for <span className="text-ss-teal">{drug.name || drug.generic}</span>
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <code className="rounded bg-ss-bg px-1.5 py-0.5 text-[13px] font-extrabold text-ss-teal">{gene}</code>
+          <span className="text-sm font-bold text-ss-text">{phenotype.label}</span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${tok.chip}`}>
+            {tok.label}
+          </span>
+        </div>
+        {impact && (
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ss-text">{impact}</p>
+        )}
+        <p className="mt-1 text-[10.5px] italic text-ss-muted">
+          For educational purposes only. Not a substitute for professional medical advice.
+        </p>
+      </div>
+    </div>
   )
 }
 
@@ -596,7 +649,7 @@ function SamhsaCard() {
 // PGx phenotype snapshot (bottom of page)
 // ---------------------------------------------------------------------------
 
-function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId }) {
+function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId, onSwitchToPair }) {
   const rows = [
     { gene: 'CYP2C19', ph: phenotypes.CYP2C19 },
     { gene: 'CYP2D6',  ph: phenotypes.CYP2D6 },
@@ -608,20 +661,73 @@ function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId }) {
   ]
   return (
     <div className="mt-10">
-      <h2 className="text-lg font-bold text-ss-text">Your PGx phenotype snapshot</h2>
-      <p className="mt-1 text-xs text-ss-muted">Estimated from your genome file. Click any gene to see prescription drugs affected by it.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-ss-text">Your PGx phenotype snapshot</h2>
+          <p className="mt-1 text-xs text-ss-muted">Estimated from your genome file. Click any gene to see prescription drugs affected by it.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-ss-muted">
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.normal.dotHex}} /> Standard</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.intermediate.dotHex}} /> Monitor</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.critical.dotHex}} /> Discuss</span>
+        </div>
+      </div>
+
+      {/* Two-together discovery callout */}
+      {typeof onSwitchToPair === 'function' && (
+        <button
+          type="button"
+          onClick={onSwitchToPair}
+          className="mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border border-ss-teal/30 bg-gradient-to-r from-ss-teal/8 to-ss-teal/[0.02] p-4 text-left transition hover:from-ss-teal/12 hover:shadow-sm"
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ss-teal/15 text-ss-teal">
+              <GitCompare size={17} />
+            </span>
+            <div>
+              <div className="text-sm font-bold text-ss-teal">Taking more than one medication?</div>
+              <div className="mt-0.5 text-xs text-ss-muted">
+                Check how <span className="font-semibold text-ss-text">two of your medications interact</span> with your specific metabolizer profile — CYP-enzyme competition, class-level synergy, and known dangerous combinations.
+              </div>
+            </div>
+          </div>
+          <span className="hidden shrink-0 items-center gap-1 rounded-full bg-ss-teal px-3 py-1.5 text-[11px] font-bold text-white shadow sm:inline-flex">
+            Two together <ArrowRight size={12} />
+          </span>
+        </button>
+      )}
+
       <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         {rows.map(({ gene, ph }) => {
           const drugsAffected = DRUG_CATALOG.filter((d) =>
             !d.isHarmReduction && (d.primaryGene === gene || d.extraGenes?.includes(gene))
           )
+          const { severity, impact } = getPgxPlainEnglish(gene, ph)
+          const tok = SEVERITY_TOKENS[severity] || SEVERITY_TOKENS.normal
           return (
-            <div key={gene} className="rounded-xl bg-white p-4 ring-1 ring-ss-border-warm/60">
-              <div className="flex items-center justify-between">
+            <div
+              key={gene}
+              className={`relative overflow-hidden rounded-xl bg-white p-4 pl-5 shadow-sm ring-1 ${tok.ring}`}
+            >
+              {/* Colour-coded severity bar */}
+              <span
+                className="absolute inset-y-0 left-0 w-1.5"
+                style={{ background: tok.dotHex }}
+                aria-hidden="true"
+              />
+              <div className="flex items-center justify-between gap-2">
                 <div className="font-bold text-ss-teal">{gene}</div>
-                <span className="text-[10px] uppercase tracking-wider text-ss-muted">{drugsAffected.length} drugs</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`hidden rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider sm:inline ${tok.chip}`}>
+                    {tok.label}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-ss-muted">{drugsAffected.length} drugs</span>
+                </div>
               </div>
-              <div className="mt-1 text-sm text-ss-text">{ph.label}</div>
+              <div className="mt-1 text-sm font-semibold text-ss-text">{ph.label}</div>
+              {impact && (
+                <p className="mt-1.5 text-[11.5px] leading-snug text-ss-muted">{impact}</p>
+              )}
               <div className="mt-3 flex flex-wrap gap-1">
                 {drugsAffected.slice(0, 6).map((d) => (
                   <button
@@ -644,6 +750,9 @@ function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId }) {
           )
         })}
       </div>
+      <p className="mt-3 text-[10.5px] italic text-ss-muted">
+        For educational purposes only. Not a substitute for professional medical advice.
+      </p>
     </div>
   )
 }

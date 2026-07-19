@@ -2619,6 +2619,60 @@ test_plan:
 
 
 agent_communication:
+    -agent: "main"
+      message: |
+        SLICE 0 + SLICE 1 — DARK CANVAS BG + DRUG CHECK POLISH SHIPPED
+
+        SLICE 0 · Darker background contrast (global):
+          • Added `ss-teal-ink` and `ss-canvas` colours (#0F2A2E) to
+            /app/tailwind.config.js.
+          • Body element in globals.css now uses `bg-ss-canvas`.
+          • Root <body> in /app/app/layout.js wraps children in a
+            max-w-[1600px] mx-auto container with `bg-ss-bg` — so the dark
+            canvas #0F2A2E is revealed as symmetric gutters on wide viewports
+            (>1600 px effective), while all existing pages remain fully
+            legible with their cream `bg-ss-bg` sheet. Zero regressions.
+
+        SLICE 1 · Drug Check polish (all 4 items):
+          1) NEW: /app/lib/pgxPlainEnglish.js — pure utility that maps
+             (gene, phenotypeCode) → { severity, impact } where severity is
+             one of 'normal' | 'intermediate' | 'critical'. Covers CYP2C19,
+             CYP2D6, CYP2C9, VKORC1, SLCO1B1, DPYD, TPMT.
+          2) PhenotypeSnapshot cards now render:
+             - Left-edge severity bar (green / amber / orange) sized to
+               match SelfScience design tokens (ss-green #2E7D32,
+               ss-amber #964219, ss-orange #C45820).
+             - "STANDARD DOSING LIKELY" / "MAY NEED MONITORING" / "DISCUSS
+               WITH PRESCRIBER" chip aligned right of gene label.
+             - Plain-English impact sentence pulled from the new utility.
+             - Colour-coded legend at top-right of the section header
+               (Standard · Monitor · Discuss).
+             - Inline educational-only disclaimer beneath the grid.
+          3) "Two together" discovery callout — full-width teal gradient
+             card ABOVE the phenotype grid: "Taking more than one
+             medication? Check how two of your medications interact with
+             your specific metabolizer profile → Two together". Tapping it
+             flips the mode tab to 'pair'. This solves the discoverability
+             gap the user flagged.
+          4) GeneStatusBar — a new component that sits directly above the
+             DrugCard whenever a drug is selected (whether via the search
+             input OR the Popular Checks chips). Shows: eyebrow "YOUR GENE
+             STATUS FOR [drug]", the primary gene, the phenotype label, the
+             severity chip, and the one-line plain-English implication
+             for THAT drug + user's genome combo. Educational disclaimer
+             inline.
+
+        Verified visually via the screenshot tool:
+          - /tmp/dc_snapshot.png (severity borders + plain-English + Two
+            together callout + legend)
+          - /tmp/dc_gene_bar.png (GeneStatusBar via Clopidogrel Popular
+            Check chip → shows the user's CYP2C19 EM status + implication
+            before they read the full card)
+          - /tmp/training_wide.png (dark canvas gutters at 1920px on the
+            training tool — confirms Slice 0 works site-wide)
+
+        No backend changes, no third-party changes, no regressions.
+
     -agent: "testing"
       message: |
         DASHBOARD GENE CHIP CLINICAL TRIAL FEATURE - COMPREHENSIVE TESTING COMPLETE

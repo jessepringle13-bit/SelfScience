@@ -79,7 +79,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        {children}
+        <div className="mx-auto min-h-screen w-full max-w-[1600px] bg-ss-bg text-ss-text 2xl:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
+          {children}
+        </div>
         <MobileNav />
         <PWAInstallPrompt />
         <PWAUpdater />

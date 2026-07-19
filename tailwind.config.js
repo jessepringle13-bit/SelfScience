@@ -25,6 +25,8 @@ module.exports = {
           ss: {
             teal: '#1B474D',
             'teal-dark': '#123539',
+            'teal-ink': '#0F2A2E',
+            canvas: '#0F2A2E',
             orange: '#C45820',
             'orange-dark': '#A5471A',
             bg: '#F7F6F2',
