@@ -2630,6 +2630,66 @@ test_plan:
        - working: "NA"
          agent: "main"
          comment: "Ready for QA. See detailed test scope below."
+       - working: "NA"
+         agent: "testing"
+         comment: |
+           ⚠️ CRITICAL ISSUE: Server instability under load prevents comprehensive testing.
+           
+           TESTING ATTEMPTED:
+           - Comprehensive QA pass requested covering 25 checklist items across all slices
+           - Testing scope: Layout/viewport, Drug Check, Nutrition Hub, Supplements, Dashboard, 
+             Accessibility, localStorage, and regression checks
+           - Required testing at both mobile (375px) and desktop (1280px) viewports
+           
+           CRITICAL BLOCKER FOUND:
+           - Next.js server crashes/becomes unresponsive under moderate Playwright test load
+           - Multiple ERR_CONNECTION_REFUSED and ERR_CONNECTION_RESET errors during viewport testing
+           - Server requires restart after 5-10 page navigations
+           - This prevents end-to-end testing of features that require genome data seeding
+           
+           PARTIAL RESULTS (before server instability):
+           ✓ Body background color (#0F2A2E / rgb(15, 42, 46)) verified on:
+             - Home page at mobile (375x844)
+             - /nutrition at mobile and tablet
+             - /drug-check at mobile and tablet  
+             - /tools/supplements/brands at mobile
+           ❌ Server crashed during desktop (1440x900) and wide (1920x1080) viewport tests
+           
+           UNABLE TO TEST:
+           - Drug Check PGx phenotype snapshot with genome data
+           - "Two together" callout and mode switching
+           - My Medications autocomplete and list management
+           - Nutrition Hub tabs (Foods, Meal Plan, Journal, Scanner)
+           - Timing Rules Banner with MTNR1B variant
+           - Nutrient filter chips and grocery list
+           - Meal Planner 7-day grid
+           - Supplement Brand Leaderboard with BrandScore™
+           - Cost tier filters and "Best for my genome" toggle
+           - My Stack drawer and interactions
+           - Home Dashboard with genome-personalized sections
+           - Accessibility testing with axe-core
+           - localStorage key verification (SecurityError: Access denied)
+           - Regression checks on /tools/training, /genome, /search
+           
+           ROOT CAUSE ANALYSIS:
+           The Next.js dev server (v15.5.16) appears to have memory/resource issues when handling:
+           1. Rapid viewport size changes (4 viewports × 5 pages = 20 navigations)
+           2. SessionStorage manipulation for genome seeding
+           3. Multiple concurrent page loads
+           
+           RECOMMENDATIONS:
+           1. IMMEDIATE: Investigate Next.js server stability - check for memory leaks, 
+              unhandled promises, or resource exhaustion
+           2. Consider increasing NODE_OPTIONS='--max-old-space-size=512' to 1024 or 2048
+           3. Add error boundaries and loading states to prevent cascading failures
+           4. Test in production build mode (next build && next start) instead of dev mode
+           5. Once server is stable, re-run comprehensive QA pass with all 25 checklist items
+           
+           TESTING ENVIRONMENT:
+           - Server: Next.js v15.5.16 in dev mode
+           - Node memory: 512MB (may be insufficient)
+           - Supervisor: nextjs process running but unstable under load
+           - Browser: Playwright Chromium with viewport manipulation
 
     -task: "Slice 2 — Nutrition Hub quick wins (QA pass)"
      implemented: true
