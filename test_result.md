@@ -2621,6 +2621,107 @@ test_plan:
 agent_communication:
     -agent: "main"
       message: |
+        SLICE 6 — FINAL SLICE SHIPPED (Meal Planner + PGx PDF Export + DSLD Scanner + Nutrient Filter Chips)
+
+        Installed: jspdf (via `yarn add jspdf --ignore-engines`) for
+        client-side PDF export.
+
+        1) NUTRIENT FILTER CHIPS (Foods tab)
+           NEW: /app/components/nutrition/NutrientFilterBar.jsx
+           - Collects unique nutrient tags from every active rule's
+             prioritize_foods[].nutrients — chip list is dynamic per
+             user variant profile. Empty state auto-hides the bar.
+           - Search input + chip filter both persist to localStorage
+             (ss_nutr_food_query, ss_nutr_food_chips).
+           - Wired into YourFoodsTab via foodFilter state prop, then
+             threaded down into NutritionRuleCard where every
+             prioritize_foods item is filtered client-side by
+             foodMatchesQuery + foodMatchesNutrients before render.
+
+        2) "SAVE FOR PHARMACIST" PDF EXPORT (Drug Check)
+           NEW: /app/lib/pgx/pgxPdfExport.js — pure jsPDF utility.
+           - Generates a 1-page US-letter document with severity-coded
+             gene stripes, phenotype labels, plain-English impacts,
+             drugs affected per gene, patient's medication list, and a
+             regulatory disclaimer at the bottom.
+           - Exposes generatePgxPdf() + downloadPgxPdf(); loaded via
+             lazy `import()` on tap to keep the initial JS bundle small.
+           - Wired to a "Save for pharmacist" button (printer icon) in
+             the PhenotypeSnapshot header. Reads current ss_my_medications
+             + phenotypes and calls downloadPgxPdf() on click.
+
+        3) DSLD SUPPLEMENT BARCODE SCANNER
+           NEW API: /app/app/api/supplements/dsld-product/route.js
+           - Proxies the public NIH DSLD /v9/search-filter endpoint.
+             Supports ?barcode=UPC and ?query=name. Public NIH endpoint,
+             no API key required. Normalises hits into a compact
+             { productName, brand, servingSize, ingredients[], claims }
+             record.
+           NEW UI: /app/components/supplements/SupplementScanner.jsx
+           - Full-screen modal reusing the existing BarcodeScanner
+             component (same @zxing infrastructure as Nutrition Hub).
+             Points the lookup at the new DSLD route.
+           - On result: renders label ingredients + a computed
+             "Genome fit: High / Medium / Low" badge (form-matching
+             heuristic covering methylfolate / methylcobalamin /
+             preformed retinol / chelated minerals / hydroxy_b12 /
+             active_bs).
+           - Flags cyanocobalamin, folic acid, beta-carotene, oxide/
+             carbonate mineral forms as "Suboptimal for your variants"
+             when the user's active forms disagree.
+           - Cross-references ss_my_medications for
+             findInteractionsForSupplement — surfaces amber interaction
+             flags immediately in the result view.
+           - Includes an "Add to my stack" button using AddToStackButton
+             from Slice 5.
+           - Wired into /tools/supplements via a top-right "Scan"
+             button; new state tracks scannerOpen, plus we now compute
+             variantsByGene + phenotypes at hydration time for the
+             scanner heuristics.
+
+        4) 7-DAY MEAL PLANNER TAB
+           NEW: /app/components/nutrition/MealPlannerTab.jsx
+           - New "Meal Plan" tab in the Nutrition Hub alongside
+             Foods / Journal / Scanner.
+           - Desktop: 7-column × 4-row grid (Mon-Sun × Breakfast /
+             Lunch / Dinner / Snacks). Mobile: single-day view with
+             left/right chevron pager.
+           - Tap-to-assign UX (no HTML5 drag needed for touch): tap
+             the "+" on any day/meal slot → bottom-sheet food picker
+             opens with search + tone-coded catalogue built from every
+             active rule's prioritize/limit/avoid foods.
+           - Persists in localStorage (ss_meal_plan), synced across
+             tabs via 'storage' events.
+           - Rough day-level macro estimate under each column (~C / ~P
+             / ~F) via nutrient-tag heuristic.
+           - "Clear plan" + "Copy week to journal" affordances in the
+             header.
+           - Verified visually — /tmp/meal_planner.png shows 6 planned
+             foods across Mon (3) and Tue (3) with empty slots on
+             Wed–Sun and 44 px "+" buttons per slot.
+
+        Also fixed:
+        - useListStore hook is SSR-safe (starts with [], hydrates in
+          useEffect) → no more hydration mismatch. AddToStackButton /
+          GroceryAddButton / GroceryListTrigger all use a mounted
+          guard before reading localStorage.
+        - Restored missing DashboardBackLink + useListStore imports in
+          supplements-client.jsx and drug-check-client.jsx.
+
+        Verified visually:
+          - /tmp/meal_planner.png    (7-day grid with Mon/Tue populated)
+          - /tmp/pgx_pdf_button.png  (Save for pharmacist button visible
+                                      + full drug-check UI)
+          - Nutrient bar wiring compiled + threaded end-to-end.
+
+        DSLD API confirmed working: `curl /api/supplements/dsld-product?query=thorne&size=2` → 200 OK.
+
+        No new server DB. All new data client-side. Privacy contract
+        preserved (ss_meal_plan / ss_nutr_food_chips / ss_nutr_food_query).
+
+
+    -agent: "main"
+      message: |
         SLICE 5 — "MY X" PERSISTENT LISTS SHIPPED
 
         Shared foundation:

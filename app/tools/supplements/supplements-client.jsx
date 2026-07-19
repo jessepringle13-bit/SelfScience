@@ -18,9 +18,10 @@ import { GOALS, getGoalById } from '@/lib/supplements/goalCategories'
 import { computePersonalisation, signalsForCategory } from '@/lib/supplements/personalisation'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { getBiomarkerValues } from '@/lib/biomarkersSession'
-import { Pill, ShieldCheck, ShieldAlert, Dna, Sparkles } from 'lucide-react'
+import { Pill, ShieldCheck, ShieldAlert, Dna, Sparkles, Camera } from 'lucide-react'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import MyStackDrawer from '@/components/supplements/MyStackDrawer'
+import SupplementScanner from '@/components/supplements/SupplementScanner'
 import { stackStore } from '@/lib/lists'
 import { useListStore } from '@/lib/lists/store'
 
@@ -41,6 +42,9 @@ function SupplementsClientInner() {
   const [hasGenome, setHasGenome] = useState(false)
   const [hasBiomarkers, setHasBiomarkers] = useState(false)
   const [stackOpen, setStackOpen] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [variantsByGene, setVariantsByGene] = useState({})
+  const [phenotypes, setPhenotypes] = useState(null)
   const [stackItems] = useListStore(stackStore)
 
   // Hydrate genome + biomarkers on mount (client-side only)
@@ -52,6 +56,24 @@ function SupplementsClientInner() {
       setSignals(sig)
       setHasGenome(!!(g?.cards?.length))
       setHasBiomarkers(!!(b && Object.values(b).some((v) => v != null && v !== '')))
+      // Build variantsByGene + phenotypes for the supplement scanner
+      if (g) {
+        const map = {}
+        for (const v of g.variants_recognized || []) {
+          if (v?.gene) map[v.gene.toUpperCase()] = { genotype: v.genotype_called, gene: v.gene }
+        }
+        for (const grp of g.fullReport || []) {
+          for (const v of grp.variants || []) {
+            if (v?.gene) map[v.gene.toUpperCase()] = { genotype: v.genotype, gene: v.gene }
+          }
+        }
+        setVariantsByGene(map)
+        try {
+          import('@/lib/pgxClassifier').then(({ inferAllPGxPhenotypes }) => {
+            try { setPhenotypes(inferAllPGxPhenotypes(g)) } catch { /* noop */ }
+          })
+        } catch { /* noop */ }
+      }
     } catch { /* silent */ }
   }, [])
 
@@ -105,6 +127,14 @@ function SupplementsClientInner() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/40 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20"
+                aria-label="Scan supplement barcode"
+              >
+                <Camera className="h-3.5 w-3.5" /> Scan
+              </button>
               <button
                 type="button"
                 onClick={() => setStackOpen(true)}
@@ -191,6 +221,12 @@ function SupplementsClientInner() {
       <CompareDrawer />
       <CompareConflictDialog />
       <MyStackDrawer open={stackOpen} onClose={() => setStackOpen(false)} />
+      <SupplementScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        phenotypes={phenotypes}
+        variantsByGene={variantsByGene}
+      />
       <CompareToast />
     </div>
     </CompareProvider>

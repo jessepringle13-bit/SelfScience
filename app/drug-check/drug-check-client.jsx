@@ -23,7 +23,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare } from 'lucide-react'
+import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare, Printer } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
 import PgxDisclaimer from '@/components/PgxDisclaimer'
@@ -43,6 +43,8 @@ import { inferAllPGxPhenotypes } from '@/lib/pgxClassifier'
 import { getPgxPlainEnglish, SEVERITY_TOKENS, getDrugGeneImplication } from '@/lib/pgxPlainEnglish'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import MyMedicationsCard from '@/components/drug-check/MyMedicationsCard'
+import { medicationsStore } from '@/lib/lists'
+import { useListStore } from '@/lib/lists/store'
 
 const POPULAR_QUERIES = ['clopidogrel', 'warfarin', 'codeine', 'omeprazole', 'simvastatin', 'escitalopram']
 const HR_STORAGE_KEY  = 'selfscience_drug_harm_reduction_opt_in'
@@ -661,6 +663,21 @@ function SamhsaCard() {
 // ---------------------------------------------------------------------------
 
 function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId, onSwitchToPair }) {
+  const [meds] = useListStore(medicationsStore)
+  const [exporting, setExporting] = useState(false)
+  const handleExport = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const { downloadPgxPdf } = await import('@/lib/pgx/pgxPdfExport')
+      downloadPgxPdf({ phenotypes, drugCatalog: DRUG_CATALOG, medications: meds })
+    } catch (err) {
+      console.error('PGx PDF export failed', err)
+      alert('Sorry, the PDF export failed. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
   const rows = [
     { gene: 'CYP2C19', ph: phenotypes.CYP2C19 },
     { gene: 'CYP2D6',  ph: phenotypes.CYP2D6 },
@@ -677,10 +694,21 @@ function PhenotypeSnapshot({ phenotypes, onPickDrug, selectedId, onSwitchToPair 
           <h2 className="text-lg font-bold text-ss-text">Your PGx phenotype snapshot</h2>
           <p className="mt-1 text-xs text-ss-muted">Estimated from your genome file. Click any gene to see prescription drugs affected by it.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-ss-muted">
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.normal.dotHex}} /> Standard</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.intermediate.dotHex}} /> Monitor</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.critical.dotHex}} /> Discuss</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ss-teal bg-white px-3 py-1.5 text-[12px] font-bold text-ss-teal hover:bg-ss-teal hover:text-white disabled:opacity-50"
+            title="Download a printable summary formatted for handing to a pharmacist or prescriber"
+          >
+            <Printer size={13} /> {exporting ? 'Generating…' : 'Save for pharmacist'}
+          </button>
+          <div className="flex flex-wrap items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-ss-muted">
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.normal.dotHex}} /> Standard</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.intermediate.dotHex}} /> Monitor</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{background: SEVERITY_TOKENS.critical.dotHex}} /> Discuss</span>
+          </div>
         </div>
       </div>
 

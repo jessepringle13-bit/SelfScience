@@ -52,6 +52,9 @@ import {
 import { getAlternatives } from '@/lib/productAlternatives'
 import TimingRulesBanner from '@/components/nutrition/TimingRulesBanner'
 import GroceryListSheet, { GroceryAddButton, GroceryListTrigger } from '@/components/nutrition/GroceryListSheet'
+import NutrientFilterBar, { foodMatchesNutrients, foodMatchesQuery } from '@/components/nutrition/NutrientFilterBar'
+import MealPlannerTab from '@/components/nutrition/MealPlannerTab'
+import { CalendarDays } from 'lucide-react'
 
 const LOG_KEY = 'selfscience_food_log_v1'
 
@@ -142,13 +145,15 @@ export default function NutritionClient() {
 
         {/* Tab bar */}
         <div className="mt-8 flex flex-wrap gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-ss-border-warm/60 sm:w-fit">
-          <TabButton active={tab === 'foods'}   onClick={() => setTab('foods')}   Icon={Apple}     label="Your Foods" />
-          <TabButton active={tab === 'journal'} onClick={() => setTab('journal')} Icon={Utensils}  label="Food Journal" />
-          <TabButton active={tab === 'scanner'} onClick={() => setTab('scanner')} Icon={ScanLine}  label="Scanner" />
+          <TabButton active={tab === 'foods'}   onClick={() => setTab('foods')}   Icon={Apple}        label="Your Foods" />
+          <TabButton active={tab === 'planner'} onClick={() => setTab('planner')} Icon={CalendarDays} label="Meal Plan" />
+          <TabButton active={tab === 'journal'} onClick={() => setTab('journal')} Icon={Utensils}     label="Food Journal" />
+          <TabButton active={tab === 'scanner'} onClick={() => setTab('scanner')} Icon={ScanLine}     label="Scanner" />
         </div>
 
         <div className="mt-8">
           {tab === 'foods'   && <YourFoodsTab activeRules={activeRules} hasGenome={!!report} />}
+          {tab === 'planner' && <MealPlannerTab activeRules={activeRules} />}
           {tab === 'journal' && <FoodJournalTab activeRules={activeRules} hasGenome={!!report} />}
           {tab === 'scanner' && <ScannerTab activeRules={activeRules} hasGenome={!!report} />}
         </div>
@@ -176,10 +181,12 @@ function TabButton({ active, onClick, Icon, label }) {
 function YourFoodsTab({ activeRules, hasGenome }) {
   const showPgx = activeRules.some((r) => r.pillar === 'Pharmacogenomics')
   const [groceryOpen, setGroceryOpen] = useState(false)
+  const [foodFilter, setFoodFilter] = useState({ query: '', selected: new Set() })
 
   return (
     <div className="space-y-8">
       <TimingRulesBanner activeRules={activeRules} />
+      <NutrientFilterBar activeRules={activeRules} onFilterChange={setFoodFilter} />
       <div className="flex justify-end">
         <GroceryListTrigger onClick={() => setGroceryOpen(true)} />
       </div>
@@ -225,7 +232,7 @@ function YourFoodsTab({ activeRules, hasGenome }) {
   )
 }
 
-function NutritionRuleCard({ rule }) {
+function NutritionRuleCard({ rule, foodFilter }) {
   const [expanded, setExpanded] = useState(false)
   const meta = PRIORITY_META[rule.priority] || PRIORITY_META.low
 
@@ -255,9 +262,15 @@ function NutritionRuleCard({ rule }) {
               <Sparkles size={13} /> Prioritize
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-              {rule.prioritize_foods.slice(0, expanded ? 999 : 6).map((f, i) => (
-                <FoodTile key={i} food={f} tone="good" ruleKey={rule.key} />
-              ))}
+              {rule.prioritize_foods
+                .filter((f) => (
+                  (!foodFilter?.query    || foodMatchesQuery(f, foodFilter.query)) &&
+                  (!foodFilter?.selected || foodMatchesNutrients(f, foodFilter.selected))
+                ))
+                .slice(0, expanded ? 999 : 6)
+                .map((f, i) => (
+                  <FoodTile key={i} food={f} tone="good" ruleKey={rule.key} />
+                ))}
             </div>
             {rule.prioritize_foods.length > 6 && (
               <button
