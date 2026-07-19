@@ -40,6 +40,7 @@ import GenomeSupplementLinks from '@/components/genome/GenomeSupplementLinks'
 import { YOUTH_VARIANT_CROSSREFS } from '@/lib/youth-content'
 import { normalizePillarName } from '@/lib/pillars'
 import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 const PILLAR_COLOR = {
   Genomics: '#1B474D',
@@ -255,6 +256,7 @@ export default function GenomeClient() {
       {/* Header */}
       <section className="relative bg-ss-teal pb-14 pt-24 text-white">
         <SiteNav variant="dark" />
+        <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
         <div className="container">
           <div className="mx-auto max-w-3xl text-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 ring-1 ring-white/20">

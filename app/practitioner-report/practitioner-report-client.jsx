@@ -44,6 +44,7 @@ import BiomarkerSummary from '@/components/practitioner/BiomarkerSummary'
 import PractitionerSupplementBlock from '@/components/practitioner/PractitionerSupplementBlock'
 import GeneticVariantSummary from '@/components/practitioner/GeneticVariantSummary'
 import DisclaimerPage from '@/components/practitioner/DisclaimerPage'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 export default function PractitionerReportClient() {
   const [report, setReport] = useState(null)
@@ -124,6 +125,7 @@ export default function PractitionerReportClient() {
       {/* SiteNav — screen only. */}
       <div className="ss-screen-only no-print">
         <SiteNav />
+        <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
       </div>
 
       <div className="container pt-8 pb-24">

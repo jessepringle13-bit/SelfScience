@@ -37,6 +37,7 @@ import {
   getPopulationDetail,
 } from '@/lib/populationDetailFrequencies'
 import RegenTools from '@/components/RegenTools'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 const VIEWS = [
   { key: 'highlights', label: 'Highlights', Icon: Sparkles },
@@ -109,6 +110,7 @@ export default function PopulationCompareClient() {
   return (
     <div className="min-h-screen bg-ss-bg">
       <SiteNav />
+      <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pt-8 pb-24">
         {/* Header */}

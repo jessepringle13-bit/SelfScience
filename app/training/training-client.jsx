@@ -21,6 +21,7 @@ import {
   TRAINING_CATEGORY_META,
 } from '@/lib/trainingProtocol'
 import { computeSportAffinity, SPORT_AFFINITY_DISCLAIMER } from '@/lib/sportAffinity'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 const CATEGORY_ORDER = ['style', 'cardio', 'recovery']
 const CATEGORY_STYLES = {
@@ -50,6 +51,7 @@ export default function TrainingClient() {
   return (
     <div className="min-h-screen bg-ss-bg">
       <SiteNav />
+      <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pt-8 pb-24">
         {/* Header */}

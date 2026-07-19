@@ -19,6 +19,7 @@ import { computePersonalisation, signalsForCategory } from '@/lib/supplements/pe
 import { getGenomeResults } from '@/lib/genomeSession'
 import { getBiomarkerValues } from '@/lib/biomarkersSession'
 import { Pill, ShieldCheck, ShieldAlert, Dna } from 'lucide-react'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 export default function SupplementsClient() {
   return (
@@ -79,6 +80,7 @@ function SupplementsClientInner() {
       {/* Compressed dark teal hero */}
       <section className="relative bg-[#1B474D] text-white">
         <SiteNav variant="dark" />
+        <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
         <div className="relative mx-auto max-w-6xl px-4 md:px-6 pt-6 pb-8 md:pt-8 md:pb-10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">

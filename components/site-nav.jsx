@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
-import { Coffee, DollarSign } from 'lucide-react'
+import { Coffee, DollarSign, LayoutDashboard } from 'lucide-react'
+import { hasGenomeResults } from '@/lib/genomeSession'
 import {
   Menu,
   X,
@@ -46,6 +47,18 @@ export function SiteNav({ variant = 'light' }) {
   const [toolsOpen, setToolsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Track whether a genome has been uploaded in this session. When true,
+  // we surface a "Dashboard" nav item so the user can always get home
+  // without hunting for the SelfScience logo. Re-checks on the
+  // selfscience:genome-changed event that /lib/genomeSession fires.
+  const [genomeLoaded, setGenomeLoaded] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const check = () => setGenomeLoaded(hasGenomeResults())
+    check()
+    window.addEventListener('selfscience:genome-changed', check)
+    return () => window.removeEventListener('selfscience:genome-changed', check)
+  }, [])
   const pillarsRef = useRef(null)
   const toolsRef = useRef(null)
   const aboutRef = useRef(null)
@@ -152,6 +165,19 @@ export function SiteNav({ variant = 'light' }) {
           >
             Start Here
           </a>
+          {/* Dashboard \u2014 only surfaces once the user has actually loaded a
+              genome. Positioned right after Start Here so the reload path
+              is obvious. */}
+          {genomeLoaded && (
+            <a
+              href="/"
+              className={`inline-flex items-center gap-1 ${
+                pathname === '/' ? linkActive : linkBase
+              }`}
+            >
+              <LayoutDashboard size={14} /> Dashboard
+            </a>
+          )}
           <a href="/search" className={linkClass('/search')}>Search</a>
 
           {/* Pillars dropdown — click to open, click outside/Escape to close */}
@@ -324,6 +350,18 @@ export function SiteNav({ variant = 'light' }) {
             >
               ✨ Start Here
             </a>
+            {/* Mobile Dashboard link \u2014 top of the drawer when a genome
+                is loaded so users on phones don't have to hunt for the
+                logo to get back home. */}
+            {genomeLoaded && (
+              <a
+                href="/"
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex w-fit items-center gap-2 rounded-full bg-white/10 px-3 py-2 font-semibold text-white hover:bg-white/20"
+              >
+                <LayoutDashboard size={14} /> Dashboard
+              </a>
+            )}
             <a href="/search" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Search</a>
             <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
 

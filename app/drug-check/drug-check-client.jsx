@@ -40,6 +40,7 @@ import {
 } from '@/lib/drugCatalog'
 import { computeDrugInteractions } from '@/lib/drugInteractions'
 import { inferAllPGxPhenotypes } from '@/lib/pgxClassifier'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 const POPULAR_QUERIES = ['clopidogrel', 'warfarin', 'codeine', 'omeprazole', 'simvastatin', 'escitalopram']
 const HR_STORAGE_KEY  = 'selfscience_drug_harm_reduction_opt_in'
@@ -109,6 +110,7 @@ export default function DrugCheckClient() {
   return (
     <div className="min-h-screen bg-ss-bg">
       <SiteNav />
+      <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pt-8 pb-24">
         {/* Header */}

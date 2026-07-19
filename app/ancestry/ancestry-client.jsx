@@ -30,6 +30,7 @@ import RegenTools from '@/components/RegenTools'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { estimateAncestry } from '@/lib/ancestryEstimator'
 import { formatPct, SUPERPOPULATIONS } from '@/lib/populationDetailFrequencies'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 export default function AncestryClient() {
   const [report, setReport] = useState(null)
@@ -47,6 +48,7 @@ export default function AncestryClient() {
   return (
     <div className="min-h-screen bg-ss-bg">
       <SiteNav />
+      <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pt-8 pb-24">
         {/* Header */}

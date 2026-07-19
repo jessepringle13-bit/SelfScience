@@ -38,6 +38,7 @@ import { GenomeSidebar } from '@/components/biomarkers/GenomeSidebar'
 import { ContextPanel } from '@/components/biomarkers/ContextPanel'
 import { TrendControls } from '@/components/biomarkers/TrendControls'
 import { loadContext, saveContext } from '@/lib/biomarkers/context'
+import DashboardBackLink from '@/components/DashboardBackLink'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
 
@@ -118,6 +119,7 @@ export default function BiomarkersClient() {
   return (
     <div className="min-h-screen bg-ss-bg">
       <SiteNav />
+      <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pb-24 pt-24 md:pt-28">
         {/* Header */}

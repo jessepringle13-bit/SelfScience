@@ -20,6 +20,7 @@ import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
 import GeneChip from '@/components/dashboard/GeneChip'
+import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
 
 export default function Dashboard() {
   const [report, setReport] = useState(null)
@@ -92,26 +93,47 @@ export default function Dashboard() {
     return new Set((pillarGenes[activePillar] || []).map((g) => g.toUpperCase()))
   }, [activePillar, pillarGenes])
 
-  // Derive top 3 gene symbols for research matching.
-  //   * No pillar → union of strengths + areas (legacy behaviour)
-  //   * Pillar    → first 3 of the pillar's tagged gene set so the
-  //                 "Research Matched to You" cards mirror the filter.
+  // Derive top gene symbols for research matching.
+  // Sourced from ALL classified variant cards (not just the trimmed
+  // overview.strengths/areasToExplore lists) so we don't miss genes that
+  // ONLY appear in report.fullReport or variants_recognized. We keep
+  // "benefit" (positive) + "awareness" categories \u2014 skip "neutral" per
+  // spec since neutral variants aren't actionable enough to warrant a
+  // dedicated PubMed lookup.
   const topGenes = useMemo(() => {
+    if (!report) return []
     if (activePillar) {
-      return (pillarGenes[activePillar] || []).slice(0, 3)
+      // Pillar-filtered mode: mirror the tile's tagged gene set.
+      return (pillarGenes[activePillar] || []).slice(0, 8)
     }
-    const genes = []
+    const cards = flattenReportCards(report) || []
     const seen = new Set()
-    for (const c of [...areas, ...strengths]) {
-      const raw = (c?.gene || '').trim()
-      if (!raw || /^rs\d/i.test(raw) || raw.includes(' + ') || raw.includes(',')) continue
-      if (seen.has(raw)) continue
-      seen.add(raw)
-      genes.push(raw)
-      if (genes.length >= 3) break
+    const out = []
+    // Priority order: awareness (Areas to Explore) first \u2014 these are the
+    // ones the user most wants research on \u2014 then benefit (Strengths).
+    const rank = (c) => {
+      const cat = String(c?.category || '').toLowerCase()
+      if (cat === 'awareness') return 0
+      if (cat === 'benefit' || cat === 'positive' || cat === 'strength') return 1
+      return 9 // neutral / unknown \u2014 skipped by the filter below anyway
     }
-    return genes
-  }, [activePillar, pillarGenes, areas, strengths])
+    const sorted = [...cards].sort((a, b) => rank(a) - rank(b))
+    for (const c of sorted) {
+      const cat = String(c?.category || '').toLowerCase()
+      if (cat === 'neutral') continue
+      const raw = (c?.gene || '').trim()
+      if (!raw) continue
+      // Split combined labels like "MTHFR (C677T)" or "APOE \u03b53/\u03b54" \u2014 keep the
+      // primary gene symbol. Skip rsid-shaped tokens.
+      const symbol = raw.split(/[\s(/\u00b7+,]/)[0].toUpperCase()
+      if (!symbol || symbol.length > 12 || /^RS\d/i.test(symbol)) continue
+      if (seen.has(symbol)) continue
+      seen.add(symbol)
+      out.push(symbol)
+      if (out.length >= 8) break
+    }
+    return out
+  }, [report, activePillar, pillarGenes])
 
   const protocolPreview = useMemo(() => {
     if (!report) return []
@@ -215,7 +237,7 @@ export default function Dashboard() {
               ))}
             </div>
           )}
-          <SeeAllLink href="/genome?tab=protocol" label="See your full protocol" />
+          <SeeAllLink href="/genome/protocol" label="See your full protocol" />
         </DashSection>
 
         {/* 6. DEEP-DIVE TOOLS */}
@@ -461,33 +483,118 @@ function ProtocolPreviewCard({ entry }) {
 }
 
 // ---------------------------------------------------------------------------
-// Research Matched section — async fetch through /api/pubmed-search
+// Research Matched section \u2014 fetches PubMed per top gene (max 8), dedupes
+// across genes by PMID, keeps the top 6 papers, and tags each with the
+// gene(s) it was matched against. Uses a session-scoped cache to avoid
+// re-querying on every render / tab-switch.
 // ---------------------------------------------------------------------------
 
-function ResearchMatched({ genes }) {
-  const [state, setState] = useState({ loading: false, byGene: {}, error: null })
+function ResearchMatchedSkeleton({ count = 6 }) {
+  // Card-shaped placeholders so the layout doesn't jump when the real
+  // cards arrive. Count matches the max we'll display.
+  return (
+    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="animate-pulse rounded-2xl bg-white p-4 ring-1 ring-ss-border-warm/60"
+        >
+          <div className="mb-3 h-4 w-24 rounded bg-ss-border-warm/60" />
+          <div className="mb-2 h-4 w-full rounded bg-ss-border-warm/40" />
+          <div className="mb-2 h-4 w-11/12 rounded bg-ss-border-warm/40" />
+          <div className="mb-3 h-4 w-3/4 rounded bg-ss-border-warm/40" />
+          <div className="h-3 w-1/3 rounded bg-ss-border-warm/30" />
+        </div>
+      ))}
+    </div>
+  )
+}
 
-  const fetchAll = useCallback(async () => {
-    if (!genes || genes.length === 0) return
-    setState({ loading: true, byGene: {}, error: null })
-    const results = await Promise.all(
-      genes.map(async (g) => {
-        try {
-          const r = await fetch(`/api/pubmed-search?gene=${encodeURIComponent(g)}&limit=2`)
-          if (!r.ok) return { gene: g, papers: [] }
-          const data = await r.json()
-          return { gene: g, papers: data.results || [] }
-        } catch {
-          return { gene: g, papers: [] }
+function ResearchMatched({ genes }) {
+  const [loading, setLoading] = useState(false)
+  const [papers, setPapers] = useState([]) // deduped, max 6
+  const [attempted, setAttempted] = useState(false)
+
+  useEffect(() => {
+    if (!genes || genes.length === 0) {
+      setPapers([])
+      setAttempted(true)
+      return
+    }
+    let alive = true
+    setLoading(true)
+    setAttempted(false)
+    ;(async () => {
+      const map = await fetchMatchedResearch(genes, { perGene: 3, concurrency: 4 })
+      if (!alive) return
+      // Merge across genes with dedupe by PMID. Track which genes each
+      // paper is relevant to so we can display "Relevant to your <GENE>"
+      // tags per card.
+      const byPmid = new Map() // pmid -> paper object with genes[]
+      // Iterate in the same order as `genes` so earlier (higher-priority)
+      // genes anchor the tag order.
+      for (const g of genes) {
+        const G = String(g).toUpperCase()
+        const list = map.get(G) || []
+        for (const p of list) {
+          const id = p.pmid || p.id || `${p.title || ''}`
+          if (!id) continue
+          const existing = byPmid.get(id)
+          if (existing) {
+            if (!existing.genes.includes(G)) existing.genes.push(G)
+          } else {
+            byPmid.set(id, { ...p, genes: [G] })
+          }
         }
-      })
-    )
-    const byGene = {}
-    for (const r of results) byGene[r.gene] = r.papers
-    setState({ loading: false, byGene, error: null })
+      }
+      // Interleave: take the first paper for gene 1, then gene 2, etc.,
+      // then round back to gene 1 for the second paper. This surfaces
+      // breadth-first coverage across the user's top variants rather than
+      // 3 papers all about the same gene.
+      const perGene = new Map()
+      for (const g of genes) perGene.set(String(g).toUpperCase(), [])
+      for (const p of byPmid.values()) {
+        const anchor = p.genes[0]
+        if (perGene.has(anchor)) perGene.get(anchor).push(p)
+      }
+      const interleaved = []
+      const seenIds = new Set()
+      let progressed = true
+      while (progressed && interleaved.length < 6) {
+        progressed = false
+        for (const g of genes) {
+          const G = String(g).toUpperCase()
+          const q = perGene.get(G)
+          if (!q || q.length === 0) continue
+          const item = q.shift()
+          const id = item.pmid || item.id || item.title
+          if (seenIds.has(id)) continue
+          seenIds.add(id)
+          interleaved.push(item)
+          progressed = true
+          if (interleaved.length >= 6) break
+        }
+      }
+      setPapers(interleaved)
+      setLoading(false)
+      setAttempted(true)
+    })()
+    return () => {
+      alive = false
+    }
   }, [genes])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  // "See all matched research" fires a full fan-out on the Search page
+  // using the user's top-8 genes so they can drill into the long tail.
+  const seeAllHref = useMemo(() => {
+    if (!genes || genes.length === 0) return '/search'
+    const params = new URLSearchParams({ genes: genes.slice(0, 8).join(',') })
+    return `/search?${params.toString()}`
+  }, [genes])
+
+  // Never show empty state unless we've completed a fetch AND all genes
+  // returned zero results.
+  const allFailed = attempted && !loading && papers.length === 0
 
   return (
     <DashSection
@@ -495,56 +602,79 @@ function ResearchMatched({ genes }) {
       subtitle="Recent papers touching your top variant genes."
       toneClass="text-ss-teal"
     >
-      {genes.length === 0 ? (
-        <EmptyRow copy="Not enough gene data yet to match research. Once you have more findings, this section fills in." />
-      ) : state.loading ? (
-        <div className="flex items-center gap-2 rounded-xl bg-white p-6 text-sm text-ss-muted ring-1 ring-ss-border-warm/60">
-          <Loader2 size={16} className="animate-spin" />
-          Loading research for {genes.join(', ')}…
-        </div>
+      {loading ? (
+        <ResearchMatchedSkeleton count={6} />
+      ) : allFailed ? (
+        <EmptyRow copy={
+          genes.length === 0
+            ? 'Load a genome to see research matched to your top variants.'
+            : 'No recent research found for your top genes right now \u2014 try again later.'
+        } />
       ) : (
-        <div className="grid gap-4 md:grid-cols-3">
-          {genes.map((g) => {
-            const papers = state.byGene[g] || []
-            return (
-              <div key={g} className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60">
-                <div className="flex items-center gap-2">
-                  <Dna size={14} className="text-ss-teal" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-ss-teal">{g}</span>
-                </div>
-                {papers.length === 0 ? (
-                  <p className="mt-3 text-sm text-ss-muted">
-                    No recent research found for this variant right now.
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-3">
-                    {papers.map((p) => (
-                      <li key={p.pmid}>
-                        <a
-                          href={p.pubmedUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group flex items-start gap-2"
-                        >
-                          <ExternalLink size={12} className="mt-1 flex-shrink-0 text-ss-muted" />
-                          <div className="min-w-0">
-                            <div className="line-clamp-3 text-sm font-medium text-ss-text group-hover:underline">
-                              {p.title}
-                            </div>
-                            <div className="mt-1 text-[11px] text-ss-muted line-clamp-1">
-                              {p.journal}{p.year ? ` · ${p.year}` : ''}
-                            </div>
-                          </div>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {papers.map((p, i) => (
+              <ResearchMatchedCard key={p.pmid || p.id || i} paper={p} />
+            ))}
+          </div>
+          <div className="mt-3 text-right">
+            <Link
+              href={seeAllHref}
+              className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-sm font-semibold text-ss-teal hover:underline"
+            >
+              See all matched research <ArrowRight size={12} />
+            </Link>
+          </div>
+        </>
       )}
     </DashSection>
+  )
+}
+
+function ResearchMatchedCard({ paper }) {
+  const genes = paper.genes || []
+  const title = paper.title || '(untitled)'
+  const journal = paper.journal || ''
+  const year = paper.year || null
+  const url = paper.pubmedUrl || (paper.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/` : paper.url) || null
+  const reliability = paper.reliabilityLabel || paper.reliability || null
+  const dotColor =
+    reliability === 'high' || String(reliability).toLowerCase().includes('high') ? 'bg-ss-green' :
+    reliability === 'moderate' || String(reliability).toLowerCase().includes('moderate') ? 'bg-ss-amber' :
+    reliability === 'low' || String(reliability).toLowerCase().includes('low') ? 'bg-red-500' :
+    'bg-ss-border-warm'
+  return (
+    <div className="flex flex-col rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ss-border-warm/60">
+      {/* Gene relevance tag(s) */}
+      <div className="mb-2 flex flex-wrap gap-1">
+        {genes.slice(0, 2).map((g) => (
+          <span
+            key={g}
+            className="inline-flex items-center gap-1 rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-bold text-ss-teal"
+          >
+            <Dna size={10} /> Relevant to your {g} variant
+          </span>
+        ))}
+      </div>
+      <div className="line-clamp-3 text-sm font-semibold text-ss-text">{title}</div>
+      <div className="mt-1 flex items-center gap-2 text-[11px] text-ss-muted">
+        <span className={`inline-block h-2 w-2 rounded-full ${dotColor}`} aria-hidden="true" />
+        <span className="line-clamp-1">
+          {journal}{year ? ` \u00b7 ${year}` : ''}
+        </span>
+      </div>
+      {url && (
+        <div className="mt-3 flex justify-end">
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex min-h-11 items-center gap-1 rounded-full border border-ss-teal px-3 py-1.5 text-xs font-semibold text-ss-teal hover:bg-ss-teal hover:text-white"
+          >
+            View <ExternalLink size={10} />
+          </a>
+        </div>
+      )}
+    </div>
   )
 }

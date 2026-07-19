@@ -27,6 +27,7 @@ import { flattenReportCards } from '@/lib/supplementProtocol'
 import { normalizePillarName } from '@/lib/pillars'
 import { getPopulationFrequency } from '@/lib/populationFrequencies'
 import {
+import DashboardBackLink from '@/components/DashboardBackLink'
   addToPractitionerReport,
   isInPractitionerReport,
   PRACTITIONER_CHANGE_EVENT,
@@ -259,6 +260,7 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#DCEDED] to-white">
         <SiteNav />
+        <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
         <main className="container py-16">
           <Link href="/" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-ss-muted hover:text-ss-teal">
             <ArrowLeft size={14} /> Back to Dashboard
