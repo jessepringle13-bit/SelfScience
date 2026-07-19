@@ -177,8 +177,14 @@ function TrialCard({ trial, matchedGenes = [] }) {
   )
 }
 
-export default function ClinicalTrialsSection({ trials, query, userGenes = [] }) {
-  const [open, setOpen] = useState(false)
+export default function ClinicalTrialsSection({ trials, query, userGenes = [], defaultOpen = false, statusFilter = null }) {
+  const [open, setOpen] = useState(!!defaultOpen)
+
+  // If the deep-link changes (e.g. user tapped a different chip while the
+  // page was still mounted), re-open the section to match.
+  useEffect(() => {
+    if (defaultOpen) setOpen(true)
+  }, [defaultOpen])
 
   // For each trial, compute which of the user's active genes actually
   // appear in the trial title/conditions/interventions. This is what
@@ -204,10 +210,26 @@ export default function ClinicalTrialsSection({ trials, query, userGenes = [] })
     })
   }, [enrichedTrials])
 
+  // Optional client-side filter driven by ?trialStatus=recruiting deep-links
+  // from the Dashboard gene chips. When set, we only show recruiting /
+  // not-yet-recruiting studies.
+  const visible = useMemo(() => {
+    if (!statusFilter) return sorted
+    if (statusFilter === 'recruiting') {
+      return sorted.filter((t) => {
+        const s = String(t.status || '').toUpperCase()
+        return s === 'RECRUITING' || s === 'NOT_YET_RECRUITING'
+      })
+    }
+    return sorted
+  }, [sorted, statusFilter])
+
   const recruitingCount = enrichedTrials.filter((t) => statusStyle(t.status).isRecruiting).length
+  const filteringToRecruiting = statusFilter === 'recruiting'
+  const displayCount = filteringToRecruiting ? recruitingCount : trials.length
 
   return (
-    <div className="mb-6 rounded-2xl border border-ss-teal/30 bg-white shadow-sm">
+    <div id="clinical-trials-section" className="mb-6 scroll-mt-24 rounded-2xl border border-ss-teal/30 bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -219,15 +241,16 @@ export default function ClinicalTrialsSection({ trials, query, userGenes = [] })
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-widest text-ss-teal">
               Clinical Trials
+              {filteringToRecruiting && <span className="ml-1 text-ss-green">· Recruiting only</span>}
             </div>
             <div className="mt-0.5 line-clamp-1 text-sm font-bold text-ss-text">
               For &ldquo;{query}&rdquo;
             </div>
           </div>
           <span className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full bg-ss-teal px-2 py-0.5 text-[11px] font-bold text-white">
-            {trials.length}
+            {displayCount}
           </span>
-          {recruitingCount > 0 && (
+          {recruitingCount > 0 && !filteringToRecruiting && (
             <span
               className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ss-green/15 px-2 py-0.5 text-[11px] font-bold text-ss-green"
               title={`${recruitingCount} currently recruiting participants`}
@@ -241,14 +264,34 @@ export default function ClinicalTrialsSection({ trials, query, userGenes = [] })
 
       {open && (
         <div className="border-t border-ss-border-warm p-3">
-          <div className="grid gap-2 md:grid-cols-2">
-            {sorted.map((t) => (
-              <TrialCard key={t.id} trial={t} matchedGenes={t._matched || []} />
-            ))}
-          </div>
+          {visible.length === 0 ? (
+            <div className="rounded-xl bg-ss-bg p-4 text-center text-sm text-ss-muted">
+              No {filteringToRecruiting ? 'recruiting ' : ''}trials in this result set.
+              {filteringToRecruiting && (
+                <>
+                  {' '}
+                  <a
+                    href={`https://clinicaltrials.gov/search?term=${encodeURIComponent(query || '')}&aggFilters=status:rec`}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="font-semibold text-ss-teal hover:underline"
+                  >
+                    Search ClinicalTrials.gov directly
+                  </a>
+                  .
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {visible.map((t) => (
+                <TrialCard key={t.id} trial={t} matchedGenes={t._matched || []} />
+              ))}
+            </div>
+          )}
           <div className="mt-3 flex justify-end">
             <a
-              href={`https://clinicaltrials.gov/search?term=${encodeURIComponent(query || '')}`}
+              href={`https://clinicaltrials.gov/search?term=${encodeURIComponent(query || '')}${filteringToRecruiting ? '&aggFilters=status:rec' : ''}`}
               target="_blank"
               rel="noreferrer noopener"
               className="inline-flex items-center gap-1 text-[11px] font-semibold text-ss-teal hover:underline"

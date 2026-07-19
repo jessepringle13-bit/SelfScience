@@ -371,6 +371,97 @@ backend:
             external API dependency with proper error handling in place.
 
 frontend:
+  - task: "Dashboard Gene Chip — Clinical Trial badges + popover / bottom-sheet + deep-link into Search"
+    implemented: true
+    working: true
+    file: "/app/components/dashboard/GeneChip.jsx, /app/components/Dashboard.jsx, /app/lib/geneTrialsCache.js, /app/app/api/clinical-trials/gene/route.js, /app/components/search/ClinicalTrialsSection.jsx, /app/app/search/search-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Wired an interactive Clinical Trials awareness layer directly onto
+            the Dashboard's gene chips (previously static <span> pills).
+
+            New pieces:
+              • /app/app/api/clinical-trials/gene/route.js — lightweight
+                proxy to ClinicalTrials.gov v2 API scoped to a single gene.
+                Returns { total, recruiting, completed, terminated, other,
+                active, top: [{ nctId, title, status, phase, year, url }, x2] }.
+                Server-side Next.js data cache: revalidate=86400 (24h).
+              • /app/lib/geneTrialsCache.js — client-side helper with 24h
+                localStorage TTL + in-flight dedupe so 40+ chips fetching
+                for overlapping genes only fire one request per unique gene.
+              • /app/components/dashboard/GeneChip.jsx — replaces the raw
+                chip. Renders the gene symbol in the same orange style, adds
+                a coloured dot badge:
+                  – Green ● when >= 1 Recruiting / Not-yet-recruiting trial
+                  – Teal  ● when trials exist but none recruiting
+                  – (none) when total = 0
+                Interactive:
+                  – Desktop (hover: hover matches): hover opens a floating
+                    popover above the chip with a pointer arrow.
+                  – Mobile (< 768px): tap opens a full-width bottom sheet
+                    with backdrop + big Close button + body scroll lock.
+                  – Click always toggles (works for both).
+                  – Escape + outside-click close.
+                Popover / sheet contents:
+                  – Counts row (Recruiting · Completed · Terminated · Other),
+                    with recruiting bolded green.
+                  – Top 2 trial titles (2-line clamp) with direct
+                    clinicaltrials.gov/study/<nctId> links.
+                  – Two CTAs: filled green "View recruiting trials" (only
+                    when recruiting > 0) and outlined teal "View all trials".
+                  – Both CTAs deep-link into /search?q=<GENE>&openTrials=1
+                    (recruiting CTA also adds &trialStatus=recruiting).
+
+            Dashboard integration:
+              • Both PillarTile and ExplorePillarCard now render <GeneChip>
+                for each gene. The chip uses <span role="button"> so it can
+                be nested inside the existing <Link>-wrapped card without
+                producing invalid button-inside-anchor HTML. Chip's onClick
+                calls e.stopPropagation()+preventDefault() so hover/tap
+                doesn't hijack the card-level navigation.
+
+            Search page deep-link:
+              • /app/app/search/search-client.jsx reads new URL params
+                openTrials=1 and trialStatus=recruiting.
+              • /app/components/search/ClinicalTrialsSection.jsx now accepts
+                defaultOpen (bool) + statusFilter ('recruiting' | null) props.
+                When defaultOpen is set the section is expanded immediately;
+                statusFilter narrows the visible list to actively-enrolling
+                trials. Section id "clinical-trials-section" + scroll-mt-24
+                gives us a clean smooth-scroll anchor.
+              • search-client also fires a one-shot useEffect that
+                scrollIntoView({ block: 'start' })s the section as soon as
+                data.clinicalTrials arrives — so users landing on the
+                deep-link never have to hunt for it.
+
+            Verified end-to-end via Playwright at 1400×900:
+              • /api/clinical-trials/gene?gene=MTHFR → 200 { total:88,
+                recruiting:6, completed:28, terminated:2, top:[...] }.
+              • /api/clinical-trials/gene?gene=COMT  → 200 { total:192,
+                recruiting:6, completed:34, terminated:3, top:[...] }.
+              • Dashboard renders with seeded genome sessionStorage → COMT
+                chip shows a green ● dot; hovering it opens a popover with
+                "6 Recruiting · 34 Completed · 3 Terminated · 7 Other" and
+                two real trial titles ("Effect of Sleep Extension in
+                Prevention to Sleep Deprivation", "Omega-3 Fatty Acids and
+                Subconcussive Head Impacts") linking directly to their
+                NCT pages.
+              • Clicking "View recruiting trials" navigates to
+                /search?q=COMT&openTrials=1&trialStatus=recruiting → search
+                results load, Clinical Trials section auto-expands showing
+                header "CLINICAL TRIALS · RECRUITING ONLY" with count 4 and
+                4 recruiting/not-yet-recruiting trial cards visible, page
+                auto-scrolls to the section.
+
+            Privacy: All calls are server-proxied to ClinicalTrials.gov (no
+            genome content ever leaves the browser). LocalStorage cache is
+            keyed by uppercase gene symbol only.
+
   - task: "Complete reading list feature — /lib/books.js + list page + book detail + genome recommendations"
     implemented: true
     working: true
@@ -1680,7 +1771,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Supplement Discovery — Phase 2 enrichment (certifications + brand profiles + ontology)"
+    - "Dashboard Gene Chip Clinical Trial badges + popover (deep-link into Search)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"

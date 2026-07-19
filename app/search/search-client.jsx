@@ -248,6 +248,14 @@ export default function SearchClient() {
   const isInitialPillarBrowse = !initialQ && !!getPillarQuery(initialPillar)
   const isInitialTextPillar = !!initialQ && !!getPillarQuery(initialPillar)
 
+  // Deep-link controls for the ClinicalTrials section (from Dashboard gene
+  // chip popovers). openTrials=1 auto-expands the section and scrolls it
+  // into view once the search completes. trialStatus=recruiting narrows
+  // the visible cards to actively-enrolling studies.
+  const openTrialsFromUrl = (params.get('openTrials') || '') === '1'
+  const trialStatusFromUrl = (params.get('trialStatus') || '').toLowerCase() || null
+  const [autoScrolledTrials, setAutoScrolledTrials] = useState(false)
+
   const [query, setQuery] = useState(initialQ)
   const [submittedQ, setSubmittedQ] = useState(initialQ)
   const [sourceType, setSourceType] = useState('all')
@@ -399,6 +407,26 @@ export default function SearchClient() {
   const [analyzing, setAnalyzing] = useState(0)
   const [page, setPage] = useState(0)
   const analyzedRef = useRef(new Set()) // ids we've already sent to /analyze
+
+  // Auto-scroll to the Clinical Trials section when the user arrives via a
+  // Dashboard gene-chip deep-link (?openTrials=1). Fires once, only after
+  // the results have loaded and trials are available in the payload.
+  useEffect(() => {
+    if (!openTrialsFromUrl || autoScrolledTrials) return
+    if (loading) return
+    const trials = data?.clinicalTrials
+    if (!Array.isArray(trials) || trials.length === 0) return
+    // Wait a tick for the section to render, then scroll.
+    const t = setTimeout(() => {
+      if (typeof document === 'undefined') return
+      const el = document.getElementById('clinical-trials-section')
+      if (el && typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      setAutoScrolledTrials(true)
+    }, 100)
+    return () => clearTimeout(t)
+  }, [openTrialsFromUrl, autoScrolledTrials, loading, data])
 
   const runSearch = useCallback(async (q, pill, genes = []) => {
     const trimmed = (q || '').trim()
@@ -1201,6 +1229,8 @@ export default function SearchClient() {
                 trials={data.clinicalTrials}
                 query={submittedQ || pillar || 'your query'}
                 userGenes={activeGenes}
+                defaultOpen={openTrialsFromUrl}
+                statusFilter={trialStatusFromUrl}
               />
             )}
 

@@ -19,6 +19,7 @@ import { matchProtocolToUserVariants, flattenReportCards } from '@/lib/supplemen
 import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
+import GeneChip from '@/components/dashboard/GeneChip'
 
 export default function Dashboard() {
   const [report, setReport] = useState(null)
@@ -377,13 +378,13 @@ function PillarTile({ pillar, summary, genes = [] }) {
         {positive}·Benefit &nbsp;{awareness}·Aware &nbsp;{neutral}·Neutral
       </div>
       {/* Compact gene chip preview so users can see WHICH of their genes
-          will fan out when they click this tile. */}
+          will fan out when they click this tile. Each chip is now
+          interactive: it shows a clinical-trial status dot + popover
+          with recruiting counts and top trial titles. */}
       {genes.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {genes.slice(0, 4).map((g) => (
-            <span key={g} className="rounded-full bg-ss-orange/15 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-ss-orange">
-              {g}
-            </span>
+            <GeneChip key={g} gene={g} size="sm" />
           ))}
           {genes.length > 4 && (
             <span className="text-[9px] font-semibold text-ss-muted">+{genes.length - 4}</span>
@@ -413,9 +414,7 @@ function ExplorePillarCard({ pillar, genes = [] }) {
         {genes.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {genes.slice(0, 6).map((g) => (
-              <span key={g} className="rounded-full bg-ss-orange/15 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-ss-orange">
-                {g}
-              </span>
+              <GeneChip key={g} gene={g} size="md" />
             ))}
             {genes.length > 6 && (
               <span className="text-[10px] text-ss-muted">+{genes.length - 6}</span>
