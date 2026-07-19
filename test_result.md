@@ -842,6 +842,51 @@ frontend:
               * Desktop hover popover (1400\u00d7900) still works as before
                 (regression-verified).
 
+        -working: true
+          agent: "main"
+          comment: |
+            Fixed a React hydration error the user hit in preview:
+              "In HTML, <a> cannot be a descendant of <a>."
+
+            Root cause: the pillar tile wraps everything in a Next.js
+            <Link> (= <a>), and the GeneChip's popover \u2014 which sat inline
+            inside that Link \u2014 renders trial-title <a>'s and CTA <Link>'s
+            of its own. So the DOM ended up like:
+              <a href="/search?...">      \u2190 pillar Link
+                \u2026
+                <span>                     \u2190 GeneChip wrapper
+                  <span role="button">     \u2190 chip
+                  <span>                   \u2190 desktop popover
+                    <a href="clinicaltrials.gov/study/NCT...">  \u2190 INVALID
+                    <Link href="/search?openTrials=1">          \u2190 INVALID
+                  </span>
+                </span>
+              </a>
+
+            Fix: portaled the DESKTOP popover to document.body too (mobile
+            sheet was already portaled last round). Introduced a chipRef +
+            popoverPos state; on every open/scroll/resize we recompute the
+            chip's viewport-relative bounding rect and render the popover
+            at fixed { top, left } with transform: translate(-50%, -100%)
+            so it stays anchored above the chip. Outside-click now checks
+            BOTH chipRef and popoverRef (the popover lives outside the
+            chip subtree now, so the previous single-ref check would have
+            false-closed on interaction).
+
+            Also cleaned up the container element: the outer wrap that
+            used to be <span ref={wrapRef}> is now a plain <span> and the
+            ref lives on the interactive chip itself.
+
+            Verified via Playwright at both viewports:
+              * Desktop 1400\u00d7900: popover.parentElement.tagName === 'BODY'
+                (i.e. portaled), rect { x:190, y:227, w:300, h:205 }.
+                Zero console errors. Content intact: header, 6/34/3/7
+                counts, two trial titles, both CTAs.
+              * Mobile 375\u00d7812: bottom sheet still opens fullwidth,
+                content intact, zero console errors.
+              * Cross-verified the DOM: no <a> is a descendant of another
+                <a> anywhere on the Dashboard after the popover opens.
+
   - task: "Complete reading list feature — /lib/books.js + list page + book detail + genome recommendations"
     implemented: true
     working: true

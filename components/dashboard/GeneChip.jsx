@@ -67,7 +67,16 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
   const [data, setData] = useState(() => (typeof window !== 'undefined' ? readCache(G) : null))
   const [loaded, setLoaded] = useState(false)
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
+  // The chip's own ref \u2014 used to measure the chip's viewport position so
+  // the portaled desktop popover can render fixed above it.
+  const chipRef = useRef(null)
+  // Popover element ref \u2014 needed so the outside-click handler doesn't
+  // false-close when the user actually clicked *inside* the popover (which
+  // lives in a portal, outside the chip's subtree).
+  const popoverRef = useRef(null)
+  // Cached viewport position of the chip while the popover is open. Uses
+  // `null` sentinel to avoid rendering the popover until we've measured.
+  const [popoverPos, setPopoverPos] = useState(null)
 
   // Fetch trial data on mount. Cache-hit resolves synchronously without
   // showing a loading state, so the badge never flickers.
@@ -84,21 +93,50 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
     }
   }, [G])
 
-  // Escape + outside-click close.
+  // Escape + outside-click close. Because the desktop popover is portaled
+  // to document.body it lives outside `chipRef`'s subtree, so we also
+  // treat popoverRef as an "inside" region.
   useEffect(() => {
     if (!open) return
     const onKey = (e) => {
       if (e.key === 'Escape') setOpen(false)
     }
     const onDoc = (e) => {
-      if (!wrapRef.current) return
-      if (!wrapRef.current.contains(e.target)) setOpen(false)
+      const inChip = chipRef.current?.contains(e.target)
+      const inPop = popoverRef.current?.contains(e.target)
+      if (!inChip && !inPop) setOpen(false)
     }
     window.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onDoc)
     return () => {
       window.removeEventListener('keydown', onKey)
       document.removeEventListener('mousedown', onDoc)
+    }
+  }, [open])
+
+  // Recompute the popover's viewport-fixed position whenever it opens (or
+  // the user scrolls / resizes while it's open) so the pointer stays
+  // aligned to the chip.
+  useEffect(() => {
+    if (!open) return
+    const compute = () => {
+      const el = chipRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setPopoverPos({
+        // centre-align above the chip
+        left: r.left + r.width / 2,
+        // 8px gap above the chip
+        top: r.top - 8,
+      })
+    }
+    compute()
+    window.addEventListener('scroll', compute, true)
+    window.addEventListener('resize', compute)
+    return () => {
+      window.removeEventListener('scroll', compute, true)
+      window.removeEventListener('resize', compute)
+      setPopoverPos(null)
     }
   }, [open])
 
@@ -173,8 +211,9 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
       : ''
 
   return (
-    <span ref={wrapRef} className={`relative inline-block ${className}`}>
+    <span className={`relative inline-block ${className}`}>
       <span
+        ref={chipRef}
         role="button"
         tabIndex={0}
         aria-haspopup="dialog"
@@ -201,32 +240,49 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
         )}
       </span>
 
-      {/* DESKTOP POPOVER — hidden on mobile via md: gate */}
-      {open && (
-        <span
-          className="pointer-events-auto absolute bottom-full left-1/2 z-40 mb-2 hidden w-[300px] -translate-x-1/2 md:block"
-          onClick={stop}
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-        >
-          <PopoverBody
-            gene={G}
-            data={data}
-            loaded={loaded}
-            hasAny={hasAny}
-            onClose={() => setOpen(false)}
-          />
-          {/* Little pointer arrow */}
-          <span
-            aria-hidden="true"
-            className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-px"
+      {/* DESKTOP POPOVER \u2014 also portaled to document.body. This is
+          essential: the chip lives inside a Next.js <Link> (pillar tile)
+          and PopoverBody itself contains <a> / <Link> for trial deep-links,
+          which would otherwise trigger the "<a> cannot be a descendant of
+          <a>" HTML validity + React hydration error. Portaling escapes
+          the ancestor <a> entirely. */}
+      {open && !isMobile && popoverPos && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            onClick={stop}
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+            style={{
+              position: 'fixed',
+              left: `${popoverPos.left}px`,
+              top: `${popoverPos.top}px`,
+              transform: 'translate(-50%, -100%)',
+              zIndex: 60,
+              width: '300px',
+              pointerEvents: 'auto',
+            }}
           >
-            <span className="block h-2 w-2 rotate-45 border-b border-r border-ss-border-warm bg-white" />
-          </span>
-        </span>
-      )}
+            <PopoverBody
+              gene={G}
+              data={data}
+              loaded={loaded}
+              hasAny={hasAny}
+              onClose={() => setOpen(false)}
+            />
+            {/* Little pointer arrow \u2014 sits at the bottom of the popover
+                just above the chip. */}
+            <span
+              aria-hidden="true"
+              className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-px"
+            >
+              <span className="block h-2 w-2 rotate-45 border-b border-r border-ss-border-warm bg-white" />
+            </span>
+          </div>,
+          document.body,
+        )}
 
-      {/* MOBILE BOTTOM SHEET — rendered via portal to escape any
+      {/* MOBILE BOTTOM SHEET \u2014 rendered via portal to escape any
           transform-containing-block ancestors (pillar tiles use hover
           transforms which otherwise capture our position:fixed). */}
       {open && isMobile && typeof document !== 'undefined' && createPortal(
