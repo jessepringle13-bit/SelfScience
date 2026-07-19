@@ -10,6 +10,7 @@ import {
   Timer, Heart, Coffee, Moon, Zap, Play, CheckCircle2, Clock, Award,
 } from 'lucide-react'
 import ExerciseCard from './ExerciseCard'
+import FullscreenSession from './FullscreenSession'
 import { saveCompletedSession, writeActiveSession, clearActiveSession } from '@/lib/training/sessionStore'
 
 export default function WorkoutSession({ session, equipment, level, riskGenes = [] }) {
@@ -62,9 +63,21 @@ export default function WorkoutSession({ session, equipment, level, riskGenes = 
 
 function ExerciseWorkout({ session, equipment, level, riskGenes }) {
   const [active, setActive] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
   const [progress, setProgress] = useState({}) // id -> { sets, rpe, done }
   const [summary, setSummary] = useState(null)
+  const [isMobile, setIsMobile] = useState(false)
   const startedAt = useRef(null)
+
+  // Detect mobile viewport at mount + resize so "Start workout" opens the
+  // immersive full-screen mode on phones and the inline flow on desktop.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // Aggregated progress reporting from each ExerciseCard.
   const handleProgress = (item) => {
@@ -88,12 +101,14 @@ function ExerciseWorkout({ session, equipment, level, riskGenes }) {
     setActive(true)
     setSummary(null)
     setProgress({})
+    if (isMobile) setFullscreen(true)
   }
 
-  const finishWorkout = () => {
+  const finishWorkout = (overrideProgress) => {
+    const finalProgress = overrideProgress || progress
     const durationSec = startedAt.current ? Math.round((Date.now() - startedAt.current) / 1000) : 0
     const exercises = (session.exercises || []).map((e) => {
-      const p = progress[e.id] || {}
+      const p = finalProgress[e.id] || {}
       return {
         id: e.id,
         name: e.name,
@@ -120,6 +135,7 @@ function ExerciseWorkout({ session, equipment, level, riskGenes }) {
       avgRpe,
     })
     setActive(false)
+    setFullscreen(false)
   }
 
   // Auto-detect "everything done" so we can nudge the user to finish.
@@ -155,14 +171,25 @@ function ExerciseWorkout({ session, equipment, level, riskGenes }) {
                 <div className="text-[12px] font-semibold text-ss-teal">
                   <span className="tabular-nums">{doneExercises}</span> / {totalExercises} exercises complete
                 </div>
-                <button
-                  type="button"
-                  onClick={finishWorkout}
-                  disabled={!canFinish}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-full bg-ss-orange px-4 py-2 text-sm font-bold text-white shadow hover:brightness-110 disabled:opacity-40"
-                >
-                  <CheckCircle2 size={14} /> Finish & save
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {isMobile && !fullscreen && (
+                    <button
+                      type="button"
+                      onClick={() => setFullscreen(true)}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-full border border-ss-teal px-3 py-2 text-sm font-bold text-ss-teal hover:bg-ss-teal hover:text-white"
+                    >
+                      Resume in fullscreen
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => finishWorkout()}
+                    disabled={!canFinish}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-ss-orange px-4 py-2 text-sm font-bold text-white shadow hover:brightness-110 disabled:opacity-40"
+                  >
+                    <CheckCircle2 size={14} /> Finish & save
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -173,12 +200,24 @@ function ExerciseWorkout({ session, equipment, level, riskGenes }) {
                 exercise={e}
                 equipment={equipment}
                 level={level}
-                interactive={active}
+                interactive={active && !fullscreen}
                 riskGenes={riskGenes}
                 onProgress={handleProgress}
               />
             ))}
           </div>
+          {/* Mobile immersive session mode. Renders as a portal overlay so
+              it lives above the site nav / bottom tab bar. Progress
+              flows back through handleProgress; Finish saves via
+              finishWorkout(overrideProgress). */}
+          <FullscreenSession
+            open={fullscreen}
+            exercises={session.exercises}
+            riskGenes={riskGenes}
+            onProgress={handleProgress}
+            onFinish={(finalProgress) => finishWorkout(finalProgress)}
+            onClose={() => setFullscreen(false)}
+          />
         </>
       ) : (
         <div className="rounded border border-dashed border-ss-border-warm/70 p-3 text-center text-[11px] italic text-ss-muted">
