@@ -6,7 +6,7 @@
         "dev": "NODE_OPTIONS='--max-old-space-size=2048' next dev --hostname 0.0.0.0 --port 3000",
         "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
         "dev:webpack": "next dev --hostname 0.0.0.0 --port 3000",
-        "build": "next build",
+        "build": "NODE_OPTIONS='--max-old-space-size=4096' next build",
         "start": "next start"
     },
     "dependencies": {
@@ -39,7 +39,7 @@
         "@radix-ui/react-toggle-group": "1.1.10",
         "@radix-ui/react-tooltip": "1.2.7",
         "@serwist/next": "^9.5.11",
-        "@supabase/supabase-js": "^2.110.2",
+        "@supabase/supabase-js": "2.74.0",
         "@tanstack/react-query": "5.56.2",
         "@tanstack/react-table": "8.21.3",
         "axios": "1.16.0",
