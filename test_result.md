@@ -2621,6 +2621,73 @@ test_plan:
 agent_communication:
     -agent: "main"
       message: |
+        SLICE 4 — BRANDSCORE™ SYSTEM SHIPPED (core + widget)
+
+        1) NEW: /app/utils/brandScore.js — pure utility
+           - computeBrandScore(brand, extras, activeForms?) →
+             { overall (0-10), tier, subScores, rawTotal, maxTotal }
+           - 6 category scorers (Manufacturing, Certifications, Testing,
+             Quality, Science, Genomics) derived directly from existing
+             BRAND_PROFILES fields (programmes, coaPolicy, focus,
+             partners, notableStudies, hq) + BRAND_EXTRAS overlay — no
+             new per-brand data required.
+           - Tier mapping ≥8 High / 5-7.9 Moderate / <5 Low, with
+             matching Tailwind chip styles exported as BRAND_SCORE_STYLE.
+           - CATEGORY_META with per-category colours + max values, used
+             by the sub-score bars.
+           - Genomics sub-score is COMPUTED AT RENDER TIME by cross-
+             referencing brand.genomeForms with activeForms
+             (activeGenomeFormsFromContext). Total scales 0-90 without
+             genome, 0-100 with — perfectly matches the user spec.
+
+        2) BRAND LEADERBOARD UPGRADE (/tools/supplements/brands)
+           - Replaced legacy 0-5 score column with BrandScore™ column:
+             sparkles icon + 0-10 chip + tier label ("High quality" /
+             "Moderate" / "Use caution").
+           - New "Sub-scores" column (lg+) with 6 vertical mini-bars —
+             Mfg / Certs / Testing / Quality / Science / Genome. Each
+             bar fills to its %-of-max height with a category colour.
+             Hover shows exact score via title tooltip.
+           - Sort now uses brandScore.overall (still respects "Best for
+             my genome" filter for genome-first ordering).
+           - Verified: Thorne #1 (5.7/10), Momentous #2 (4.2), Pure
+             Encapsulations #3 (3.8), etc. Genome column badges (High/
+             Med) correctly light up for methylation-friendly brands
+             when MTHFR TT variant is seeded.
+
+        3) NEW: /app/components/supplements/StackQualityWidget.jsx
+           - Reads ss_my_stack (localStorage) + genome context to
+             compute:
+               • Overall (0-100) — weighted 60% BrandTrust + 40% Genome.
+               • Brand Trust (0-10) — mean BrandScore of items.
+               • Genome Alignment (0-10) — mean genomics sub-score.
+               • Est. monthly cost — sum of per-item cost-tier estimates
+                 ($15 / $30 / $60).
+               • Item count + a red-alert row for any items carrying an
+                 alertFlag (supplement-drug interaction, FDA warning).
+           - Empty state: prompts "Add supplements to your stack to see
+             your quality score" with a "Build stack" CTA to
+             /tools/supplements. Ready for Slice 5's My Stack builder.
+           - Injected into the main Dashboard (below Research Matched).
+
+        Verified visually:
+          - /tmp/brandscore_v2.png    (brand leaderboard with sub-bars)
+          - /tmp/stack_widget.png     (dashboard widget populated,
+                                       showing 56/100 + brand trust 4.4
+                                       + genome align 7.5 + cost $180 +
+                                       Vitamin K2 alert)
+
+        Two spec items still open for a follow-up pass:
+          - Brand detail page radar chart of the 6 sub-scores (Recharts
+            is already installed; small addition).
+          - Evidence quality badges on DSLD product cards (ProductCard).
+          - "vs. Alternatives" tab on brand detail (comparison view).
+
+        No backend / third-party / DB changes. All computed client-side.
+
+
+    -agent: "main"
+      message: |
         SLICE 3 — SUPPLEMENT DISCOVERY CORE SHIPPED (partial: 3/4)
 
         1) NEW: /app/lib/supplements/brandExtras.js

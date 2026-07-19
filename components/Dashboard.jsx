@@ -21,6 +21,7 @@ import { PILLARS, default as SiteNav } from '@/components/site-nav'
 import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
+import StackQualityWidget from '@/components/supplements/StackQualityWidget'
 
 export default function Dashboard() {
   const [report, setReport] = useState(null)
@@ -225,6 +226,11 @@ export default function Dashboard() {
 
         {/* 4. RESEARCH MATCHED TO YOU */}
         <ResearchMatched genes={topGenes} />
+
+        {/* Stack Quality Widget */}
+        <div className="mt-8">
+          <StackQualityWidget />
+        </div>
 
         {/* 5. YOUR PROTOCOL PREVIEW */}
         <DashSection title="Your Protocol Preview" subtitle="First 3 variant-driven recommendations. Full protocol is in the Genome tab." toneClass="text-ss-teal">

@@ -11,8 +11,9 @@ import { BRAND_CATEGORIES, inferBrandCategories } from '@/lib/supplements/brandC
 import {
   getBrandExtras, computeGenomeFit, activeGenomeFormsFromContext, COST_TIER_STYLE,
 } from '@/lib/supplements/brandExtras'
+import { computeBrandScore, BRAND_SCORE_STYLE, CATEGORY_META } from '@/utils/brandScore'
 import { getGenomeResults } from '@/lib/genomeSession'
-import { Trophy, ArrowLeft, Award, Search, ExternalLink, Filter, Dna, DollarSign } from 'lucide-react'
+import { Trophy, ArrowLeft, Award, Search, ExternalLink, Filter, Dna, DollarSign, Sparkles } from 'lucide-react'
 
 const FILTER_TAGS = [
   { id: 'all',     label: 'All' },
@@ -83,13 +84,17 @@ export default function BrandsLeaderboardClient() {
 
   // Pre-compute categories + extras per brand once
   const brandsWithMeta = useMemo(() => {
-    return Object.values(BRAND_PROFILES).map((b) => ({
-      ...b,
-      _categories: inferBrandCategories(b),
-      _extras: getBrandExtras(b.slug),
-      _genomeFit: computeGenomeFit(b, activeForms),
-    }))
-  }, [activeForms])
+    return Object.values(BRAND_PROFILES).map((b) => {
+      const _extras = getBrandExtras(b.slug)
+      return {
+        ...b,
+        _categories: inferBrandCategories(b),
+        _extras,
+        _genomeFit: computeGenomeFit(b, activeForms),
+        _brandScore: computeBrandScore(b, _extras, hasGenome ? activeForms : null),
+      }
+    })
+  }, [activeForms, hasGenome])
 
   const availableCategories = useMemo(() => {
     const present = new Set()
@@ -107,13 +112,13 @@ export default function BrandsLeaderboardClient() {
       if (genomeFilterOn && hasGenome && b._genomeFit === 0) return false
       return true
     })
-    // Sort: genome filter on → genomeFit desc first, then score desc, then name.
+    // Sort: genome filter on → genomeFit desc first, then brandScore desc, then name.
     filtered.sort((a, b) => {
       if (genomeFilterOn && hasGenome) {
         const diff = b._genomeFit - a._genomeFit
         if (diff !== 0) return diff
       }
-      return (b.score - a.score) || a.name.localeCompare(b.name)
+      return (b._brandScore.overall - a._brandScore.overall) || a.name.localeCompare(b.name)
     })
     return filtered
   }, [brandsWithMeta, query, filter, category, costFilter, genomeFilterOn, hasGenome])
@@ -247,8 +252,8 @@ export default function BrandsLeaderboardClient() {
                 <tr>
                   <th className="text-left px-4 py-2 font-semibold w-14">#</th>
                   <th className="text-left px-4 py-2 font-semibold">Brand</th>
-                  <th className="text-left px-4 py-2 font-semibold">Score</th>
-                  <th className="text-left px-4 py-2 font-semibold hidden md:table-cell">Focus</th>
+                  <th className="text-left px-4 py-2 font-semibold">BrandScore™</th>
+                  <th className="text-left px-4 py-2 font-semibold hidden lg:table-cell">Sub-scores</th>
                   <th className="text-left px-4 py-2 font-semibold">Certifications</th>
                   <th className="text-left px-4 py-2 font-semibold">Cost</th>
                   {hasGenome && <th className="text-left px-4 py-2 font-semibold">Genome</th>}
@@ -257,7 +262,8 @@ export default function BrandsLeaderboardClient() {
               </thead>
               <tbody>
                 {brands.map((b, idx) => {
-                  const style = getScoreStyle(b.score)
+                  const bs = b._brandScore
+                  const bsStyle = BRAND_SCORE_STYLE[bs.tier]
                   const certs = (b.programmes || []).map((id) => CERT_REGISTRY[id]).filter(Boolean)
                   const costStyle = COST_TIER_STYLE[b._extras.costTier] || COST_TIER_STYLE['$$']
                   const genomeFit = b._genomeFit
@@ -278,17 +284,20 @@ export default function BrandsLeaderboardClient() {
                         >
                           {b.name}
                         </button>
-                        <div className="text-[11px] text-slate-500">{b.hq}</div>
+                        <div className="text-[11px] text-slate-500 line-clamp-1">{b.focus || b.hq}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] ${style.chip}`}>
-                          <span className="font-semibold">{b.score}</span>
-                          <span className="opacity-60">/5</span>
-                          <span className="hidden lg:inline opacity-80">· {style.label}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${bsStyle.chip}`}>
+                            <Sparkles className="h-3 w-3" />
+                            <span className="tabular-nums">{bs.overall.toFixed(1)}</span>
+                            <span className="opacity-60 font-medium">/10</span>
+                          </span>
                         </div>
+                        <div className="mt-1 text-[10px] text-slate-500">{bsStyle.label}</div>
                       </td>
-                      <td className="px-4 py-3 text-slate-700 hidden md:table-cell">
-                        <span className="line-clamp-2 text-xs">{b.focus || '—'}</span>
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <SubScoreBars subScores={bs.subScores} />
                       </td>
                       <td className="px-4 py-3">
                         <CertBadges certifications={certs} compact maxVisible={3} />
@@ -296,7 +305,7 @@ export default function BrandsLeaderboardClient() {
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${costStyle.chip}`}>
                           {b._extras.costTier}
-                          <span className="hidden lg:inline text-[10px] font-medium opacity-70">· {costStyle.label}</span>
+                          <span className="hidden xl:inline text-[10px] font-medium opacity-70">· {costStyle.label}</span>
                         </span>
                       </td>
                       {hasGenome && (
@@ -337,6 +346,32 @@ export default function BrandsLeaderboardClient() {
       />
 
       <SiteFooter />
+    </div>
+  )
+}
+
+function SubScoreBars({ subScores }) {
+  const entries = Object.entries(subScores || {})
+  return (
+    <div className="flex items-end gap-1.5" style={{ minWidth: 160 }}>
+      {entries.map(([key, val]) => {
+        const meta = CATEGORY_META[key]
+        if (!meta) return null
+        const pct = Math.max(4, Math.round((val / meta.max) * 100))
+        return (
+          <div key={key} className="flex flex-col items-center gap-1" title={`${meta.label}: ${val}/${meta.max}`}>
+            <div className="relative h-8 w-3 overflow-hidden rounded-sm bg-slate-100">
+              <div
+                className="absolute inset-x-0 bottom-0 transition-[height]"
+                style={{ background: meta.color, height: `${pct}%` }}
+              />
+            </div>
+            <div className="text-[8px] font-bold uppercase tracking-wider text-slate-500 leading-none">
+              {meta.label}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
