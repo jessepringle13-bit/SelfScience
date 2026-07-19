@@ -2618,6 +2618,68 @@ test_plan:
 
 
 
+
+    -task: "Slice 0 + Slice 1 — Dark canvas + Drug Check polish (QA pass)"
+     implemented: true
+     working: "NA"
+     file: "/app/tailwind.config.js, /app/app/layout.js, /app/app/drug-check/drug-check-client.jsx, /app/lib/pgxPlainEnglish.js"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: true
+     status_history:
+       - working: "NA"
+         agent: "main"
+         comment: "Ready for QA. See detailed test scope below."
+
+    -task: "Slice 2 — Nutrition Hub quick wins (QA pass)"
+     implemented: true
+     working: "NA"
+     file: "/app/app/nutrition/nutrition-client.jsx, /app/components/nutrition/TimingRulesBanner.jsx"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: true
+     status_history:
+       - working: "NA"
+         agent: "main"
+         comment: "Ready for QA. Timing banner, Consider Limiting redesign, macro strip, Why this grade collapsible."
+
+    -task: "Slice 3-4 — Supplement Discovery + BrandScore™"
+     implemented: true
+     working: "NA"
+     file: "/app/utils/brandScore.js, /app/lib/supplements/brandExtras.js, /app/lib/supplements/interactions.js, /app/app/tools/supplements/brands/brands-client.jsx, /app/components/supplements/StackQualityWidget.jsx"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: true
+     status_history:
+       - working: "NA"
+         agent: "main"
+         comment: "Ready for QA. Cost tier, Best-for-my-genome filter, BrandScore column + sub-score bars, Stack Quality widget."
+
+    -task: "Slice 5 — My X persistent lists"
+     implemented: true
+     working: "NA"
+     file: "/app/lib/lists/store.js, /app/components/drug-check/MyMedicationsCard.jsx, /app/components/supplements/MyStackDrawer.jsx, /app/components/nutrition/GroceryListSheet.jsx"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: true
+     status_history:
+       - working: "NA"
+         agent: "main"
+         comment: "Ready for QA. Medications list, Stack drawer, Grocery list — all localStorage-backed."
+
+    -task: "Slice 6 — Meal Planner + PGx PDF + DSLD Scanner + Nutrient Chips"
+     implemented: true
+     working: "NA"
+     file: "/app/components/nutrition/MealPlannerTab.jsx, /app/components/nutrition/NutrientFilterBar.jsx, /app/lib/pgx/pgxPdfExport.js, /app/components/supplements/SupplementScanner.jsx, /app/app/api/supplements/dsld-product/route.js"
+     stuck_count: 0
+     priority: "high"
+     needs_retesting: true
+     status_history:
+       - working: "NA"
+         agent: "main"
+         comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
+
+
 agent_communication:
     -agent: "main"
       message: |
