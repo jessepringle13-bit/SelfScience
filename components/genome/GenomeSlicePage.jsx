@@ -26,8 +26,8 @@ import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 import { normalizePillarName } from '@/lib/pillars'
 import { getPopulationFrequency } from '@/lib/populationFrequencies'
-import {
 import DashboardBackLink from '@/components/DashboardBackLink'
+import {
   addToPractitionerReport,
   isInPractitionerReport,
   PRACTITIONER_CHANGE_EVENT,
