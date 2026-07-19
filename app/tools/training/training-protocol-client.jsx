@@ -302,7 +302,25 @@ function TrainingProtocolInner() {
             {/* ------------ WEEKLY BLUEPRINT ------------ */}
             {tab === 'blueprint' && (
               <div className="space-y-4">
-                <WeeklyBlueprint blueprint={protocol.blueprint} />
+                <WeeklyBlueprint
+                  blueprint={protocol.blueprint}
+                  onDayClick={(idx) => {
+                    setTab('workouts')
+                    setTimeout(() => {
+                      const el = document.getElementById(`session-${idx}`)
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }, 250)
+                  }}
+                  onStartToday={() => {
+                    setTab('workouts')
+                    setTimeout(() => {
+                      const jsDay = new Date().getDay()
+                      const idx = (jsDay + 6) % 7
+                      const el = document.getElementById(`session-${idx}`)
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }, 250)
+                  }}
+                />
                 <div className="rounded-xl border border-ss-border-warm bg-white p-4 text-[12px] leading-relaxed text-ss-text">
                   <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-ss-teal">How this was decided</div>
                   <div className="mt-1 text-ss-muted">
@@ -316,7 +334,14 @@ function TrainingProtocolInner() {
             {tab === 'workouts' && (
               <div className="space-y-4">
                 {protocol.sessions?.map((s, i) => (
-                  <WorkoutSession key={i} session={s} equipment={protocol.intake?.equipment} level={protocol.intake?.experienceLevel} />
+                  <div key={i} id={`session-${i}`}>
+                    <WorkoutSession
+                      session={s}
+                      equipment={protocol.intake?.equipment}
+                      level={protocol.intake?.experienceLevel}
+                      riskGenes={(protocol.profile?.cards || []).map((c) => c.gene).filter(Boolean)}
+                    />
+                  </div>
                 ))}
               </div>
             )}
