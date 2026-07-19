@@ -42,6 +42,14 @@ export default function MyStackDrawer({ open, onClose }) {
 
   const hasGenome = context.activeForms.length > 0
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   // Enrich each item with brand + BrandScore + interaction flags.
   const enriched = useMemo(() => {
     const userDrugs = (meds || []).map((m) => m.name)

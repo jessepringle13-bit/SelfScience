@@ -160,6 +160,14 @@ export default function MealPlannerTab({ activeRules, onCopyToJournal }) {
   const goToDay = (delta) => setVisibleDayIdx((i) => Math.max(0, Math.min(DAYS.length - 1, i + delta)))
   const activeDay = DAYS[visibleDayIdx]
 
+  // Close food picker on Escape
+  useEffect(() => {
+    if (!assignTarget || typeof window === 'undefined') return
+    const onKey = (e) => { if (e.key === 'Escape') setAssignTarget(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [assignTarget])
+
   return (
     <div className="space-y-4">
       {/* Header */}

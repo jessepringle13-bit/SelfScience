@@ -6,7 +6,7 @@
 // swaps the lookup target to the NIH DSLD API. Renders a genome-fit
 // verdict + interaction flags in the result view.
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X, Camera, Search, ExternalLink, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 import BarcodeScanner from '@/components/BarcodeScanner'
 import { findInteractionsForSupplement } from '@/lib/supplements/interactions'
@@ -90,6 +90,14 @@ export default function SupplementScanner({ open, onClose, phenotypes, variantsB
   }
 
   const reset = () => setState({ status: 'idle', product: null, error: null, query: '' })
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!open || typeof window === 'undefined') return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
   if (!open) return null
 
