@@ -1,10 +1,6 @@
 'use client'
 
-// /app/components/training/Phase2Panels.jsx
-// All Phase 2 UI panels — Mobility, Recovery, Supplements, Equipment,
-// Metrics, Goals, Beginner, Youth, Coach Share.
-// Kept in a single file to avoid file explosion; each panel exported.
-
+import { useState, useEffect } from 'react'
 import {
   Wind, Moon, Pill, Wrench, LineChart, Target, GraduationCap,
   Shield, Users, AlertCircle, CheckCircle2, Clock, Info, Sparkles,
@@ -12,6 +8,9 @@ import {
 import { EVIDENCE_LEVELS } from '@/lib/training/supplements'
 import { PRIORITY_META } from '@/lib/training/equipment'
 import { OnlyFull, useViewMode } from '@/lib/training/viewMode'
+import SupplementTimingSchedule from './SupplementTimingSchedule'
+import MilestoneCheckbox from './MilestoneCheckbox'
+import { getCurrentWeek, resetProgramStart } from '@/lib/training/milestoneStore'
 
 // ─────────────────── Small primitives ───────────────────
 
@@ -207,6 +206,7 @@ export function SupplementPanel({ supplements }) {
   }
   return (
     <Panel icon={Pill} title="Supplement Protocol" eyebrow="3G" accent="#059669">
+      <SupplementTimingSchedule supplements={supplements} />
       <p className="text-[11.5px] italic text-ss-muted">
         Each supplement below is included because a rule fired on your genotype, goals, or biomarker signal — not because it is on a general recommendation list.
       </p>
@@ -344,6 +344,7 @@ export function GoalsPanel({ goals }) {
   )
   return (
     <Panel icon={Target} title="Goals, Milestones & Progression" eyebrow="3J" accent="#B91C1C">
+      <GoalsProgressBar />
       <div className="text-[11px] italic text-ss-muted">Primary goal frame: <span className="font-semibold text-ss-teal">{goals.primaryGoal}</span></div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -356,6 +357,7 @@ export function GoalsPanel({ goals }) {
           <div className="rounded border-l-4 border-ss-teal bg-ss-teal/5 p-2 text-[11px]">
             <span className="font-semibold text-ss-teal">Week-4 milestone:</span> {goals.foundation.milestone}
           </div>
+          <MilestoneCheckbox id="foundation" label={`Mark Week-4 milestone complete: ${goals.foundation.milestone}`} />
         </Card>
         <Card subtitle="Weeks 5–12" title="Development">
           <OnlyFull>
@@ -366,6 +368,7 @@ export function GoalsPanel({ goals }) {
           <div className="rounded border-l-4 border-ss-teal bg-ss-teal/5 p-2 text-[11px]">
             <span className="font-semibold text-ss-teal">Week-12 milestone:</span> {goals.development.milestone}
           </div>
+          <MilestoneCheckbox id="development" label={`Mark Week-12 milestone complete: ${goals.development.milestone}`} />
         </Card>
         <Card subtitle="6 months" title="Transformation">
           <OnlyFull>
@@ -373,9 +376,59 @@ export function GoalsPanel({ goals }) {
             <div><span className="font-semibold text-ss-teal">Lifestyle anchors:</span><List items={goals.transformation.lifestyleAnchors} /></div>
           </OnlyFull>
           <div className="italic text-ss-muted">{goals.transformation.reassess}</div>
+          <MilestoneCheckbox id="transformation" label="Mark 6-month transformation goal complete" />
         </Card>
       </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window === 'undefined') return
+            if (confirm('Reset your program start date to today? This clears your Week-X tracker.')) {
+              resetProgramStart()
+              window.location.reload()
+            }
+          }}
+          className="min-h-11 rounded-full border border-ss-teal px-3 py-2 text-xs font-semibold text-ss-teal hover:bg-ss-teal hover:text-white"
+        >
+          Regenerate protocol
+        </button>
+      </div>
     </Panel>
+  )
+}
+
+// Progress bar showing current week vs program length, with a
+// Week-4-complete banner when the Foundation phase wraps up.
+function GoalsProgressBar() {
+  const [week, setWeek] = useState(1)
+  useEffect(() => {
+    const refresh = () => setWeek(getCurrentWeek())
+    refresh()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('selfscience:milestone-changed', refresh)
+      return () => window.removeEventListener('selfscience:milestone-changed', refresh)
+    }
+  }, [])
+  const totalWeeks = 26 // Foundation (4) + Development (8) + Transformation (14)
+  const pct = Math.max(4, Math.min(100, Math.round((week / totalWeeks) * 100)))
+  const foundationDone = week > 4
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between text-[11px] font-semibold">
+        <span className="text-ss-teal">Week {week} of your protocol</span>
+        <span className="text-ss-muted">{pct}% through the 6-month arc</span>
+      </div>
+      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ss-border-warm/60">
+        <div className="h-full bg-gradient-to-r from-ss-teal to-ss-green transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      {foundationDone && week <= 6 && (
+        <div className="mt-2 rounded-lg border-l-4 border-ss-teal bg-ss-teal/8 p-2 text-[11.5px] text-ss-teal">
+          <span className="font-bold">Foundation block complete.</span> Time to assess your Week-4 milestone before moving to Development.
+        </div>
+      )}
+    </div>
   )
 }
 
