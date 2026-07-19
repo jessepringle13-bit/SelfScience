@@ -51,6 +51,7 @@ import {
 } from '@/lib/ingredientDictionary'
 import { getAlternatives } from '@/lib/productAlternatives'
 import TimingRulesBanner from '@/components/nutrition/TimingRulesBanner'
+import GroceryListSheet, { GroceryAddButton, GroceryListTrigger } from '@/components/nutrition/GroceryListSheet'
 
 const LOG_KEY = 'selfscience_food_log_v1'
 
@@ -174,10 +175,15 @@ function TabButton({ active, onClick, Icon, label }) {
 // ---------------------------------------------------------------------------
 function YourFoodsTab({ activeRules, hasGenome }) {
   const showPgx = activeRules.some((r) => r.pillar === 'Pharmacogenomics')
+  const [groceryOpen, setGroceryOpen] = useState(false)
 
   return (
     <div className="space-y-8">
       <TimingRulesBanner activeRules={activeRules} />
+      <div className="flex justify-end">
+        <GroceryListTrigger onClick={() => setGroceryOpen(true)} />
+      </div>
+      <GroceryListSheet open={groceryOpen} onClose={() => setGroceryOpen(false)} />
       {showPgx && <PgxDisclaimer />}
 
       {!hasGenome && (
@@ -250,7 +256,7 @@ function NutritionRuleCard({ rule }) {
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
               {rule.prioritize_foods.slice(0, expanded ? 999 : 6).map((f, i) => (
-                <FoodTile key={i} food={f} tone="good" />
+                <FoodTile key={i} food={f} tone="good" ruleKey={rule.key} />
               ))}
             </div>
             {rule.prioritize_foods.length > 6 && (
@@ -326,11 +332,21 @@ function NutritionRuleCard({ rule }) {
   )
 }
 
-function FoodTile({ food, tone }) {
+function FoodTile({ food, tone, ruleKey }) {
   const border = tone === 'good' ? 'border-l-4 border-ss-green' : tone === 'warn' ? 'border-l-4 border-ss-orange' : 'border-l-4 border-ss-amber'
+  const showGrocery = tone === 'good'
   return (
-    <div className={`rounded-lg bg-white p-3 shadow-sm ring-1 ring-ss-border-warm/40 ${border}`}>
-      <div className="text-sm font-bold text-ss-teal">{food.food}</div>
+    <div className={`relative rounded-lg bg-white p-3 shadow-sm ring-1 ring-ss-border-warm/40 ${border}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 text-sm font-bold text-ss-teal">{food.food}</div>
+        {showGrocery && (
+          <GroceryAddButton
+            food={{ id: `${ruleKey || 'r'}-${food.food}`, name: food.food, serving_frequency: food.daily_target || food.weekly_target }}
+            category={ruleKey || 'nutrition'}
+            className="-mr-1 -mt-1"
+          />
+        )}
+      </div>
       <p className="mt-1 text-xs leading-relaxed text-ss-muted">{food.reason}</p>
       {(food.daily_target || food.weekly_target) && (
         <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ss-teal">

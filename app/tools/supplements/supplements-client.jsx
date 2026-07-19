@@ -18,8 +18,11 @@ import { GOALS, getGoalById } from '@/lib/supplements/goalCategories'
 import { computePersonalisation, signalsForCategory } from '@/lib/supplements/personalisation'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { getBiomarkerValues } from '@/lib/biomarkersSession'
-import { Pill, ShieldCheck, ShieldAlert, Dna } from 'lucide-react'
+import { Pill, ShieldCheck, ShieldAlert, Dna, Sparkles } from 'lucide-react'
 import DashboardBackLink from '@/components/DashboardBackLink'
+import MyStackDrawer from '@/components/supplements/MyStackDrawer'
+import { stackStore } from '@/lib/lists'
+import { useListStore } from '@/lib/lists/store'
 
 export default function SupplementsClient() {
   return (
@@ -37,6 +40,8 @@ function SupplementsClientInner() {
   const [signals, setSignals] = useState([])
   const [hasGenome, setHasGenome] = useState(false)
   const [hasBiomarkers, setHasBiomarkers] = useState(false)
+  const [stackOpen, setStackOpen] = useState(false)
+  const [stackItems] = useListStore(stackStore)
 
   // Hydrate genome + biomarkers on mount (client-side only)
   useEffect(() => {
@@ -100,6 +105,20 @@ function SupplementsClientInner() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setStackOpen(true)}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/40 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20"
+                aria-label={`Open my stack (${stackItems.length} items)`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                My Stack
+                {stackItems.length > 0 && (
+                  <span className="ml-0.5 rounded-full bg-white text-[#1B474D] px-1.5 py-0.5 text-[10px] font-black">
+                    {stackItems.length}
+                  </span>
+                )}
+              </button>
               {(hasGenome || hasBiomarkers) && (
                 <a
                   href="/tools/supplements/my-variants"
@@ -171,6 +190,7 @@ function SupplementsClientInner() {
       <CompareFloatingBar />
       <CompareDrawer />
       <CompareConflictDialog />
+      <MyStackDrawer open={stackOpen} onClose={() => setStackOpen(false)} />
       <CompareToast />
     </div>
     </CompareProvider>

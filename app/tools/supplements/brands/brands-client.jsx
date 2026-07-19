@@ -13,6 +13,9 @@ import {
 } from '@/lib/supplements/brandExtras'
 import { computeBrandScore, BRAND_SCORE_STYLE, CATEGORY_META } from '@/utils/brandScore'
 import { getGenomeResults } from '@/lib/genomeSession'
+import MyStackDrawer, { AddToStackButton } from '@/components/supplements/MyStackDrawer'
+import { stackStore } from '@/lib/lists'
+import { useListStore } from '@/lib/lists/store'
 import { Trophy, ArrowLeft, Award, Search, ExternalLink, Filter, Dna, DollarSign, Sparkles } from 'lucide-react'
 
 const FILTER_TAGS = [
@@ -41,6 +44,8 @@ export default function BrandsLeaderboardClient() {
   const [category, setCategory] = useState('all')
   const [costFilter, setCostFilter] = useState('all')
   const [drawerBrand, setDrawerBrand] = useState(null)
+  const [stackOpen, setStackOpen] = useState(false)
+  const [stackItems] = useListStore(stackStore)
   const [genomeFilterOn, setGenomeFilterOn] = useState(false)
   const [variantsByGene, setVariantsByGene] = useState({})
   const [hasGenome, setHasGenome] = useState(false)
@@ -142,9 +147,25 @@ export default function BrandsLeaderboardClient() {
                 Every curated supplement brand in SelfScience, scored on manufacturing, CoA policy, proprietary-blend disclosure, third-party certification, and clinical-study track record.
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setStackOpen(true)}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/40 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20"
+              aria-label={`Open my stack (${stackItems.length} items)`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              My Stack
+              {stackItems.length > 0 && (
+                <span className="ml-0.5 rounded-full bg-white text-[#1B474D] px-1.5 py-0.5 text-[10px] font-black">
+                  {stackItems.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </section>
+
+      <MyStackDrawer open={stackOpen} onClose={() => setStackOpen(false)} />
 
       <main className="mx-auto max-w-6xl px-4 md:px-6 -mt-4 md:-mt-6 pb-16 space-y-4">
         {/* Filter toolbar */}
@@ -317,14 +338,25 @@ export default function BrandsLeaderboardClient() {
                         </td>
                       )}
                       <td className="px-4 py-3 text-right">
-                        <a
-                          href={b.officialUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[#C45820] hover:underline text-xs font-medium"
-                        >
-                          Store <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <AddToStackButton
+                            item={{
+                              id: `brand-${b.slug}`,
+                              name: `${b.name} — Foundational`,
+                              brand: b.name,
+                              brandSlug: b.slug,
+                            }}
+                            label="Add"
+                          />
+                          <a
+                            href={b.officialUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[#C45820] hover:underline text-xs font-medium"
+                          >
+                            Store <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   )

@@ -42,6 +42,7 @@ import { computeDrugInteractions } from '@/lib/drugInteractions'
 import { inferAllPGxPhenotypes } from '@/lib/pgxClassifier'
 import { getPgxPlainEnglish, SEVERITY_TOKENS, getDrugGeneImplication } from '@/lib/pgxPlainEnglish'
 import DashboardBackLink from '@/components/DashboardBackLink'
+import MyMedicationsCard from '@/components/drug-check/MyMedicationsCard'
 
 const POPULAR_QUERIES = ['clopidogrel', 'warfarin', 'codeine', 'omeprazole', 'simvastatin', 'escitalopram']
 const HR_STORAGE_KEY  = 'selfscience_drug_harm_reduction_opt_in'
@@ -299,16 +300,26 @@ function SingleDrugSection({
       <HarmReductionToggle enabled={showHR} onToggle={onToggleHR} />
 
       {!selected && !query && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-ss-muted">Popular checks:</span>
-          {POPULAR_QUERIES.map((q) => (
-            <button
-              key={q}
-              onClick={() => { const d = findDrug(q); if (d) pickDrug(d) }}
-              className="rounded-full border border-ss-border-warm bg-white px-3 py-1 text-xs font-medium capitalize text-ss-teal transition hover:bg-ss-teal/5"
-            >{q}</button>
-          ))}
-        </div>
+        <>
+          <MyMedicationsCard
+            drugCatalog={DRUG_CATALOG}
+            phenotypes={phenotypes}
+            onSelectDrug={(item) => {
+              const d = DRUG_CATALOG.find((x) => x.id === item.drugId)
+              if (d) pickDrug(d)
+            }}
+          />
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-ss-muted">Popular checks:</span>
+            {POPULAR_QUERIES.map((q) => (
+              <button
+                key={q}
+                onClick={() => { const d = findDrug(q); if (d) pickDrug(d) }}
+                className="rounded-full border border-ss-border-warm bg-white px-3 py-1 text-xs font-medium capitalize text-ss-teal transition hover:bg-ss-teal/5"
+              >{q}</button>
+            ))}
+          </div>
+        </>
       )}
 
       {selected && (

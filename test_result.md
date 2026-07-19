@@ -2621,6 +2621,78 @@ test_plan:
 agent_communication:
     -agent: "main"
       message: |
+        SLICE 5 — "MY X" PERSISTENT LISTS SHIPPED
+
+        Shared foundation:
+        1) NEW: /app/lib/lists/store.js — makeListStore(key) factory that
+           returns { all, add, remove, update, clear, has, findBy,
+           subscribe } for a localStorage-backed list. Emits a custom
+           event on every mutation + subscribes to cross-tab 'storage'
+           events. Also exports a useListStore(store) React hook that
+           starts empty (SSR-safe) and hydrates in useEffect.
+        2) NEW: /app/lib/lists/index.js — three namespaced instances:
+             medicationsStore  →  ss_my_medications
+             stackStore        →  ss_my_stack
+             groceryStore      →  ss_grocery_list
+
+        My Medications (Drug Check):
+        3) NEW: /app/components/drug-check/MyMedicationsCard.jsx
+           - Autocomplete against DRUG_CATALOG with catalog + free-text
+             fallback.
+           - Persistent list with gene chips coloured by PGx severity.
+           - Cross-genome AGGREGATE — "PGX summary across your list"
+             with critical/intermediate counts + per-med plain-English
+             impact from getPgxPlainEnglish.
+           - Clear-all + per-item remove.
+           - Mounted above Popular Checks in drug-check-client.jsx.
+           - Verified: 3 meds (clopidogrel/simvastatin/warfarin) with
+             seeded genome (CYP2C19*2 + SLCO1B1 CC) → correct chips + 1
+             critical + 1 intermediate summary.
+
+        My Stack (Supplements):
+        4) NEW: /app/components/supplements/MyStackDrawer.jsx
+           - Side-in drawer showing Stack Quality aggregate + per-item
+             card (name, brand, BrandScore, cost tier, dose/timing).
+           - Cross-references ss_my_medications + user's phenotypes via
+             findInteractionsForSupplement — surfaces amber interaction
+             flags per item.
+           - "Export stack" copies a formatted text summary to clipboard.
+           - Trash-all button with confirm.
+           - Exported <AddToStackButton /> — reusable pill for any
+             brand/product card; toggles item in stack + shows "In stack"
+             state via emerald pill.
+           - Wired into:
+             - /tools/supplements (top-right "My Stack N" trigger)
+             - /tools/supplements/brands (top-right trigger + Add
+               button per row).
+           - Verified visually — 2 items (Thorne + Nordic Naturals) →
+             Stack Quality 51/100 · Brand Trust 4.5 · Genome 6.0 · $90/mo.
+
+        Grocery List (Nutrition):
+        5) NEW: /app/components/nutrition/GroceryListSheet.jsx
+           - Bottom-sheet modal listing items with category + serving
+             metadata.
+           - Copy-list-to-clipboard export + confirm-clear.
+           - Exported <GroceryAddButton /> (per-food-tile "+" icon, 44px
+             touch) + <GroceryListTrigger /> (Foods-tab pill with count
+             badge).
+           - FoodTile now renders GroceryAddButton for Prioritize items;
+             tapping toggles the food in the list.
+           - Verified visually — 3 items (Wild salmon, Leafy greens,
+             Avocado) rendered with correct category + serving.
+
+        Full end-to-end wiring:
+        - Stack Quality dashboard widget (Slice 4) now auto-lights when
+          items are added via the Stack drawer.
+        - Supplement-drug interaction table (Slice 3) fires personalised
+          amber flags in the drawer using both med list + PGx phenotypes.
+
+        No backend / DB / third-party changes. All list data lives
+        entirely in localStorage under ss_* namespaced keys.
+
+
+    -agent: "main"
+      message: |
         SLICE 4 — BRANDSCORE™ SYSTEM SHIPPED (core + widget)
 
         1) NEW: /app/utils/brandScore.js — pure utility
