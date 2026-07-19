@@ -43,6 +43,7 @@ import WeeklyBlueprint from '@/components/training/WeeklyBlueprint'
 import WorkoutHistory from '@/components/training/WorkoutHistory'
 import ReadinessCheckIn from '@/components/training/ReadinessCheckIn'
 import MobileTabBar from '@/components/training/MobileTabBar'
+import OfflineIndicator from '@/components/training/OfflineIndicator'
 import SmartAlternatives from '@/components/training/SmartAlternatives'
 import WorkoutSession from '@/components/training/WorkoutSession'
 import TabNav from '@/components/training/TabNav'
@@ -338,6 +339,12 @@ function TrainingProtocolInner() {
             {/* ------------ WORKOUTS ------------ */}
             {tab === 'workouts' && (
               <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-orange">
+                    Today&apos;s training · {protocol.sessions?.length || 0} session{(protocol.sessions?.length || 0) === 1 ? '' : 's'}
+                  </div>
+                  <OfflineIndicator />
+                </div>
                 {protocol.sessions?.map((s, i) => (
                   <div key={i} id={`session-${i}`}>
                     <WorkoutSession

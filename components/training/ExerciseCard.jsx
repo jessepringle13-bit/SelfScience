@@ -19,6 +19,99 @@ import {
   AlertCircle, CheckCircle2, Timer as TimerIcon, Play, Pause, ShieldAlert,
 } from 'lucide-react'
 
+// Parse a tempo string like "2-1-2-0" or "3-0-1-0" into 4 phase seconds:
+// [eccentric, bottom pause, concentric, top pause].
+function parseTempo(t) {
+  const parts = String(t || '')
+    .split(/[-·:x\s]/i)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .slice(0, 4)
+    .map((p) => {
+      const n = parseInt(p, 10)
+      return isNaN(n) ? 0 : Math.max(0, Math.min(10, n))
+    })
+  if (parts.length !== 4) return null
+  if (parts.every((n) => n === 0)) return null
+  return parts
+}
+
+// TempoBars — a 4-bar visualiser that loops through Eccentric → Iso →
+// Concentric → Iso, filling each bar over its per-phase seconds. If the
+// tempo is unparsable, renders the raw text.
+function TempoBars({ tempo }) {
+  const phases = useMemo(() => parseTempo(tempo), [tempo])
+  const [phaseIdx, setPhaseIdx] = useState(0)
+  const [phaseProgress, setPhaseProgress] = useState(0)
+  const startRef = useRef(null)
+  const rafRef = useRef(null)
+
+  useEffect(() => {
+    if (!phases) return
+    const total = phases.reduce((a, b) => a + b, 0)
+    if (total <= 0) return
+    let cancelled = false
+    const tick = (now) => {
+      if (cancelled) return
+      if (startRef.current == null) startRef.current = now
+      const elapsedMs = (now - startRef.current) % (total * 1000)
+      let cursor = 0
+      for (let i = 0; i < phases.length; i++) {
+        const durMs = phases[i] * 1000
+        if (elapsedMs < cursor + durMs) {
+          setPhaseIdx(i)
+          setPhaseProgress(durMs === 0 ? 1 : (elapsedMs - cursor) / durMs)
+          break
+        }
+        cursor += durMs
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      cancelled = true
+      startRef.current = null
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [phases])
+
+  if (!phases) return <span>{tempo}</span>
+
+  const LABELS = ['Ecc', 'Iso', 'Con', 'Iso']
+  return (
+    <span className="inline-flex items-end gap-1 align-middle" aria-label={`Tempo ${tempo}`}>
+      {phases.map((sec, i) => {
+        const active = i === phaseIdx && sec > 0
+        const isPause = sec === 0
+        const fillPct = active ? Math.round(phaseProgress * 100) : (i < phaseIdx ? 100 : 0)
+        return (
+          <span key={i} className="flex flex-col items-center leading-none">
+            <span
+              className="relative block h-4 w-2.5 overflow-hidden rounded-sm bg-ss-border-warm/60"
+              title={`${LABELS[i]} · ${sec}s`}
+            >
+              {!isPause && (
+                <span
+                  className="absolute inset-x-0 bottom-0 bg-ss-teal transition-[height] duration-150 ease-linear"
+                  style={{ height: `${fillPct}%`, opacity: active ? 1 : 0.5 }}
+                />
+              )}
+              {isPause && (
+                <span
+                  className="absolute left-1/2 top-1/2 h-[2px] w-[6px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ss-muted/60"
+                />
+              )}
+            </span>
+            <span className={`mt-0.5 text-[8px] font-bold uppercase tracking-wider ${active ? 'text-ss-teal' : 'text-ss-muted'}`}>
+              {sec}
+            </span>
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
 // Genes whose high-risk genotypes correlate with soft-tissue/tendon injury
 // susceptibility per published associations. We flag exercises that load
 // tendons heavily (deadlifts, plyos, etc.) when the user carries these.
@@ -197,7 +290,10 @@ export default function ExerciseCard({
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
             <span><span className="font-semibold text-ss-teal">Sets:</span> {ex.sets}</span>
             <span><span className="font-semibold text-ss-teal">Reps:</span> {ex.reps}</span>
-            <span><span className="font-semibold text-ss-teal">Tempo:</span> {ex.tempo}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="font-semibold text-ss-teal">Tempo:</span>
+              <TempoBars tempo={ex.tempo} />
+            </span>
             <span><span className="font-semibold text-ss-teal">Rest:</span> {ex.rest}</span>
           </div>
 

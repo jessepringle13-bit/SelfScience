@@ -2556,6 +2556,68 @@ test_plan:
         contract is untouched. No re-testing required unless the frontend
         agent verifies the dose chip visually.
 
+    -task: "Training Protocol — nice-to-have leftovers"
+     implemented: true
+     working: true
+     file: "/app/components/training/*.jsx, /app/lib/training/metricsStore.js"
+     stuck_count: 0
+     priority: "medium"
+     needs_retesting: false
+     status_history:
+       - working: true
+         agent: "main"
+         comment: |
+           Shipped the final "nice-to-have" polish items from the massive
+           Training Protocol interactive spec:
+
+           1) METRICS TAB — Per-row "+ Log" button opens a bottom-sheet /
+              centered modal with numeric value + date, stored in
+              /app/lib/training/metricsStore.js (localStorage,
+              ss_training_metrics_v1). When ≥2 numeric entries exist for a
+              metric, a recharts sparkline appears next to the "Your latest"
+              cell along with a coloured delta chip (+/- vs first entry).
+              Added a "Log in Biomarkers" CTA at the top of the tab.
+
+           2) WORKOUTS TAB — Tempo text ("2-1-2-0") replaced with a 4-bar
+              animated visualiser (TempoBars in ExerciseCard.jsx). Bars loop
+              Ecc → Iso → Con → Iso, filling each bar over its phase
+              seconds; pause phases render as a subtle dash. Numeric labels
+              persist below each bar for accessibility. Also added an
+              "Available offline / Offline mode / Online only" pill
+              (OfflineIndicator.jsx) at the top of the Workouts tab — state
+              derives from navigator.serviceWorker.controller +
+              navigator.onLine.
+
+           3) WEEKLY BLUEPRINT — Added left/right chevron week navigation
+              (weekOffset state). Header shows "This week / Last week / Next
+              week" + Mon-Sun date range. Tap the "Today" affordance to
+              reset to current week. Added a completion summary bar under
+              the grid: "X of Y sessions completed this week" with a
+              progress fill and "🎉 Week complete" state. Off-current-week
+              views hide the "Start today's workout" CTA and disable day
+              click-through to avoid confusion. Added getSessionsForWeek()
+              helper in sessionStore.js.
+
+           4) ALREADY-DONE (verified during audit; no re-work needed):
+              - Injury flag icon on high-tendon-load exercises for COL5A1/MMP3
+                carriers (ExerciseCard.jsx, TENDON_RISK_GENES set).
+              - Vibration API haptics on set tap + rest-timer completion.
+              - "Getting stronger" PR chip in WorkoutHistory via detectPr().
+              - HRV numeric input + low-readiness banner (≤ 8/15) in
+                ReadinessCheckIn.jsx.
+
+           Verified visually via screenshot tool:
+           - /tmp/train_blueprint.png    (chevrons, weekly summary)
+           - /tmp/train_metrics.png      (per-row Log buttons + Trend col)
+           - /tmp/train_metrics_sheet.png (log modal + sparklines + delta)
+           - /tmp/train_workouts.png     (tempo bars on every card)
+           - /tmp/train_workouts_top.png (Online-only pill + session header)
+
+           No backend changes; no third-party API changes. Data lives
+           entirely in localStorage per privacy contract.
+
+
+
 agent_communication:
     -agent: "testing"
       message: |

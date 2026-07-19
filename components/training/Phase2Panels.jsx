@@ -1,16 +1,22 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Wind, Moon, Pill, Wrench, LineChart, Target, GraduationCap,
   Shield, Users, AlertCircle, CheckCircle2, Clock, Info, Sparkles,
+  Plus, ExternalLink, X, TrendingUp,
 } from 'lucide-react'
+import {
+  ResponsiveContainer, LineChart as RCLineChart, Line, Tooltip as RCTooltip,
+} from 'recharts'
 import { EVIDENCE_LEVELS } from '@/lib/training/supplements'
 import { PRIORITY_META } from '@/lib/training/equipment'
 import { OnlyFull, useViewMode } from '@/lib/training/viewMode'
 import SupplementTimingSchedule from './SupplementTimingSchedule'
 import MilestoneCheckbox from './MilestoneCheckbox'
 import { getCurrentWeek, resetProgramStart } from '@/lib/training/milestoneStore'
+import { getEntries, saveEntry, getLatestEntry } from '@/lib/training/metricsStore'
 
 // ─────────────────── Small primitives ───────────────────
 
@@ -288,41 +294,253 @@ export function EquipmentPanel({ items }) {
 // ─────────────────── 3I · Metrics ───────────────────
 
 export function MetricsPanel({ metrics }) {
+  const [logging, setLogging] = useState(null) // { name } or null
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const bump = () => setTick((t) => t + 1)
+    if (typeof window === 'undefined') return
+    window.addEventListener('selfscience:training-metrics-changed', bump)
+    return () => window.removeEventListener('selfscience:training-metrics-changed', bump)
+  }, [])
   if (!metrics) return null
-  const section = (title, items) => (
-    items?.length ? (
+
+  const renderSection = (title, items) => {
+    if (!items?.length) return null
+    const hasCurrentCol = 'current' in (items[0] || {})
+    return (
       <div className="mt-3 avoid-break">
         <Sub>{title}</Sub>
-        <table className="mt-1 w-full border-collapse text-left text-[11.5px]">
-          <thead>
-            <tr className="border-b-2 border-ss-teal/30 text-[9.5px] uppercase tracking-wider text-ss-muted">
-              <th className="py-1 pr-2 font-semibold">Metric</th>
-              <th className="py-1 pr-2 font-semibold">Frequency</th>
-              <th className="py-1 pr-2 font-semibold">Target / interpretation</th>
-              {'current' in (items[0] || {}) && <th className="py-1 pr-2 font-semibold">Your latest</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((m, i) => (
-              <tr key={i} className="border-b border-ss-border-warm/30 align-top">
-                <td className="py-1.5 pr-2 font-semibold text-ss-text">{m.name}</td>
-                <td className="py-1.5 pr-2 text-ss-muted">{m.frequency}</td>
-                <td className="py-1.5 pr-2">{m.target}</td>
-                {'current' in m && <td className="py-1.5 pr-2 font-semibold text-ss-teal">{m.current ?? '—'}</td>}
+        <div className="mt-1 overflow-x-auto">
+          <table className="w-full border-collapse text-left text-[11.5px]">
+            <thead>
+              <tr className="border-b-2 border-ss-teal/30 text-[9.5px] uppercase tracking-wider text-ss-muted">
+                <th className="py-1 pr-2 font-semibold">Metric</th>
+                <th className="py-1 pr-2 font-semibold">Frequency</th>
+                <th className="py-1 pr-2 font-semibold">Target / interpretation</th>
+                <th className="py-1 pr-2 font-semibold">{hasCurrentCol ? 'Your latest' : 'Trend'}</th>
+                <th className="py-1 pr-2 font-semibold text-right">Log</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((m, i) => (
+                <MetricRow
+                  key={`${title}-${m.name}-${i}`}
+                  metric={m}
+                  onLog={() => setLogging({ name: m.name })}
+                  refreshTick={tick}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    ) : null
-  )
+    )
+  }
+
   return (
     <Panel icon={LineChart} title="Metrics to Track" eyebrow="3I" accent="#0891B2">
-      {section('Performance', metrics.performance)}
-      {section('Body composition', metrics.bodyComp)}
-      {section('Recovery', metrics.recovery)}
-      {section('Biomarker targets', metrics.biomarkerTargets)}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ss-teal/20 bg-ss-teal/5 p-3">
+        <div className="text-[11.5px] text-ss-text">
+          <span className="font-semibold text-ss-teal">Tip:</span> tap <span className="font-semibold">Log</span> next to any row to store today&apos;s value locally. Two or more entries draw a trend line.
+        </div>
+        <Link
+          href="/biomarkers"
+          className="inline-flex min-h-11 items-center gap-1 rounded-full border border-ss-teal px-3 py-1.5 text-[11px] font-semibold text-ss-teal hover:bg-ss-teal hover:text-white"
+        >
+          Log in Biomarkers <ExternalLink size={11} />
+        </Link>
+      </div>
+
+      {renderSection('Performance', metrics.performance)}
+      {renderSection('Body composition', metrics.bodyComp)}
+      {renderSection('Recovery', metrics.recovery)}
+      {renderSection('Biomarker targets', metrics.biomarkerTargets)}
+
+      {logging && (
+        <LogMetricSheet
+          metricName={logging.name}
+          onClose={() => setLogging(null)}
+        />
+      )}
     </Panel>
+  )
+}
+
+// A single metric row — renders spec + latest value + sparkline (if 2+
+// entries logged locally) + Log button.
+function MetricRow({ metric: m, onLog, refreshTick }) {
+  const entries = useMemo(() => getEntries(m.name), [m.name, refreshTick])
+  const latest = entries[entries.length - 1] || null
+  const numericEntries = entries.filter((e) => typeof e.value === 'number')
+  const hasSpark = numericEntries.length >= 2
+
+  // Prefer user's latest logged value; fall back to the static "current"
+  // field from the metric definition (if any).
+  const displayValue = latest?.value != null
+    ? latest.value
+    : ('current' in m ? (m.current ?? '—') : null)
+
+  // Trend delta (latest vs first) — only if numeric.
+  let delta = null
+  if (numericEntries.length >= 2) {
+    const first = numericEntries[0].value
+    const last = numericEntries[numericEntries.length - 1].value
+    delta = last - first
+  }
+
+  return (
+    <tr className="border-b border-ss-border-warm/30 align-top">
+      <td className="py-1.5 pr-2 font-semibold text-ss-text">{m.name}</td>
+      <td className="py-1.5 pr-2 text-ss-muted">{m.frequency}</td>
+      <td className="py-1.5 pr-2">{m.target}</td>
+      <td className="py-1.5 pr-2">
+        <div className="flex items-center gap-2">
+          <span className="whitespace-nowrap font-semibold text-ss-teal">
+            {displayValue != null && displayValue !== '' ? displayValue : '—'}
+          </span>
+          {hasSpark && (
+            <div className="h-6 w-16" aria-label={`Trend for ${m.name}`}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RCLineChart data={numericEntries.map((e) => ({ v: e.value, d: e.dateISO }))}>
+                  <Line
+                    type="monotone"
+                    dataKey="v"
+                    stroke="#0F766E"
+                    strokeWidth={1.5}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <RCTooltip
+                    cursor={false}
+                    contentStyle={{ fontSize: 10, padding: '2px 6px', borderRadius: 6 }}
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.d || ''}
+                    formatter={(v) => [v, m.name]}
+                  />
+                </RCLineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {delta != null && delta !== 0 && (
+            <span
+              className={`inline-flex items-center text-[10px] font-bold ${
+                delta > 0 ? 'text-ss-green' : 'text-red-600'
+              }`}
+              title={`Change since first entry: ${delta > 0 ? '+' : ''}${Math.round(delta * 100) / 100}`}
+            >
+              <TrendingUp
+                size={10}
+                className={delta > 0 ? '' : 'rotate-180'}
+              />
+              {delta > 0 ? '+' : ''}{Math.round(delta * 100) / 100}
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="py-1.5 pr-2 text-right">
+        <button
+          type="button"
+          onClick={onLog}
+          className="inline-flex min-h-9 items-center gap-1 rounded-full border border-ss-teal px-2.5 py-1 text-[11px] font-semibold text-ss-teal hover:bg-ss-teal hover:text-white"
+        >
+          <Plus size={11} /> Log
+        </button>
+      </td>
+    </tr>
+  )
+}
+
+// Bottom-sheet modal for logging a metric value.
+function LogMetricSheet({ metricName, onClose }) {
+  const [value, setValue] = useState('')
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [saved, setSaved] = useState(false)
+
+  const canSave = value.trim() !== ''
+
+  const handleSave = () => {
+    if (!canSave) return
+    saveEntry(metricName, value, date)
+    setSaved(true)
+    setTimeout(() => onClose(), 700)
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:rounded-2xl"
+      >
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-ss-orange">Log metric</div>
+            <div className="mt-0.5 text-base font-extrabold text-ss-teal">{metricName}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-ss-muted hover:bg-ss-bg"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <label className="block">
+          <span className="text-[11px] font-semibold text-ss-teal">Value</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="e.g. 145, 12:03, 65 kg"
+            className="mt-1 h-11 w-full rounded-lg border border-ss-border-warm bg-white px-3 text-sm outline-none focus:border-ss-teal"
+          />
+        </label>
+        <label className="mt-3 block">
+          <span className="text-[11px] font-semibold text-ss-teal">Date</span>
+          <input
+            type="date"
+            value={date}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setDate(e.target.value)}
+            className="mt-1 h-11 w-full rounded-lg border border-ss-border-warm bg-white px-3 text-sm outline-none focus:border-ss-teal"
+          />
+        </label>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 rounded-full px-3 text-sm font-semibold text-ss-muted hover:text-ss-teal"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canSave || saved}
+            onClick={handleSave}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-ss-teal px-4 text-sm font-bold text-white shadow-sm hover:brightness-110 disabled:opacity-40"
+          >
+            {saved ? <><CheckCircle2 size={14} /> Saved</> : 'Save entry'}
+          </button>
+        </div>
+        <div className="mt-3 text-[10.5px] italic text-ss-muted">
+          Stored on this device only. Not synced to any server.
+        </div>
+      </div>
+    </div>
   )
 }
 

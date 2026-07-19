@@ -1,23 +1,26 @@
 'use client'
 
 // /app/components/training/WeeklyBlueprint.jsx
-// Visual 7-day weekly training calendar — now interactive:
-//   • Highlights TODAY with a teal border + "Today" pill
+// Visual 7-day weekly training calendar — interactive:
+//   • Highlights TODAY (only when viewing "This week")
 //   • Marks completed days with a green checkmark from sessionStore
-//   • Tapping a day fires the onDayClick handler so the parent can
-//     navigate into that day's session
-//   • Renders a streak counter + weekly completion summary
+//   • Tapping a day fires onDayClick so the parent can navigate into that
+//     day's session
+//   • Streak counter + weekly completion summary
+//   • Left/right chevrons navigate weeks; footer summarises "X of Y
+//     sessions completed" for the visible week
 //
 // All localStorage reads are wrapped so SSR stays clean.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Calendar, Zap, Heart, Timer, Coffee, Wind, CheckCircle2,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
   getCompletedDaySet,
   getStreakDays,
-  getSessionsThisWeek,
+  getSessionsForWeek,
 } from '@/lib/training/sessionStore'
 
 const INTENSITY_META = {
@@ -38,46 +41,72 @@ function iconFor(type) {
   return Calendar
 }
 
-// Given a day index (0=Mon,...,6=Sun), return the calendar YYYY-MM-DD for
-// the current week's occurrence of that day.
-function isoForWeekdayIndex(weekdayIdx) {
-  const now = new Date()
-  const monday = new Date(now)
-  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
-  monday.setHours(0, 0, 0, 0)
+// Monday of the current calendar week for a given date.
+function mondayOf(date) {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+// YYYY-MM-DD for a Monday + weekday offset (0=Mon…6=Sun).
+function isoForMondayAndWeekday(monday, weekdayIdx) {
   const target = new Date(monday)
   target.setDate(monday.getDate() + weekdayIdx)
   return target.toISOString().slice(0, 10)
 }
 
-function todayWeekdayIndex() {
-  const jsDay = new Date().getDay()
-  return (jsDay + 6) % 7 // Mon=0 … Sun=6
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+function formatWeekRange(monday) {
+  const end = new Date(monday)
+  end.setDate(monday.getDate() + 6)
+  const sameMonth = monday.getMonth() === end.getMonth()
+  const startPart = `${MONTH_ABBR[monday.getMonth()]} ${monday.getDate()}`
+  const endPart = sameMonth ? `${end.getDate()}` : `${MONTH_ABBR[end.getMonth()]} ${end.getDate()}`
+  return `${startPart}–${endPart}`
 }
 
 export default function WeeklyBlueprint({ blueprint, onDayClick, onStartToday }) {
+  // weekOffset = 0 (current week), -1 = last week, +1 = next week, etc.
+  const [weekOffset, setWeekOffset] = useState(0)
   const [completed, setCompleted] = useState(() => new Set())
   const [streak, setStreak] = useState(0)
-  const [sessionsThisWeek, setSessionsThisWeek] = useState(0)
+  const [sessionsInView, setSessionsInView] = useState(0)
+
+  const thisMonday = useMemo(() => mondayOf(new Date()), [])
+  const viewMonday = useMemo(() => {
+    const d = new Date(thisMonday)
+    d.setDate(thisMonday.getDate() + weekOffset * 7)
+    return d
+  }, [thisMonday, weekOffset])
 
   useEffect(() => {
     const refresh = () => {
-      setCompleted(getCompletedDaySet(14))
+      setCompleted(getCompletedDaySet(180))
       setStreak(getStreakDays())
-      setSessionsThisWeek(getSessionsThisWeek().length)
+      setSessionsInView(getSessionsForWeek(viewMonday).length)
     }
     refresh()
     if (typeof window !== 'undefined') {
       window.addEventListener('selfscience:training-session-saved', refresh)
       return () => window.removeEventListener('selfscience:training-session-saved', refresh)
     }
-  }, [])
+  }, [viewMonday])
 
   if (!blueprint?.days) return null
 
-  const todayIdx = todayWeekdayIndex()
+  const isCurrentWeek = weekOffset === 0
+  const todayISO = new Date().toISOString().slice(0, 10)
   const activeDays = blueprint.days.filter((d) => d.type !== 'rest')
   const activeCount = activeDays.length
+
+  const weekLabel = weekOffset === 0
+    ? 'This week'
+    : weekOffset === -1
+      ? 'Last week'
+      : weekOffset === 1
+        ? 'Next week'
+        : formatWeekRange(viewMonday)
 
   return (
     <div
@@ -96,9 +125,41 @@ export default function WeeklyBlueprint({ blueprint, onDayClick, onStartToday })
               🔥 {streak}-day streak
             </span>
           )}
-          <span className="text-ss-muted">
-            {sessionsThisWeek} of {activeCount} sessions this week
-          </span>
+        </div>
+      </div>
+
+      {/* Week nav */}
+      <div className="mb-3 flex items-center justify-between rounded-xl border border-ss-border-warm/60 bg-white/60 px-2 py-1.5">
+        <button
+          type="button"
+          onClick={() => setWeekOffset((w) => w - 1)}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full text-ss-teal hover:bg-ss-teal/10"
+          aria-label="Previous week"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <div className="flex flex-col items-center leading-tight">
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-ss-teal">{weekLabel}</span>
+          <span className="text-[10px] text-ss-muted">{formatWeekRange(viewMonday)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {!isCurrentWeek && (
+            <button
+              type="button"
+              onClick={() => setWeekOffset(0)}
+              className="min-h-11 rounded-full px-2 text-[10px] font-bold uppercase tracking-wider text-ss-muted hover:text-ss-teal"
+            >
+              Today
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setWeekOffset((w) => w + 1)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-ss-teal hover:bg-ss-teal/10"
+            aria-label="Next week"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       </div>
 
@@ -107,10 +168,10 @@ export default function WeeklyBlueprint({ blueprint, onDayClick, onStartToday })
         {blueprint.days.map((d, i) => {
           const meta = INTENSITY_META[d.intensity] || INTENSITY_META.easy
           const Icon = iconFor(d.type)
-          const isToday = i === todayIdx
-          const iso = isoForWeekdayIndex(i)
+          const iso = isoForMondayAndWeekday(viewMonday, i)
+          const isToday = iso === todayISO
           const isCompleted = completed.has(iso)
-          const clickable = typeof onDayClick === 'function' && d.type !== 'rest'
+          const clickable = typeof onDayClick === 'function' && d.type !== 'rest' && isCurrentWeek
           const Component = clickable ? 'button' : 'div'
           return (
             <Component
@@ -165,16 +226,53 @@ export default function WeeklyBlueprint({ blueprint, onDayClick, onStartToday })
         })}
       </div>
 
-      {/* Start today's workout CTA */}
-      {typeof onStartToday === 'function' && blueprint.days[todayIdx]?.type !== 'rest' && (
+      {/* Weekly completion summary */}
+      <WeekSummary sessions={sessionsInView} target={activeCount} isFuture={weekOffset > 0} />
+
+      {/* Start today's workout CTA — only on current week */}
+      {isCurrentWeek && typeof onStartToday === 'function' && (() => {
+        const jsDay = new Date().getDay()
+        const idx = (jsDay + 6) % 7
+        return blueprint.days[idx]?.type !== 'rest'
+      })() && (
         <div className="mt-4 flex justify-center">
           <button
             type="button"
             onClick={onStartToday}
             className="inline-flex min-h-11 items-center gap-2 rounded-full bg-ss-teal px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-110"
           >
-            ▶ Start today's workout
+            ▶ Start today&apos;s workout
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WeekSummary({ sessions, target, isFuture }) {
+  const pct = target > 0 ? Math.min(100, Math.round((sessions / target) * 100)) : 0
+  const complete = sessions >= target && target > 0
+  return (
+    <div className="mt-4 rounded-xl border border-ss-teal/20 bg-white/70 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-1 text-[11.5px] font-semibold">
+        <span className="text-ss-teal">
+          {isFuture
+            ? `${target} session${target === 1 ? '' : 's'} planned`
+            : <><span className="text-lg font-black">{sessions}</span> of {target} session{target === 1 ? '' : 's'} completed</>
+          }
+        </span>
+        {!isFuture && (
+          <span className={complete ? 'text-ss-green' : 'text-ss-muted'}>
+            {complete ? '🎉 Week complete' : `${pct}%`}
+          </span>
+        )}
+      </div>
+      {!isFuture && (
+        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-ss-border-warm/60">
+          <div
+            className={`h-full transition-all ${complete ? 'bg-ss-green' : 'bg-gradient-to-r from-ss-teal to-ss-green'}`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
       )}
     </div>
