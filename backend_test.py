@@ -1,508 +1,805 @@
 #!/usr/bin/env python3
 """
-Backend API tests for Supplement Discovery (DSLD proxy endpoints)
-Tests GET /api/supplements/dsld/search and GET /api/supplements/dsld/{id}
+Backend testing script for SelfScience Next.js app
+Tests two main features:
+1. POST /api/supplements/prices - admin-token gated write endpoint
+2. Search adapter refactor regression check
 """
 
 import requests
 import json
 import time
 import sys
-import re
+from datetime import datetime
 
-# Base URL from environment
-BASE_URL = "https://health-research-hub-3.preview.emergentagent.com/api"
+# Base URL - using localhost as specified in review request
+BASE_URL = "http://localhost:3000"
 
-# Marketplace domains that should NEVER appear in brand URLs
-MARKETPLACE_DOMAINS = [
-    'amazon.', 'walmart.', 'iherb.', 'vitacost.', 'gnc.',
-    'ebay.', 'target.', 'costco.'
-]
+# Read admin token from .env
+PRICES_ADMIN_TOKEN = "ss_prices_a4dJp8kNqT2vXeR7yLwFmZ3bH6cKgV1u"
 
-def test_search_methylfolate():
-    """Test 1: Search for methylfolate with size=5, verify MethylPro curated brand"""
-    print("\n=== Test 1: Search methylfolate (size=5) ===")
+# Test results tracking
+test_results = []
+
+def log_test(test_num, description, passed, details=""):
+    """Log test result"""
+    status = "✅ PASS" if passed else "❌ FAIL"
+    result = {
+        "test": test_num,
+        "description": description,
+        "passed": passed,
+        "details": details
+    }
+    test_results.append(result)
+    print(f"\n{status} Test {test_num}: {description}")
+    if details:
+        print(f"  Details: {details}")
+    return passed
+
+def test_1_get_prices_baseline():
+    """Test 1: GET /api/supplements/prices baseline"""
     try:
-        start = time.time()
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'methylfolate',
-            'size': 5
-        }, timeout=15)
-        elapsed = time.time() - start
+        resp = requests.get(f"{BASE_URL}/api/supplements/prices", timeout=10)
         
-        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        if resp.status_code != 200:
+            return log_test(1, "GET /api/supplements/prices baseline", False, 
+                          f"Expected 200, got {resp.status_code}")
         
         data = resp.json()
-        print(f"✓ Query: {data.get('query')}")
-        print(f"✓ Total: {data.get('total')}, Returned: {data.get('returned')}")
         
-        assert 'results' in data, "Missing 'results' field"
-        assert data['returned'] <= 5, f"Expected returned <= 5, got {data['returned']}"
+        # Check response shape
+        if "meta" not in data or "prices" not in data or "count" not in data:
+            return log_test(1, "GET /api/supplements/prices baseline", False,
+                          "Missing required fields: meta, prices, or count")
         
-        results = data['results']
-        assert len(results) > 0, "Expected non-empty results"
+        # Check meta.source
+        source = data.get("meta", {}).get("source")
+        if source not in ["bundled", "bundled+overlay"]:
+            return log_test(1, "GET /api/supplements/prices baseline", False,
+                          f"meta.source should be 'bundled' or 'bundled+overlay', got '{source}'")
         
-        # Find MethylPro product
-        methylpro_found = False
-        methylpro_curated = False
-        methylpro_url_correct = False
-        methylpro_formquality_preferred = False
-        
-        for r in results:
-            if r.get('brand', {}).get('name') == 'MethylPro':
-                methylpro_found = True
-                brand = r['brand']
-                print(f"✓ Found MethylPro product: {r.get('fullName')}")
-                print(f"  Brand curated: {brand.get('curated')}")
-                print(f"  Brand URL: {brand.get('url', {}).get('url')}")
-                print(f"  URL source: {brand.get('url', {}).get('source')}")
-                
-                if brand.get('curated') == True:
-                    methylpro_curated = True
-                
-                if brand.get('url', {}).get('source') == 'curated' and \
-                   brand.get('url', {}).get('url') == 'https://methylpro.com':
-                    methylpro_url_correct = True
-                
-                # Check formQuality for preferred L-5-Methylfolate
-                formQuality = r.get('formQuality', [])
-                for fq in formQuality:
-                    if fq.get('tier') == 'preferred' and 'methylfolate' in fq.get('formLabel', '').lower():
-                        methylpro_formquality_preferred = True
-                        print(f"  ✓ FormQuality: {fq.get('ingredient')} - {fq.get('tier')} - {fq.get('formLabel')}")
-        
-        assert methylpro_found, "MethylPro product not found in results"
-        assert methylpro_curated, "MethylPro brand.curated should be true"
-        assert methylpro_url_correct, "MethylPro URL should be curated https://methylpro.com"
-        assert methylpro_formquality_preferred, "MethylPro should have preferred tier L-5-Methylfolate"
-        
-        print("✅ Test 1 PASSED")
-        return True
+        return log_test(1, "GET /api/supplements/prices baseline", True,
+                       f"Response has correct shape. meta.source='{source}', count={data.get('count')}")
+    
     except Exception as e:
-        print(f"❌ Test 1 FAILED: {e}")
-        return False
+        return log_test(1, "GET /api/supplements/prices baseline", False, str(e))
 
-def test_search_magnesium_glycinate():
-    """Test 2: Search magnesium glycinate, verify all required fields present"""
-    print("\n=== Test 2: Search magnesium glycinate (size=8) ===")
+def test_2_post_no_token():
+    """Test 2: POST without token should return 401"""
     try:
-        start = time.time()
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'magnesium glycinate',
-            'size': 8
-        }, timeout=15)
-        elapsed = time.time() - start
+        payload = {"mode": "replace", "prices": {}}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices", 
+                           json=payload, timeout=10)
         
-        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        if resp.status_code != 401:
+            return log_test(2, "POST without token → 401", False,
+                          f"Expected 401, got {resp.status_code}")
         
         data = resp.json()
-        results = data.get('results', [])
-        print(f"✓ Returned {len(results)} results")
+        if "error" not in data or data["error"] != "Unauthorized":
+            return log_test(2, "POST without token → 401", False,
+                          f"Expected error='Unauthorized', got {data}")
         
-        # Verify all required fields in each result
-        required_fields = ['id', 'fullName', 'brand', 'productType', 'physicalState', 
-                          'netContents', 'offMarket', 'entryDate', 'ingredients', 'formQuality']
-        
-        for i, r in enumerate(results):
-            for field in required_fields:
-                assert field in r, f"Result {i} missing field '{field}'"
-            
-            # Verify brand structure
-            brand = r['brand']
-            assert 'name' in brand, f"Result {i} brand missing 'name'"
-            assert 'curated' in brand, f"Result {i} brand missing 'curated'"
-            assert 'trustBadges' in brand, f"Result {i} brand missing 'trustBadges'"
-            assert 'url' in brand, f"Result {i} brand missing 'url'"
-            
-            # Verify brand.url structure
-            url_obj = brand['url']
-            assert 'url' in url_obj, f"Result {i} brand.url missing 'url'"
-            assert 'source' in url_obj, f"Result {i} brand.url missing 'source'"
-            assert 'canonical' in url_obj, f"Result {i} brand.url missing 'canonical'"
-            assert 'trust' in url_obj, f"Result {i} brand.url missing 'trust'"
-        
-        print(f"✓ All {len(results)} results have required fields")
-        print("✅ Test 2 PASSED")
-        return True
+        return log_test(2, "POST without token → 401", True,
+                       "Correctly rejected with 401 Unauthorized")
+    
     except Exception as e:
-        print(f"❌ Test 2 FAILED: {e}")
-        return False
+        return log_test(2, "POST without token → 401", False, str(e))
 
-def test_search_ubiquinol():
-    """Test 3: Search ubiquinol, verify CoQ10 formQuality with preferred tier"""
-    print("\n=== Test 3: Search ubiquinol (size=5) ===")
+def test_3_post_incorrect_token():
+    """Test 3: POST with incorrect token should return 401"""
     try:
-        start = time.time()
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'ubiquinol',
-            'size': 5
-        }, timeout=15)
-        elapsed = time.time() - start
+        payload = {"mode": "replace", "prices": {}}
+        headers = {"x-prices-admin-token": "wrong_token_12345"}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           json=payload, headers=headers, timeout=10)
         
-        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        if resp.status_code != 401:
+            return log_test(3, "POST with incorrect token → 401", False,
+                          f"Expected 401, got {resp.status_code}")
         
         data = resp.json()
-        results = data.get('results', [])
-        print(f"✓ Returned {len(results)} results")
+        if "error" not in data or data["error"] != "Unauthorized":
+            return log_test(3, "POST with incorrect token → 401", False,
+                          f"Expected error='Unauthorized', got {data}")
         
-        # Look for CoQ10 formQuality with preferred tier and Ubiquinol
-        coq10_preferred_found = False
-        for r in results:
-            formQuality = r.get('formQuality', [])
-            for fq in formQuality:
-                ingredient = fq.get('ingredient', '')
-                tier = fq.get('tier', '')
-                formLabel = fq.get('formLabel', '')
-                
-                if 'coq10' in ingredient.lower() and tier == 'preferred' and 'ubiquinol' in formLabel.lower():
-                    coq10_preferred_found = True
-                    print(f"✓ Found CoQ10 preferred form: {ingredient} - {tier} - {formLabel}")
-                    print(f"  Product: {r.get('fullName')}")
-                    break
-            if coq10_preferred_found:
-                break
-        
-        assert coq10_preferred_found, "No product found with CoQ10 preferred tier Ubiquinol"
-        print("✅ Test 3 PASSED")
-        return True
+        return log_test(3, "POST with incorrect token → 401", True,
+                       "Correctly rejected with 401 Unauthorized")
+    
     except Exception as e:
-        print(f"❌ Test 3 FAILED: {e}")
-        return False
+        return log_test(3, "POST with incorrect token → 401", False, str(e))
 
-def test_search_empty_query():
-    """Test 4: Empty query should return 200 with empty results"""
-    print("\n=== Test 4: Empty query ===")
+def test_4_post_replace_mode():
+    """Test 4: POST with correct token, mode='replace'"""
     try:
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': ''
-        }, timeout=15)
+        payload = {
+            "mode": "replace",
+            "source": "test-agent",
+            "prices": {
+                "thorne::creatine": {
+                    "perServing": 0.99,
+                    "currency": "USD",
+                    "updated": "2026-09",
+                    "source": "scraped"
+                },
+                "test brand::test ingredient": {
+                    "perServing": 1.50,
+                    "currency": "USD",
+                    "updated": "2026-09",
+                    "source": "scraped",
+                    "productUrl": "https://example.com/product"
+                }
+            }
+        }
+        headers = {"x-prices-admin-token": PRICES_ADMIN_TOKEN}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           json=payload, headers=headers, timeout=10)
         
-        print(f"✓ Status: {resp.status_code}")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        if resp.status_code != 200:
+            return log_test(4, "POST replace mode with correct token", False,
+                          f"Expected 200, got {resp.status_code}: {resp.text}")
         
         data = resp.json()
-        print(f"✓ Query: '{data.get('query')}'")
-        print(f"✓ Total: {data.get('total')}, Returned: {data.get('returned')}")
         
-        assert data.get('query') == '', "Expected empty query string"
-        assert data.get('total') == 0, "Expected total = 0"
-        assert data.get('results') == [], "Expected empty results array"
+        # Check response shape
+        if not data.get("ok"):
+            return log_test(4, "POST replace mode with correct token", False,
+                          f"Expected ok=true, got {data}")
         
-        print("✅ Test 4 PASSED")
-        return True
+        if data.get("mode") != "replace":
+            return log_test(4, "POST replace mode with correct token", False,
+                          f"Expected mode='replace', got {data.get('mode')}")
+        
+        if data.get("wrote") != 2:
+            return log_test(4, "POST replace mode with correct token", False,
+                          f"Expected wrote=2, got {data.get('wrote')}")
+        
+        if "updatedAt" not in data:
+            return log_test(4, "POST replace mode with correct token", False,
+                          "Missing updatedAt field")
+        
+        return log_test(4, "POST replace mode with correct token", True,
+                       f"Successfully wrote 2 prices. updatedAt={data.get('updatedAt')}")
+    
     except Exception as e:
-        print(f"❌ Test 4 FAILED: {e}")
-        return False
+        return log_test(4, "POST replace mode with correct token", False, str(e))
 
-def test_search_size_clamping():
-    """Test 5: size=100 should be clamped to 50"""
-    print("\n=== Test 5: Size clamping (size=100) ===")
+def test_5_get_after_replace():
+    """Test 5: GET after POST should show merged prices"""
     try:
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'vitamin d',
-            'size': 100
-        }, timeout=15)
-        
-        print(f"✓ Status: {resp.status_code}")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        
-        data = resp.json()
-        returned = data.get('returned', 0)
-        print(f"✓ Returned: {returned}")
-        
-        assert returned <= 50, f"Expected returned <= 50, got {returned}"
-        print("✅ Test 5 PASSED")
-        return True
-    except Exception as e:
-        print(f"❌ Test 5 FAILED: {e}")
-        return False
-
-def test_search_onmarket_zero():
-    """Test 6: onMarket=0 should still return 200"""
-    print("\n=== Test 6: onMarket=0 ===")
-    try:
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'vitamin c',
-            'size': 5,
-            'onMarket': 0
-        }, timeout=15)
-        
-        print(f"✓ Status: {resp.status_code}")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        
-        data = resp.json()
-        print(f"✓ Returned: {data.get('returned')}")
-        print("✅ Test 6 PASSED")
-        return True
-    except Exception as e:
-        print(f"❌ Test 6 FAILED: {e}")
-        return False
-
-def test_search_cache_hit():
-    """Test 7: Repeat request should return cache hit"""
-    print("\n=== Test 7: Cache hit ===")
-    try:
-        # First request
-        resp1 = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'methylfolate',
-            'size': 5
-        }, timeout=15)
-        data1 = resp1.json()
-        cache1 = data1.get('_cache')
-        print(f"✓ First request _cache: {cache1}")
-        
-        # Second request (should hit cache)
+        # Small delay to ensure cache invalidation
         time.sleep(0.5)
-        resp2 = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-            'q': 'methylfolate',
-            'size': 5
-        }, timeout=15)
-        data2 = resp2.json()
-        cache2 = data2.get('_cache')
-        print(f"✓ Second request _cache: {cache2}")
         
-        assert cache2 == 'hit', f"Expected _cache='hit' on second request, got '{cache2}'"
-        print("✅ Test 7 PASSED")
-        return True
-    except Exception as e:
-        print(f"❌ Test 7 FAILED: {e}")
-        return False
-
-def test_no_marketplace_urls():
-    """Test 8: Verify no marketplace URLs in any brand.url.url"""
-    print("\n=== Test 8: No marketplace URLs ===")
-    try:
-        # Test multiple queries
-        queries = ['methylfolate', 'magnesium', 'vitamin d']
-        all_urls = []
+        resp = requests.get(f"{BASE_URL}/api/supplements/prices", timeout=10)
         
-        for q in queries:
-            resp = requests.get(f"{BASE_URL}/supplements/dsld/search", params={
-                'q': q,
-                'size': 10
-            }, timeout=15)
-            data = resp.json()
-            results = data.get('results', [])
-            
-            for r in results:
-                url = r.get('brand', {}).get('url', {}).get('url', '')
-                if url:
-                    all_urls.append((q, r.get('fullName'), url))
-        
-        print(f"✓ Collected {len(all_urls)} URLs from {len(queries)} queries")
-        
-        # Check for marketplace domains
-        marketplace_found = []
-        for query, product, url in all_urls:
-            url_lower = url.lower()
-            for marketplace in MARKETPLACE_DOMAINS:
-                if marketplace in url_lower:
-                    marketplace_found.append((query, product, url, marketplace))
-        
-        if marketplace_found:
-            print("❌ Found marketplace URLs:")
-            for query, product, url, marketplace in marketplace_found:
-                print(f"  Query: {query}")
-                print(f"  Product: {product}")
-                print(f"  URL: {url}")
-                print(f"  Marketplace: {marketplace}")
-            assert False, f"Found {len(marketplace_found)} marketplace URLs"
-        
-        print("✓ No marketplace URLs found")
-        print("✅ Test 8 PASSED")
-        return True
-    except Exception as e:
-        print(f"❌ Test 8 FAILED: {e}")
-        return False
-
-def test_label_detail_methylpro():
-    """Test 9: Label detail for MethylPro L-Methylfolate 1mg (id=274162)"""
-    print("\n=== Test 9: Label detail 274162 (MethylPro) ===")
-    try:
-        start = time.time()
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/274162", timeout=15)
-        elapsed = time.time() - start
-        
-        print(f"✓ Status: {resp.status_code} (took {elapsed:.2f}s)")
-        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        if resp.status_code != 200:
+            return log_test(5, "GET after POST shows merged prices", False,
+                          f"Expected 200, got {resp.status_code}")
         
         data = resp.json()
-        assert 'product' in data, "Missing 'product' field"
         
-        product = data['product']
-        print(f"✓ Product: {product.get('fullName')}")
+        # Check meta
+        meta = data.get("meta", {})
+        if meta.get("source") != "bundled+overlay":
+            return log_test(5, "GET after POST shows merged prices", False,
+                          f"Expected meta.source='bundled+overlay', got '{meta.get('source')}'")
         
-        # Verify brand
-        brand = product.get('brand', {})
-        brand_name = brand.get('name')
-        print(f"✓ Brand name: {brand_name}")
-        assert brand_name == 'MethylPro', f"Expected brand 'MethylPro', got '{brand_name}'"
+        if meta.get("overlayCount") != 2:
+            return log_test(5, "GET after POST shows merged prices", False,
+                          f"Expected overlayCount=2, got {meta.get('overlayCount')}")
         
-        # Verify manufacturer
-        manufacturer = brand.get('manufacturer', {})
-        mfg_name = manufacturer.get('name')
-        print(f"✓ Manufacturer: {mfg_name}")
-        assert mfg_name == 'Metabolic Maintenance', f"Expected manufacturer 'Metabolic Maintenance', got '{mfg_name}'"
+        # Check prices
+        prices = data.get("prices", {})
+        thorne_creatine = prices.get("thorne::creatine")
         
-        # Verify labelPdf
-        labelPdf = product.get('labelPdf')
-        print(f"✓ Label PDF: {labelPdf}")
-        assert labelPdf and labelPdf.startswith('https://dsld.od.nih.gov/labels/'), \
-            f"Expected labelPdf to start with 'https://dsld.od.nih.gov/labels/', got '{labelPdf}'"
+        if not thorne_creatine:
+            return log_test(5, "GET after POST shows merged prices", False,
+                          "thorne::creatine not found in prices")
         
-        # Verify formQuality has preferred L-5-Methylfolate
-        formQuality = product.get('formQuality', [])
-        preferred_found = False
-        for fq in formQuality:
-            if fq.get('tier') == 'preferred' and 'methylfolate' in fq.get('formLabel', '').lower():
-                preferred_found = True
-                print(f"✓ FormQuality: {fq.get('ingredient')} - {fq.get('tier')} - {fq.get('formLabel')}")
+        if thorne_creatine.get("perServing") != 0.99:
+            return log_test(5, "GET after POST shows merged prices", False,
+                          f"Expected thorne::creatine.perServing=0.99, got {thorne_creatine.get('perServing')}")
         
-        assert preferred_found, "Expected preferred tier L-5-Methylfolate in formQuality"
-        
-        print("✅ Test 9 PASSED")
-        return True
+        return log_test(5, "GET after POST shows merged prices", True,
+                       f"Prices merged correctly. thorne::creatine.perServing=0.99, overlayCount=2")
+    
     except Exception as e:
-        print(f"❌ Test 9 FAILED: {e}")
-        return False
+        return log_test(5, "GET after POST shows merged prices", False, str(e))
 
-def test_label_detail_not_found():
-    """Test 10: Non-existent label should return 404"""
-    print("\n=== Test 10: Label detail 999999999 (not found) ===")
+def test_6_post_merge_mode():
+    """Test 6: POST with mode='merge' should preserve existing keys"""
     try:
-        resp = requests.get(f"{BASE_URL}/supplements/dsld/999999999", timeout=15)
+        payload = {
+            "mode": "merge",
+            "prices": {
+                "now foods::vitamin d": {
+                    "perServing": 0.11,
+                    "currency": "USD",
+                    "updated": "2026-09",
+                    "source": "scraped"
+                }
+            }
+        }
+        headers = {"x-prices-admin-token": PRICES_ADMIN_TOKEN}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           json=payload, headers=headers, timeout=10)
         
-        print(f"✓ Status: {resp.status_code}")
-        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        if resp.status_code != 200:
+            return log_test(6, "POST merge mode preserves existing keys", False,
+                          f"Expected 200, got {resp.status_code}: {resp.text}")
         
         data = resp.json()
-        assert 'error' in data, "Expected 'error' field in response"
-        print(f"✓ Error message: {data.get('error')}")
         
-        # Verify it's not a 500 error
-        assert resp.status_code != 500, "Should return 404, not 500"
+        if not data.get("ok") or data.get("mode") != "merge" or data.get("wrote") != 1:
+            return log_test(6, "POST merge mode preserves existing keys", False,
+                          f"Expected ok=true, mode='merge', wrote=1, got {data}")
         
-        print("✅ Test 10 PASSED")
-        return True
-    except Exception as e:
-        print(f"❌ Test 10 FAILED: {e}")
-        return False
-
-def test_label_detail_cache_hit():
-    """Test 11: Repeat label detail request should return cache hit"""
-    print("\n=== Test 11: Label detail cache hit ===")
-    try:
-        # First request
-        resp1 = requests.get(f"{BASE_URL}/supplements/dsld/274162", timeout=15)
-        data1 = resp1.json()
-        cache1 = data1.get('_cache')
-        print(f"✓ First request _cache: {cache1}")
-        
-        # Second request (should hit cache)
+        # Verify merge preserved previous keys
         time.sleep(0.5)
-        resp2 = requests.get(f"{BASE_URL}/supplements/dsld/274162", timeout=15)
-        data2 = resp2.json()
-        cache2 = data2.get('_cache')
-        print(f"✓ Second request _cache: {cache2}")
+        get_resp = requests.get(f"{BASE_URL}/api/supplements/prices", timeout=10)
+        get_data = get_resp.json()
+        prices = get_data.get("prices", {})
         
-        assert cache2 == 'hit', f"Expected _cache='hit' on second request, got '{cache2}'"
-        print("✅ Test 11 PASSED")
-        return True
+        # Should have all 3 keys now (2 from replace + 1 from merge)
+        if "thorne::creatine" not in prices:
+            return log_test(6, "POST merge mode preserves existing keys", False,
+                          "thorne::creatine was removed (should be preserved)")
+        
+        if "test brand::test ingredient" not in prices:
+            return log_test(6, "POST merge mode preserves existing keys", False,
+                          "test brand::test ingredient was removed (should be preserved)")
+        
+        if "now foods::vitamin d" not in prices:
+            return log_test(6, "POST merge mode preserves existing keys", False,
+                          "now foods::vitamin d not found (should be added)")
+        
+        overlay_count = get_data.get("meta", {}).get("overlayCount", 0)
+        if overlay_count != 3:
+            return log_test(6, "POST merge mode preserves existing keys", False,
+                          f"Expected overlayCount=3, got {overlay_count}")
+        
+        return log_test(6, "POST merge mode preserves existing keys", True,
+                       f"Merge successful. All 3 keys present, overlayCount=3")
+    
     except Exception as e:
-        print(f"❌ Test 11 FAILED: {e}")
-        return False
+        return log_test(6, "POST merge mode preserves existing keys", False, str(e))
 
-def test_timing_and_json():
-    """Test 12-13: All calls within 15s and JSON well-formed"""
-    print("\n=== Test 12-13: Timing and JSON validation ===")
+def test_7_post_invalid_mode():
+    """Test 7: POST with mode='delete' should return 400"""
     try:
-        test_cases = [
-            (f"{BASE_URL}/supplements/dsld/search?q=creatine&size=5", "search creatine"),
-            (f"{BASE_URL}/supplements/dsld/274162", "label detail 274162"),
-        ]
+        payload = {"mode": "delete", "prices": {}}
+        headers = {"x-prices-admin-token": PRICES_ADMIN_TOKEN}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           json=payload, headers=headers, timeout=10)
         
-        for url, desc in test_cases:
-            start = time.time()
-            resp = requests.get(url, timeout=15)
-            elapsed = time.time() - start
-            
-            print(f"✓ {desc}: {resp.status_code} in {elapsed:.2f}s")
-            assert elapsed < 15, f"{desc} took {elapsed:.2f}s (> 15s)"
-            
-            # Verify JSON is well-formed
-            data = resp.json()
-            json_str = json.dumps(data)
-            
-            # Check for MongoDB ObjectId patterns (should not exist)
-            objectid_pattern = r'ObjectId\(["\']?[a-f0-9]{24}["\']?\)'
-            if re.search(objectid_pattern, json_str, re.IGNORECASE):
-                raise AssertionError(f"Found MongoDB ObjectId in response for {desc}")
-            
-            # Check for undefined values in critical fields
-            if 'results' in data:
-                for r in data['results']:
-                    for key in ['id', 'fullName', 'brand']:
-                        if key not in r or r[key] is None:
-                            raise AssertionError(f"Critical field '{key}' is undefined in {desc}")
-            
-            if 'product' in data:
-                product = data['product']
-                for key in ['id', 'fullName', 'brand']:
-                    if key not in product or product[key] is None:
-                        raise AssertionError(f"Critical field '{key}' is undefined in product for {desc}")
+        if resp.status_code != 400:
+            return log_test(7, "POST with invalid mode → 400", False,
+                          f"Expected 400, got {resp.status_code}")
         
-        print("✓ All requests completed within 15s")
-        print("✓ JSON well-formed, no ObjectId leaks, no undefined critical fields")
-        print("✅ Test 12-13 PASSED")
-        return True
+        data = resp.json()
+        if "error" not in data or 'mode must be "replace" or "merge"' not in data["error"]:
+            return log_test(7, "POST with invalid mode → 400", False,
+                          f"Expected mode validation error, got {data}")
+        
+        return log_test(7, "POST with invalid mode → 400", True,
+                       "Correctly rejected invalid mode with 400")
+    
     except Exception as e:
-        print(f"❌ Test 12-13 FAILED: {e}")
-        return False
+        return log_test(7, "POST with invalid mode → 400", False, str(e))
+
+def test_8_post_malformed_json():
+    """Test 8: POST with malformed JSON should return 400"""
+    try:
+        headers = {
+            "x-prices-admin-token": PRICES_ADMIN_TOKEN,
+            "Content-Type": "application/json"
+        }
+        # Send malformed JSON
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           data="{invalid json", headers=headers, timeout=10)
+        
+        if resp.status_code != 400:
+            return log_test(8, "POST with malformed JSON → 400", False,
+                          f"Expected 400, got {resp.status_code}")
+        
+        data = resp.json()
+        if "error" not in data or "Invalid JSON" not in data["error"]:
+            return log_test(8, "POST with malformed JSON → 400", False,
+                          f"Expected JSON validation error, got {data}")
+        
+        return log_test(8, "POST with malformed JSON → 400", True,
+                       "Correctly rejected malformed JSON with 400")
+    
+    except Exception as e:
+        return log_test(8, "POST with malformed JSON → 400", False, str(e))
+
+def test_9_post_sanitization():
+    """Test 9: POST with mixed valid/invalid entries - sanitization"""
+    try:
+        payload = {
+            "mode": "replace",
+            "prices": {
+                "valid::ingredient": {
+                    "perServing": 0.50,
+                    "currency": "USD",
+                    "updated": "2026-09"
+                },
+                "no_delimiter_key": {
+                    "perServing": 1.0
+                },
+                "negative::price": {
+                    "perServing": -5
+                },
+                "toohigh::price": {
+                    "perServing": 999
+                },
+                "badurl::key": {
+                    "perServing": 1.0,
+                    "productUrl": "javascript:alert(1)"
+                }
+            }
+        }
+        headers = {"x-prices-admin-token": PRICES_ADMIN_TOKEN}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code != 200:
+            return log_test(9, "POST sanitization filters invalid entries", False,
+                          f"Expected 200, got {resp.status_code}: {resp.text}")
+        
+        data = resp.json()
+        
+        # Only valid::ingredient should be accepted (wrote=1)
+        # Note: badurl::key might be accepted with productUrl stripped
+        wrote = data.get("wrote", 0)
+        if wrote < 1 or wrote > 2:
+            return log_test(9, "POST sanitization filters invalid entries", False,
+                          f"Expected wrote=1 or 2 (valid entries only), got {wrote}")
+        
+        # Verify the sanitization worked
+        time.sleep(0.5)
+        get_resp = requests.get(f"{BASE_URL}/api/supplements/prices", timeout=10)
+        get_data = get_resp.json()
+        prices = get_data.get("prices", {})
+        
+        # valid::ingredient should be present
+        if "valid::ingredient" not in prices:
+            return log_test(9, "POST sanitization filters invalid entries", False,
+                          "valid::ingredient was rejected (should be accepted)")
+        
+        # Invalid entries should be rejected
+        if "no_delimiter_key" in prices:
+            return log_test(9, "POST sanitization filters invalid entries", False,
+                          "no_delimiter_key was accepted (should be rejected)")
+        
+        if "negative::price" in prices:
+            return log_test(9, "POST sanitization filters invalid entries", False,
+                          "negative::price was accepted (should be rejected)")
+        
+        if "toohigh::price" in prices:
+            return log_test(9, "POST sanitization filters invalid entries", False,
+                          "toohigh::price was accepted (should be rejected)")
+        
+        return log_test(9, "POST sanitization filters invalid entries", True,
+                       f"Sanitization working correctly. wrote={wrote}, only valid entries accepted")
+    
+    except Exception as e:
+        return log_test(9, "POST sanitization filters invalid entries", False, str(e))
+
+def test_10_search_mthfr():
+    """Test 10: GET /api/search?q=MTHFR C677T"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/search",
+                          params={"q": "MTHFR C677T", "limit": 5},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(10, "GET /api/search MTHFR C677T", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        
+        # Check response shape
+        if "total" not in data or "sources" not in data or "results" not in data:
+            return log_test(10, "GET /api/search MTHFR C677T", False,
+                          "Missing required fields: total, sources, or results")
+        
+        # Check total is between 1 and 5
+        total = data.get("total", 0)
+        if total < 1 or total > 5:
+            return log_test(10, "GET /api/search MTHFR C677T", False,
+                          f"Expected total between 1-5, got {total}")
+        
+        # Check sources object has expected keys
+        sources = data.get("sources", {})
+        expected_sources = ["pubmed", "semanticScholar", "openAlex", "crossref", 
+                          "europePMC", "omim", "disgenet", "clinicalTrials"]
+        for src in expected_sources:
+            if src not in sources:
+                return log_test(10, "GET /api/search MTHFR C677T", False,
+                              f"Missing source: {src}")
+        
+        # Check results array
+        results = data.get("results", [])
+        if len(results) == 0:
+            return log_test(10, "GET /api/search MTHFR C677T", False,
+                          "results array is empty")
+        
+        # Check first result has required fields
+        first = results[0]
+        required_fields = ["provider", "source", "title", "journal", "url"]
+        for field in required_fields:
+            if field not in first:
+                return log_test(10, "GET /api/search MTHFR C677T", False,
+                              f"First result missing field: {field}")
+        
+        # Check clinicalTrials array
+        if "clinicalTrials" not in data:
+            return log_test(10, "GET /api/search MTHFR C677T", False,
+                          "Missing clinicalTrials field")
+        
+        clinical_trials = data.get("clinicalTrials", [])
+        
+        return log_test(10, "GET /api/search MTHFR C677T", True,
+                       f"Search working. total={total}, results={len(results)}, clinicalTrials={len(clinical_trials)}")
+    
+    except Exception as e:
+        return log_test(10, "GET /api/search MTHFR C677T", False, str(e))
+
+def test_11_search_zone2_relevance():
+    """Test 11: GET /api/search zone 2 training - relevance filter"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/search",
+                          params={"q": "zone 2 training", "limit": 10},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(11, "GET /api/search zone 2 training relevance", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        results = data.get("results", [])
+        
+        if len(results) == 0:
+            return log_test(11, "GET /api/search zone 2 training relevance", False,
+                          "No results returned")
+        
+        # Check top 5 results for relevance
+        top_results = results[:5]
+        irrelevant_keywords = ["war zone", "work zone safety", "training zone hypermodel"]
+        
+        irrelevant_found = []
+        for i, result in enumerate(top_results):
+            title = result.get("title", "").lower()
+            for keyword in irrelevant_keywords:
+                if keyword in title:
+                    irrelevant_found.append(f"Result {i+1}: '{result.get('title')}'")
+        
+        if irrelevant_found:
+            return log_test(11, "GET /api/search zone 2 training relevance", False,
+                          f"Irrelevant results found: {'; '.join(irrelevant_found)}")
+        
+        return log_test(11, "GET /api/search zone 2 training relevance", True,
+                       f"Relevance filter working. {len(results)} results, top 5 are topic-relevant")
+    
+    except Exception as e:
+        return log_test(11, "GET /api/search zone 2 training relevance", False, str(e))
+
+def test_12_search_creatine():
+    """Test 12: GET /api/search creatine supplementation"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/search",
+                          params={"q": "creatine supplementation", "limit": 5},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(12, "GET /api/search creatine supplementation", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        results = data.get("results", [])
+        
+        if len(results) == 0:
+            return log_test(12, "GET /api/search creatine supplementation", False,
+                          "No results returned")
+        
+        # Check that results are about creatine
+        creatine_count = 0
+        for result in results:
+            title = result.get("title", "").lower()
+            abstract = result.get("abstract", "").lower()
+            if "creatine" in title or "creatine" in abstract:
+                creatine_count += 1
+        
+        if creatine_count == 0:
+            return log_test(12, "GET /api/search creatine supplementation", False,
+                          "No results about creatine found")
+        
+        return log_test(12, "GET /api/search creatine supplementation", True,
+                       f"{creatine_count}/{len(results)} results about creatine")
+    
+    except Exception as e:
+        return log_test(12, "GET /api/search creatine supplementation", False, str(e))
+
+def test_13_search_rapamycin():
+    """Test 13: GET /api/search rapamycin (single-token)"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/search",
+                          params={"q": "rapamycin", "limit": 5},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(13, "GET /api/search rapamycin", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        results = data.get("results", [])
+        
+        if len(results) == 0:
+            return log_test(13, "GET /api/search rapamycin", False,
+                          "No results returned")
+        
+        # Check that results are about rapamycin
+        rapamycin_count = 0
+        for result in results:
+            title = result.get("title", "").lower()
+            abstract = result.get("abstract", "").lower()
+            if "rapamycin" in title or "rapamycin" in abstract:
+                rapamycin_count += 1
+        
+        if rapamycin_count == 0:
+            return log_test(13, "GET /api/search rapamycin", False,
+                          "No results about rapamycin found")
+        
+        return log_test(13, "GET /api/search rapamycin", True,
+                       f"{rapamycin_count}/{len(results)} results about rapamycin")
+    
+    except Exception as e:
+        return log_test(13, "GET /api/search rapamycin", False, str(e))
+
+def test_14_semantic_expand():
+    """Test 14: POST /api/semantic-expand"""
+    try:
+        payload = {"query": "MTHFR"}
+        resp = requests.post(f"{BASE_URL}/api/semantic-expand",
+                           json=payload, timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(14, "POST /api/semantic-expand", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        
+        if "expansions" not in data:
+            return log_test(14, "POST /api/semantic-expand", False,
+                          "Missing expansions field")
+        
+        expansions = data.get("expansions")
+        if not isinstance(expansions, list):
+            return log_test(14, "POST /api/semantic-expand", False,
+                          f"expansions should be array, got {type(expansions)}")
+        
+        # Empty array is acceptable on LLM 429
+        return log_test(14, "POST /api/semantic-expand", True,
+                       f"Endpoint working. expansions={len(expansions)} terms")
+    
+    except Exception as e:
+        return log_test(14, "POST /api/semantic-expand", False, str(e))
+
+def test_15_semantic_rerank():
+    """Test 15: POST /api/semantic-rerank"""
+    try:
+        payload = {
+            "query": "MTHFR",
+            "items": [
+                {"id": "a", "title": "MTHFR gene polymorphism"},
+                {"id": "b", "title": "Unrelated cardiology study"}
+            ]
+        }
+        resp = requests.post(f"{BASE_URL}/api/semantic-rerank",
+                           json=payload, timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(15, "POST /api/semantic-rerank", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        
+        if "order" not in data:
+            return log_test(15, "POST /api/semantic-rerank", False,
+                          "Missing order field")
+        
+        # order can be null or array
+        order = data.get("order")
+        if order is not None and not isinstance(order, list):
+            return log_test(15, "POST /api/semantic-rerank", False,
+                          f"order should be array or null, got {type(order)}")
+        
+        return log_test(15, "POST /api/semantic-rerank", True,
+                       f"Endpoint working. order={order}")
+    
+    except Exception as e:
+        return log_test(15, "POST /api/semantic-rerank", False, str(e))
+
+def test_16_clinical_trials_gene():
+    """Test 16: GET /api/clinical-trials/gene?gene=MTHFR"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/clinical-trials/gene",
+                          params={"gene": "MTHFR"},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(16, "GET /api/clinical-trials/gene MTHFR", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        
+        # Check required fields
+        required_fields = ["gene", "total", "recruiting", "completed", 
+                         "terminated", "other", "active", "top"]
+        for field in required_fields:
+            if field not in data:
+                return log_test(16, "GET /api/clinical-trials/gene MTHFR", False,
+                              f"Missing field: {field}")
+        
+        if data.get("gene") != "MTHFR":
+            return log_test(16, "GET /api/clinical-trials/gene MTHFR", False,
+                          f"Expected gene='MTHFR', got '{data.get('gene')}'")
+        
+        return log_test(16, "GET /api/clinical-trials/gene MTHFR", True,
+                       f"Endpoint working. total={data.get('total')}, recruiting={data.get('recruiting')}")
+    
+    except Exception as e:
+        return log_test(16, "GET /api/clinical-trials/gene MTHFR", False, str(e))
+
+def test_17_pubmed_search():
+    """Test 17: GET /api/pubmed-search?gene=COMT"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/pubmed-search",
+                          params={"gene": "COMT", "limit": 2},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(17, "GET /api/pubmed-search COMT", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        # Just verify it returns 200 - this endpoint is separate and unaffected
+        return log_test(17, "GET /api/pubmed-search COMT", True,
+                       "Endpoint working (separate endpoint, unaffected by refactor)")
+    
+    except Exception as e:
+        return log_test(17, "GET /api/pubmed-search COMT", False, str(e))
+
+def test_18_supplements_dsld_search():
+    """Test 18: GET /api/supplements/dsld/search?q=methylfolate"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/supplements/dsld/search",
+                          params={"q": "methylfolate", "size": 3},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(18, "GET /api/supplements/dsld/search", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        data = resp.json()
+        
+        if "results" not in data:
+            return log_test(18, "GET /api/supplements/dsld/search", False,
+                          "Missing results field")
+        
+        results = data.get("results", [])
+        if len(results) > 3:
+            return log_test(18, "GET /api/supplements/dsld/search", False,
+                          f"Expected max 3 results, got {len(results)}")
+        
+        return log_test(18, "GET /api/supplements/dsld/search", True,
+                       f"Endpoint working. {len(results)} results returned")
+    
+    except Exception as e:
+        return log_test(18, "GET /api/supplements/dsld/search", False, str(e))
+
+def test_19_nutrition_product():
+    """Test 19: GET /api/nutrition/product?barcode=0038000845017"""
+    try:
+        resp = requests.get(f"{BASE_URL}/api/nutrition/product",
+                          params={"barcode": "0038000845017"},
+                          timeout=15)
+        
+        if resp.status_code != 200:
+            return log_test(19, "GET /api/nutrition/product barcode", False,
+                          f"Expected 200, got {resp.status_code}")
+        
+        # Just verify it returns 200 - this endpoint is separate and unaffected
+        return log_test(19, "GET /api/nutrition/product barcode", True,
+                       "Endpoint working (separate endpoint, unaffected by refactor)")
+    
+    except Exception as e:
+        return log_test(19, "GET /api/nutrition/product barcode", False, str(e))
+
+def cleanup_prices():
+    """Cleanup: Reset prices overlay to empty"""
+    try:
+        print("\n\n=== CLEANUP: Resetting prices overlay ===")
+        payload = {"mode": "replace", "prices": {}}
+        headers = {"x-prices-admin-token": PRICES_ADMIN_TOKEN}
+        resp = requests.post(f"{BASE_URL}/api/supplements/prices",
+                           json=payload, headers=headers, timeout=10)
+        
+        if resp.status_code == 200:
+            print("✅ Prices overlay reset successfully")
+        else:
+            print(f"⚠️  Cleanup warning: Failed to reset prices overlay (status {resp.status_code})")
+    except Exception as e:
+        print(f"⚠️  Cleanup warning: {e}")
 
 def main():
-    print("=" * 70)
-    print("BACKEND API TESTS - Supplement Discovery (DSLD Proxy)")
-    print("=" * 70)
+    print("=" * 80)
+    print("SelfScience Backend Testing")
+    print("=" * 80)
     print(f"Base URL: {BASE_URL}")
+    print(f"Started at: {datetime.now().isoformat()}")
+    print("=" * 80)
     
-    # Spread requests over time to respect rate limits
-    tests = [
-        test_search_methylfolate,
-        test_search_magnesium_glycinate,
-        test_search_ubiquinol,
-        test_search_empty_query,
-        test_search_size_clamping,
-        test_search_onmarket_zero,
-        test_search_cache_hit,
-        test_no_marketplace_urls,
-        test_label_detail_methylpro,
-        test_label_detail_not_found,
-        test_label_detail_cache_hit,
-        test_timing_and_json,
-    ]
+    # Test 1: POST /api/supplements/prices feature (Tests 1-9)
+    print("\n\n### FEATURE 1: POST /api/supplements/prices (Admin-token gated)")
+    print("=" * 80)
     
-    results = []
-    for i, test in enumerate(tests):
-        if i > 0:
-            time.sleep(1)  # Spread requests to respect rate limits
-        results.append(test())
+    test_1_get_prices_baseline()
+    test_2_post_no_token()
+    test_3_post_incorrect_token()
+    test_4_post_replace_mode()
+    test_5_get_after_replace()
+    test_6_post_merge_mode()
+    test_7_post_invalid_mode()
+    test_8_post_malformed_json()
+    test_9_post_sanitization()
     
-    print("\n" + "=" * 70)
+    # Test 2: Search adapter refactor (Tests 10-19)
+    print("\n\n### FEATURE 2: Search Adapter Refactor Regression Check")
+    print("=" * 80)
+    
+    test_10_search_mthfr()
+    test_11_search_zone2_relevance()
+    test_12_search_creatine()
+    test_13_search_rapamycin()
+    test_14_semantic_expand()
+    test_15_semantic_rerank()
+    test_16_clinical_trials_gene()
+    test_17_pubmed_search()
+    test_18_supplements_dsld_search()
+    test_19_nutrition_product()
+    
+    # Cleanup
+    cleanup_prices()
+    
+    # Summary
+    print("\n\n" + "=" * 80)
     print("TEST SUMMARY")
-    print("=" * 70)
-    passed = sum(results)
-    total = len(results)
-    print(f"Passed: {passed}/{total}")
+    print("=" * 80)
     
-    if passed == total:
-        print("✅ ALL TESTS PASSED")
-        sys.exit(0)
-    else:
-        print(f"❌ {total - passed} TEST(S) FAILED")
-        sys.exit(1)
+    passed = sum(1 for r in test_results if r["passed"])
+    failed = sum(1 for r in test_results if not r["passed"])
+    total = len(test_results)
+    
+    print(f"\nTotal Tests: {total}")
+    print(f"✅ Passed: {passed}")
+    print(f"❌ Failed: {failed}")
+    print(f"Success Rate: {(passed/total*100):.1f}%")
+    
+    if failed > 0:
+        print("\n\nFailed Tests:")
+        for r in test_results:
+            if not r["passed"]:
+                print(f"  ❌ Test {r['test']}: {r['description']}")
+                if r["details"]:
+                    print(f"     {r['details']}")
+    
+    print("\n" + "=" * 80)
+    print(f"Completed at: {datetime.now().isoformat()}")
+    print("=" * 80)
+    
+    # Exit with appropriate code
+    sys.exit(0 if failed == 0 else 1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

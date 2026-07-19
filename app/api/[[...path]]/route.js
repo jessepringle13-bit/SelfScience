@@ -34,6 +34,7 @@ import {
 import { loadExerciseDB, filterExercises } from '@/lib/training/exerciseDb'
 import { normalizeSearchHit, normalizeLabelDetail } from '@/lib/supplements/dsld'
 import PRICES_JSON from '@/lib/supplements/prices.json'
+import { getMergedPrices, replaceOverlay, mergeOverlay } from '@/lib/supplements/pricesStore'
 import {
   isAdminAuthenticated,
   verifyPassword,
@@ -52,10 +53,23 @@ import {
 } from '@/lib/supabase/admin-articles'
 import { isValidSlug } from '@/lib/slugify'
 import { EDITORIAL_PILLARS } from '@/lib/supabase/pillar-map'
-
-const NCBI_KEY = process.env.PUBMED_API_KEY || process.env.NCBI_API_KEY || ''
-const PUBMED_BASE = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
-const S2_BASE = 'https://api.semanticscholar.org/graph/v1'
+import {
+  fetchWithTimeout,
+  safeJson,
+  safeText,
+  searchPubmed,
+  searchSemanticScholar,
+  searchEuropePMC,
+  searchClinicalTrials,
+  searchOMIM,
+  searchDisGeNET,
+  searchOpenAlex,
+  searchCrossref,
+  llmExpandQuery,
+  llmRerankResults,
+  parseQuery,
+  mergeResults,
+} from '@/lib/search'
 
 /**
  * Response headers that instruct every layer (SW → browser HTTP cache →
@@ -69,544 +83,6 @@ const NO_STORE_HEADERS = {
   Expires: '0',
   'CDN-Cache-Control': 'no-store',
   'Vercel-CDN-Cache-Control': 'no-store',
-}
-
-/* --------------------------------- Utils ---------------------------------- */
-
-const withKey = (url) => (NCBI_KEY ? `${url}&api_key=${NCBI_KEY}` : url)
-
-const safeJson = async (res) => {
-  try {
-    return await res.json()
-  } catch {
-    return null
-  }
-}
-
-const safeText = async (res) => {
-  try {
-    return await res.text()
-  } catch {
-    return ''
-  }
-}
-
-/**
- * fetch() with a hard timeout. Any biomedical API that hasn't returned
- * headers by the timeout is aborted, ensuring the parent /api/search call
- * never runs past the ingress 60s cap because one provider (looking at you,
- * Crossref) decided to hang.
- *
- * Callers should still wrap in try/catch and treat AbortError as "no
- * results" — the existing per-provider handlers already do this.
- */
-async function fetchWithTimeout(url, options = {}, ms = 12_000) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), ms)
-  try {
-    return await fetch(url, { ...options, signal: ctrl.signal })
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-/* Extract PubMed abstracts from efetch XML for a batch of PMIDs.
- * Returns { [pmid]: abstractString } */
-const parsePubmedAbstracts = (xml) => {
-  const out = {}
-  if (!xml) return out
-  // Split per PubmedArticle block
-  const articleBlocks = xml.split(/<PubmedArticle[\s>]/).slice(1)
-  for (const block of articleBlocks) {
-    const pmidMatch = block.match(/<PMID[^>]*>(\d+)<\/PMID>/)
-    if (!pmidMatch) continue
-    const pmid = pmidMatch[1]
-    // Grab all <AbstractText ...>...</AbstractText> pieces (some abstracts are multi-section)
-    const parts = [...block.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g)].map((m) =>
-      m[1]
-        .replace(/<[^>]+>/g, '') // strip inner tags
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&apos;/g, "'")
-        .trim()
-    )
-    out[pmid] = parts.join(' ').trim()
-  }
-  return out
-}
-
-const yearFromPubdate = (pubdate) => {
-  if (!pubdate) return null
-  const m = String(pubdate).match(/(19|20)\d{2}/)
-  return m ? parseInt(m[0], 10) : null
-}
-
-const detectPreprint = (paper) => {
-  const journalName = paper?.journal?.name || paper?.venue || ''
-  const types = paper?.publicationTypes || []
-  const isPreprintVenue = /biorxiv|medrxiv|arxiv|chemrxiv|ssrn|preprints\.org/i.test(journalName)
-  const isPreprintType = types.some((t) => /preprint/i.test(t))
-  return isPreprintVenue || isPreprintType
-}
-
-/* ------------------------------ PubMed search ----------------------------- */
-
-async function searchPubmed(query, limit = 100) {
-  try {
-    const esearchUrl = withKey(
-      `${PUBMED_BASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(
-        query
-      )}&retmax=${limit}&retmode=json&sort=relevance`
-    )
-    const esearchRes = await fetchWithTimeout(esearchUrl, { cache: 'no-store' }, 10_000)
-    if (!esearchRes.ok) throw new Error(`PubMed esearch ${esearchRes.status}`)
-    const esearch = await safeJson(esearchRes)
-    const ids = esearch?.esearchresult?.idlist || []
-    if (!ids.length) return []
-
-    // Fetch summaries + abstracts in parallel
-    const idsJoined = ids.join(',')
-    const [sumRes, absRes] = await Promise.all([
-      fetchWithTimeout(
-        withKey(`${PUBMED_BASE}/esummary.fcgi?db=pubmed&id=${idsJoined}&retmode=json`),
-        { cache: 'no-store' },
-        10_000
-      ),
-      fetchWithTimeout(
-        withKey(
-          `${PUBMED_BASE}/efetch.fcgi?db=pubmed&id=${idsJoined}&rettype=abstract&retmode=xml`
-        ),
-        { cache: 'no-store' },
-        10_000
-      ),
-    ])
-
-    const summary = await safeJson(sumRes)
-    const abstractsXml = await safeText(absRes)
-    const abstractsMap = parsePubmedAbstracts(abstractsXml)
-
-    const results = []
-    for (const pmid of ids) {
-      const rec = summary?.result?.[pmid]
-      if (!rec) continue
-      const authors = (rec.authors || []).map((a) => a.name).filter(Boolean)
-      const doi =
-        (rec.articleids || []).find((x) => x.idtype === 'doi')?.value || null
-      results.push({
-        id: `pubmed:${pmid}`,
-        provider: 'PubMed',
-        source: 'peer-reviewed',
-        title: rec.title?.replace(/\.$/, '') || '(untitled)',
-        journal: rec.fulljournalname || rec.source || '',
-        year: yearFromPubdate(rec.pubdate || rec.epubdate),
-        authors,
-        authorsShort: authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
-        abstract: abstractsMap[pmid] || '',
-        doi,
-        url: doi
-          ? `https://doi.org/${doi}`
-          : `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
-        pmid,
-        // AI-populated later
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-      })
-    }
-    return results
-  } catch (err) {
-    console.error('PubMed error:', err)
-    return []
-  }
-}
-
-/* -------------------------- Semantic Scholar search ----------------------- */
-
-async function searchSemanticScholar(query, limit = 100) {
-  try {
-    const fields = [
-      'title',
-      'abstract',
-      'authors',
-      'year',
-      'journal',
-      'venue',
-      'openAccessPdf',
-      'publicationTypes',
-      'externalIds',
-      'url',
-      'citationCount',
-    ].join(',')
-    const url = `${S2_BASE}/paper/search?query=${encodeURIComponent(
-      query
-    )}&limit=${limit}&fields=${fields}`
-    const res = await fetchWithTimeout(url, {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-    }, 12_000)
-    if (!res.ok) {
-      // S2 often 429s; return empty rather than fail whole search
-      console.warn('Semantic Scholar returned', res.status)
-      return []
-    }
-    const data = await safeJson(res)
-    const papers = data?.data || []
-
-    return papers.map((p) => {
-      const authors = (p.authors || []).map((a) => a.name).filter(Boolean)
-      const preprint = detectPreprint(p)
-      const journal = p.journal?.name || p.venue || (preprint ? 'Preprint' : '')
-      const doi = p.externalIds?.DOI || null
-      const paperId = p.paperId || p.externalIds?.CorpusId || ''
-      const link =
-        p.openAccessPdf?.url ||
-        p.url ||
-        (doi ? `https://doi.org/${doi}` : `https://www.semanticscholar.org/paper/${paperId}`)
-      return {
-        id: `s2:${paperId}`,
-        provider: 'Semantic Scholar',
-        source: preprint ? 'preprint' : 'peer-reviewed',
-        title: p.title || '(untitled)',
-        journal,
-        year: p.year || null,
-        authors,
-        authorsShort:
-          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
-        abstract: p.abstract || '',
-        doi,
-        url: link,
-        pmid: p.externalIds?.PubMed || null,
-        citationCount: p.citationCount ?? null,
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-      }
-    })
-  } catch (err) {
-    console.error('Semantic Scholar error:', err)
-    return []
-  }
-}
-
-/* ------------------------------ Europe PMC ------------------------------- */
-
-/**
- * Europe PMC free-text search. No API key required. Covers PubMed +
- * additional biomedical literature (preprints, agricola, patents) that
- * PubMed alone misses. Response schema documented at
- * https://europepmc.org/RestfulWebService.
- */
-async function searchEuropePMC(query, limit = 40) {
-  try {
-    const url =
-      `https://www.ebi.ac.uk/europepmc/webservices/rest/search` +
-      `?query=${encodeURIComponent(query)}` +
-      `&format=json&pageSize=${Math.min(limit, 100)}` +
-      `&resultType=core`
-    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 12_000)
-    if (!res.ok) {
-      console.warn('Europe PMC returned', res.status)
-      return []
-    }
-    const data = await safeJson(res)
-    const rows = data?.resultList?.result || []
-    return rows.map((r) => {
-      const authors = (r.authorList?.author || []).map((a) => a.fullName || a.lastName).filter(Boolean)
-      const doi = r.doi || null
-      const isPreprint = r.source === 'PPR' || /preprint|biorxiv|medrxiv|arxiv/i.test(r.journalTitle || '')
-      // Prefer full-text HTML URL when marked as open access.
-      const oaUrl = r.hasPDF === 'Y' && r.pmcid
-        ? `https://europepmc.org/article/PMC/${r.pmcid}`
-        : null
-      // Stable-ish id: EuPMC uses combined `source:id`. Fall back to PMID / DOI.
-      const rawId = r.pmid ? `pubmed:${r.pmid}` : r.doi ? `doi:${r.doi}` : `eupmc:${r.id}`
-      return {
-        id: rawId,
-        provider: 'Europe PMC',
-        source: isPreprint ? 'preprint' : 'peer-reviewed',
-        title: (r.title || '(untitled)').replace(/\.$/, ''),
-        journal: r.journalTitle || (isPreprint ? 'Preprint' : ''),
-        year: parseInt(r.pubYear, 10) || null,
-        authors,
-        authorsShort:
-          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
-        abstract: r.abstractText || '',
-        doi,
-        url: doi ? `https://doi.org/${doi}` : (r.pmid ? `https://europepmc.org/article/MED/${r.pmid}` : `https://europepmc.org/article/${r.source}/${r.id}`),
-        pmid: r.pmid || null,
-        citationCount: r.citedByCount ?? null,
-        oaUrl,
-        oaStatus: r.isOpenAccess === 'Y' ? 'gold' : null,
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-      }
-    })
-  } catch (err) {
-    console.error('Europe PMC error:', err)
-    return []
-  }
-}
-
-/* --------------------------- ClinicalTrials.gov -------------------------- */
-
-/**
- * Free public API v2. Returns active + completed trials matching a gene
- * or condition. Rendered as a distinct "Active Trials" strip above the
- * PubMed literature results, so users see trials happening RIGHT NOW.
- * Docs: https://clinicaltrials.gov/data-api/api
- */
-async function searchClinicalTrials(query, limit = 20) {
-  try {
-    const url =
-      `https://clinicaltrials.gov/api/v2/studies` +
-      `?query.term=${encodeURIComponent(query)}` +
-      `&pageSize=${Math.min(limit, 50)}` +
-      `&fields=protocolSection.identificationModule,protocolSection.statusModule,protocolSection.designModule,protocolSection.sponsorCollaboratorsModule,protocolSection.descriptionModule,protocolSection.conditionsModule,protocolSection.armsInterventionsModule`
-    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 12_000)
-    if (!res.ok) {
-      console.warn('ClinicalTrials.gov returned', res.status)
-      return []
-    }
-    const data = await safeJson(res)
-    const rows = data?.studies || []
-    return rows.map((s) => {
-      const p = s?.protocolSection || {}
-      const nctId = p.identificationModule?.nctId || ''
-      const title = p.identificationModule?.briefTitle || p.identificationModule?.officialTitle || 'Clinical Trial'
-      const status = p.statusModule?.overallStatus || ''
-      const phase = (p.designModule?.phases || []).join(', ') || null
-      const sponsor = p.sponsorCollaboratorsModule?.leadSponsor?.name || ''
-      const summary = p.descriptionModule?.briefSummary || ''
-      const conditions = p.conditionsModule?.conditions || []
-      const interventions = (p.armsInterventionsModule?.interventions || [])
-        .map((i) => i.name).filter(Boolean)
-      const startDate = p.statusModule?.startDateStruct?.date || null
-      const year = startDate ? parseInt(String(startDate).slice(0, 4), 10) : null
-      return {
-        id: `nct:${nctId}`,
-        provider: 'ClinicalTrials.gov',
-        source: 'clinical-trial',
-        title,
-        journal: sponsor || 'Clinical Trial',
-        year,
-        authors: [sponsor].filter(Boolean),
-        authorsShort: sponsor,
-        abstract: summary,
-        doi: null,
-        url: nctId ? `https://clinicaltrials.gov/study/${nctId}` : 'https://clinicaltrials.gov',
-        pmid: null,
-        nctId,
-        status,
-        phase,
-        conditions,
-        interventions,
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-      }
-    })
-  } catch (err) {
-    console.error('ClinicalTrials.gov error:', err)
-    return []
-  }
-}
-
-/* -------------------------- OMIM + DisGeNET (gene registries) ------------- */
-
-// Both are gene-centric registries. They provide *disease associations* for a
-// gene rather than free-text literature. We surface them as informational
-// records in the merged pool so the user can jump straight to authoritative
-// gene-disease context without leaving Search. Rendered like a study card
-// with a distinct `omim` / `disgenet` source so downstream filters treat
-// them separately.
-//
-// OMIM key: set OMIM_API_KEY in env (https://omim.org/api). Missing key ->
-//   returns [] silently so the pipeline never blocks.
-// DisGeNET key: set DISGENET_API_KEY in env
-//   (https://www.disgenet.org/api). Missing key -> returns [] silently.
-
-async function searchOMIM(gene) {
-  const key = process.env.OMIM_API_KEY
-  if (!key || !gene) return []
-  try {
-    const url =
-      `https://api.omim.org/api/entry/search` +
-      `?search=approved_gene_symbol:${encodeURIComponent(gene)}` +
-      `&limit=8&format=json&apiKey=${encodeURIComponent(key)}`
-    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 10_000)
-    if (!res.ok) return []
-    const data = await safeJson(res)
-    const rows = data?.omim?.searchResponse?.entryList || []
-    return rows.map((r) => {
-      const e = r?.entry || {}
-      const mimNumber = e.mimNumber || ''
-      const title = (e.titles?.preferredTitle || `OMIM ${mimNumber}`).replace(/\.$/, '')
-      return {
-        id: `omim:${mimNumber}`,
-        provider: 'OMIM',
-        source: 'omim',
-        title: `${gene}: ${title}`,
-        journal: 'Online Mendelian Inheritance in Man',
-        year: null,
-        authors: [],
-        authorsShort: '',
-        abstract: e.textSection?.[0]?.textSectionContent || '',
-        doi: null,
-        url: `https://www.omim.org/entry/${mimNumber}`,
-        pmid: null,
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-        _matchedGenes: [gene.toUpperCase()],
-      }
-    })
-  } catch (err) {
-    console.error('OMIM error:', err?.message)
-    return []
-  }
-}
-
-async function searchDisGeNET(gene) {
-  const key = process.env.DISGENET_API_KEY
-  if (!key || !gene) return []
-  try {
-    const url =
-      `https://www.disgenet.org/api/gda/gene/symbol/${encodeURIComponent(gene)}` +
-      `?limit=15&format=json`
-    const res = await fetchWithTimeout(url, {
-      cache: 'no-store',
-      headers: { Authorization: `Bearer ${key}` },
-    }, 10_000)
-    if (!res.ok) return []
-    const rows = (await safeJson(res)) || []
-    return rows.slice(0, 12).map((r) => ({
-      id: `disgenet:${r.diseaseid}-${gene}`,
-      provider: 'DisGeNET',
-      source: 'disgenet',
-      title: `${gene}: ${r.disease_name || 'Disease association'}`,
-      journal: 'DisGeNET (gene-disease evidence score)',
-      year: r.year_finalist || null,
-      authors: [],
-      authorsShort: '',
-      abstract: `${r.disease_name || ''}. Evidence score: ${r.score || 'n/a'} (out of 1.0). Reported in ${r.nof_pmids || 0} PubMed article(s), ${r.nof_snps || 0} SNP-level record(s).`,
-      doi: null,
-      url: `https://www.disgenet.org/browser/1/1/0/${gene}`,
-      pmid: null,
-      reliability: null,
-      reliabilityLabel: null,
-      reliabilityNote: null,
-      plain: null,
-      flags: [],
-      _matchedGenes: [gene.toUpperCase()],
-      _disgenetScore: r.score,
-    }))
-  } catch (err) {
-    console.error('DisGeNET error:', err?.message)
-    return []
-  }
-}
-
-/* ---------------------- Semantic query expansion (LLM) ------------------- */
-
-/**
- * Ask the LLM for 3-5 semantically related biomedical terms for the query.
- * Cached per-query on the CLIENT (localStorage) — this endpoint does no
- * server-side caching. Returns the expansions as a plain array of strings.
- * Bails to [] on any error so search never blocks.
- */
-async function llmExpandQuery(query) {
-  try {
-    const prompt =
-      `Expand this biomedical search query into 3-5 additional semantically related search terms. ` +
-      `Focus on synonyms, related pathways, and clinically-linked concepts a research literature search would use. ` +
-      `Return ONLY a JSON array of strings, no prose, no markdown, no wrapping object. ` +
-      `Example: query="energy" -> ["ATP production","mitochondrial function","cellular respiration","fatigue","aerobic metabolism"]. ` +
-      `Query: "${query}"`
-    const result = await expandSemantic(prompt)
-    if (!result?.text) return []
-    let s = String(result.text).trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
-    let arr = null
-    try {
-      const j = JSON.parse(s)
-      if (Array.isArray(j)) {
-        arr = j
-      } else if (j && typeof j === 'object') {
-        // Model wrapped it — grab the first array-valued property.
-        for (const v of Object.values(j)) {
-          if (Array.isArray(v)) { arr = v; break }
-        }
-      }
-    } catch { /* leave arr null */ }
-    if (!Array.isArray(arr)) return []
-    return arr
-      .filter((x) => typeof x === 'string' && x.length && x.length < 80)
-      .slice(0, 5)
-  } catch (err) {
-    console.warn('[semantic-expand] failed:', err?.message)
-    return []
-  }
-}
-
-async function llmRerankResults(query, items) {
-  try {
-    if (!Array.isArray(items) || items.length < 2) return null
-    // Limit to 40 to keep the prompt small.
-    const truncated = items.slice(0, 40)
-    const lines = truncated.map((it, i) => {
-      const t = String(it.title || '').slice(0, 200)
-      const j = it.journal ? ` [${String(it.journal).slice(0, 60)}]` : ''
-      const y = it.year ? ` (${it.year})` : ''
-      return `${i + 1}. ${t}${j}${y}`
-    }).join('\n')
-    const prompt =
-      `Given the query "${query}", rank the following ${truncated.length} papers from most to least semantically relevant. ` +
-      `Consider: exact topic match, methodology fit, and clinical/mechanistic relevance. ` +
-      `Return ONLY a JSON array of integers (1-indexed) matching the input line numbers, in ranked order. Example: [3,1,7,2,4,...]. No prose. No markdown. No wrapping object.\n\n${lines}`
-    const result = await rerankSemantic(prompt)
-    if (!result?.text) return null
-    let s = String(result.text).trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
-    let arr = null
-    try {
-      const j = JSON.parse(s)
-      if (Array.isArray(j)) {
-        arr = j
-      } else if (j && typeof j === 'object') {
-        for (const v of Object.values(j)) {
-          if (Array.isArray(v)) { arr = v; break }
-        }
-      }
-    } catch { /* leave arr null */ }
-    if (!Array.isArray(arr)) return null
-    const seen = new Set()
-    const ordered = []
-    for (const n of arr) {
-      const idx = parseInt(n, 10) - 1
-      if (Number.isInteger(idx) && idx >= 0 && idx < truncated.length && !seen.has(idx)) {
-        seen.add(idx)
-        ordered.push(truncated[idx].id)
-      }
-    }
-    for (let i = 0; i < truncated.length; i++) {
-      if (!seen.has(i)) ordered.push(truncated[i].id)
-    }
-    return ordered
-  } catch (err) {
-    console.warn('[semantic-rerank] failed:', err?.message)
-    return null
-  }
 }
 
 async function handleSemanticExpand(request) {
@@ -624,311 +100,6 @@ async function handleSemanticRerank(request) {
   if (!q || !items.length) return NextResponse.json({ order: null }, { headers: NO_STORE_HEADERS })
   const order = await llmRerankResults(q, items)
   return NextResponse.json({ order }, { headers: NO_STORE_HEADERS })
-}
-
-/* ------------------------------ OpenAlex ---------------------------------- */
-
-/**
- * OpenAlex uses an inverted index for abstracts.
- * Reconstruct the plain text from { word: [positions...] }.
- */
-function reconstructOpenAlexAbstract(inv) {
-  if (!inv || typeof inv !== 'object') return ''
-  const positions = []
-  for (const [word, poss] of Object.entries(inv)) {
-    for (const p of poss || []) positions[p] = word
-  }
-  return positions.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
-}
-
-const OPENALEX_MAILTO = process.env.CONTACT_EMAIL || 'contact@selfscience.io'
-
-async function searchOpenAlex(query, limit = 10) {
-  try {
-    const url =
-      `https://api.openalex.org/works?search=${encodeURIComponent(query)}` +
-      `&per-page=${limit}&mailto=${encodeURIComponent(OPENALEX_MAILTO)}` +
-      `&filter=is_paratext:false,type:article|preprint|review|book-chapter|dataset` +
-      `&select=id,doi,title,publication_year,authorships,primary_location,type,abstract_inverted_index,open_access,cited_by_count`
-    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 12_000)
-    if (!res.ok) {
-      console.warn('OpenAlex returned', res.status)
-      return []
-    }
-    const data = await safeJson(res)
-    const works = data?.results || []
-    return works.map((w) => {
-      const doi = w.doi ? String(w.doi).replace(/^https?:\/\/doi\.org\//i, '') : null
-      const authors = (w.authorships || []).map((a) => a.author?.display_name).filter(Boolean)
-      const journal = w.primary_location?.source?.display_name || ''
-      const isPreprint = /preprint/i.test(w.type || '') || /biorxiv|medrxiv|arxiv|ssrn/i.test(journal)
-      const openAccess = w.open_access || {}
-      const oaUrl = openAccess.oa_url || null
-      return {
-        id: `oa:${(w.id || '').split('/').pop()}`,
-        provider: 'OpenAlex',
-        source: isPreprint ? 'preprint' : 'peer-reviewed',
-        title: w.title || '(untitled)',
-        journal,
-        year: w.publication_year || null,
-        authors,
-        authorsShort:
-          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
-        abstract: reconstructOpenAlexAbstract(w.abstract_inverted_index),
-        doi,
-        url: doi ? `https://doi.org/${doi}` : w.id,
-        pmid: null,
-        citationCount: w.cited_by_count ?? null,
-        oaUrl,
-        oaStatus: openAccess.oa_status || null,
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-      }
-    })
-  } catch (err) {
-    console.error('OpenAlex error:', err)
-    return []
-  }
-}
-
-/* ------------------------------ Crossref ---------------------------------- */
-
-function stripJats(str) {
-  if (!str) return ''
-  return String(str)
-    .replace(/<jats:[^>]+>/gi, '')
-    .replace(/<\/jats:[^>]+>/gi, '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-async function searchCrossref(query, limit = 10) {
-  try {
-    const url =
-      `https://api.crossref.org/works?query=${encodeURIComponent(query)}` +
-      `&rows=${limit}` +
-      `&mailto=${encodeURIComponent(OPENALEX_MAILTO)}`
-    const res = await fetchWithTimeout(url, {
-      cache: 'no-store',
-      headers: { 'User-Agent': `SelfScience/0.4 (mailto:${OPENALEX_MAILTO})` },
-    }, 12_000)
-    if (!res.ok) {
-      console.warn('Crossref returned', res.status)
-      return []
-    }
-    const data = await safeJson(res)
-    const items = data?.message?.items || []
-    return items.map((it) => {
-      const doi = it.DOI || null
-      const authors = (it.author || [])
-        .map((a) => [a.given, a.family].filter(Boolean).join(' '))
-        .filter(Boolean)
-      const journal = (it['container-title'] || [])[0] || ''
-      const year =
-        it.published?.['date-parts']?.[0]?.[0] ||
-        it['published-online']?.['date-parts']?.[0]?.[0] ||
-        it['published-print']?.['date-parts']?.[0]?.[0] ||
-        null
-      const isPreprint = it.subtype === 'preprint' || /preprint/i.test(it.type || '')
-      return {
-        id: `crossref:${(doi || it.title?.[0] || '').slice(0, 60)}`,
-        provider: 'Crossref',
-        source: isPreprint ? 'preprint' : 'peer-reviewed',
-        title: (it.title || [])[0] || '(untitled)',
-        journal,
-        year,
-        authors,
-        authorsShort:
-          authors.slice(0, 3).join(', ') + (authors.length > 3 ? ', et al.' : ''),
-        abstract: stripJats(it.abstract),
-        doi,
-        url: doi ? `https://doi.org/${doi}` : null,
-        pmid: null,
-        citationCount: null,
-        oaUrl: null,
-        reliability: null,
-        reliabilityLabel: null,
-        reliabilityNote: null,
-        plain: null,
-        flags: [],
-      }
-    })
-  } catch (err) {
-    console.error('Crossref error:', err)
-    return []
-  }
-}
-
-/* ---------------------------- Merge + dedupe ------------------------------ */
-
-const normalizeTitle = (t) =>
-  (t || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-// Provider priority when the same paper is found in multiple sources.
-// Later sources fill in missing fields (e.g., abstract, oaUrl, citationCount).
-const PROVIDER_RANK = { PubMed: 0, 'Semantic Scholar': 1, OpenAlex: 2, Crossref: 3 }
-
-/* -------------------------- Relevance filtering --------------------------- */
-
-// Common English stopwords + a few generic academic filler words we don't want
-// to inflate token overlap scores.
-const STOPWORDS = new Set([
-  'a', 'an', 'the', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or', 'but',
-  'is', 'are', 'was', 'were', 'be', 'as', 'by', 'with', 'from', 'that', 'this',
-  'these', 'those', 'it', 'its', 'we', 'our', 'their', 'not', 'no', 'do', 'does',
-  'has', 'have', 'had', 'can', 'may', 'might', 'will', 'shall', 'study',
-  'research', 'paper', 'article',
-])
-
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-/**
- * Turn a raw user query into { tokens, phrases, fullPhrase } where:
- *  - tokens = significant lowercase words (stopwords removed, min 2 chars OR digit)
- *  - phrases = the full query (if 2+ tokens) plus every adjacent bigram
- *  - fullPhrase = the full lowercased query string for exact-phrase matching
- */
-function parseQuery(q) {
-  const clean = (q || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim()
-  if (!clean) return { tokens: [], phrases: [], fullPhrase: '' }
-  const raw = clean.split(' ')
-  const tokens = raw.filter((w) => w && !STOPWORDS.has(w) && (w.length >= 2 || /^\d+$/.test(w)))
-  const phrases = new Set()
-  if (tokens.length >= 2) {
-    phrases.add(clean)
-    for (let i = 0; i < raw.length - 1; i++) {
-      if (STOPWORDS.has(raw[i]) || STOPWORDS.has(raw[i + 1])) continue
-      const bigram = `${raw[i]} ${raw[i + 1]}`
-      if (bigram.trim().length >= 3) phrases.add(bigram)
-    }
-  }
-  return { tokens, phrases: [...phrases], fullPhrase: clean }
-}
-
-/**
- * Score a result against a parsed query. Higher score = more relevant.
- * Also returns a `keep` flag that decides whether to include the result at all.
- */
-function scoreRelevance(item, parsed) {
-  const { tokens, phrases, fullPhrase } = parsed
-  const title = (item.title || '').toLowerCase()
-  const abstract = (item.abstract || '').toLowerCase()
-  const journal = (item.journal || '').toLowerCase()
-
-  let score = 0
-
-  // Full-query phrase — strongest signal
-  if (fullPhrase && title.includes(fullPhrase)) score += 20
-  else if (fullPhrase && abstract.includes(fullPhrase)) score += 12
-
-  // Bigram / phrase matches
-  let phraseHitsTitle = 0
-  let phraseHitsAbstract = 0
-  for (const p of phrases) {
-    if (p === fullPhrase) continue // already counted
-    if (title.includes(p)) { score += 6; phraseHitsTitle++ }
-    else if (abstract.includes(p)) { score += 3; phraseHitsAbstract++ }
-  }
-
-  // Individual token (whole-word) matches
-  let titleTokenHits = 0
-  let absTokenHits = 0
-  for (const t of tokens) {
-    const re = new RegExp(`\\b${escapeRegex(t)}\\b`, 'i')
-    if (re.test(title)) { score += 2; titleTokenHits++ }
-    else if (re.test(abstract)) { score += 1; absTokenHits++ }
-    else if (re.test(journal)) score += 0.5
-  }
-
-  // ---- Keep / drop decision ----
-  // Filter out results that lack meaningful match to the query.
-  // For "zone 2 training", this must drop "Work Zone Safety Gamification" (only
-  // 2 of 3 tokens, no phrase) while keeping "Zone 2 aerobic exercise" (phrase match).
-  let keep
-  if (tokens.length === 0) {
-    keep = true
-  } else if (tokens.length === 1) {
-    // Single-token query — trust source API but require ≥1 hit somewhere.
-    keep = titleTokenHits + absTokenHits > 0
-  } else {
-    const hasFullPhrase =
-      fullPhrase && (title.includes(fullPhrase) || abstract.includes(fullPhrase))
-    const hasStrongBigram = phraseHitsTitle > 0
-    const allTokensInTitle = titleTokenHits === tokens.length
-    // Every query token appears SOMEWHERE (title+abstract) AND at least 2 of them
-    // are in the title. This lets legitimate variations through (e.g. "rapamycin
-    // and mTOR pathway in cancer" for query "rapamycin mTOR inhibition") but
-    // drops results where the query looks like an accidental keyword overlap.
-    const goodCoverage =
-      (titleTokenHits + absTokenHits) === tokens.length &&
-      titleTokenHits >= Math.min(2, tokens.length - 1)
-    keep = hasFullPhrase || hasStrongBigram || allTokensInTitle || goodCoverage
-  }
-
-  return { score, keep }
-}
-
-function mergeResults(arrays, parsedQuery) {
-  const seen = new Map()
-  const all = []
-  for (const arr of arrays) for (const it of arr) all.push(it)
-
-  // Sort so higher-priority providers land first and become the "base" record
-  all.sort((a, b) => (PROVIDER_RANK[a.provider] ?? 9) - (PROVIDER_RANK[b.provider] ?? 9))
-
-  for (const item of all) {
-    const key = item.doi
-      ? `doi:${item.doi.toLowerCase()}`
-      : `title:${normalizeTitle(item.title)}`
-    if (!key || key === 'title:') continue
-    if (!seen.has(key)) {
-      seen.set(key, { ...item, providers: [item.provider] })
-    } else {
-      const existing = seen.get(key)
-      if (!existing.providers.includes(item.provider)) existing.providers.push(item.provider)
-      // Fill in missing fields from lower-priority sources
-      if (!existing.abstract && item.abstract) existing.abstract = item.abstract
-      if (!existing.oaUrl && item.oaUrl) existing.oaUrl = item.oaUrl
-      if (!existing.oaStatus && item.oaStatus) existing.oaStatus = item.oaStatus
-      if (!existing.citationCount && item.citationCount)
-        existing.citationCount = item.citationCount
-      if (!existing.journal && item.journal) existing.journal = item.journal
-      if (!existing.doi && item.doi) existing.doi = item.doi
-      if (!existing.pmid && item.pmid) existing.pmid = item.pmid
-    }
-  }
-
-  let list = [...seen.values()]
-
-  // Score + filter for relevance if the caller passed a parsed query.
-  if (parsedQuery && parsedQuery.tokens.length > 0) {
-    list = list
-      .map((it) => {
-        const r = scoreRelevance(it, parsedQuery)
-        return { ...it, _relevance: r.score, _keep: r.keep }
-      })
-      .filter((it) => it._keep)
-      // Primary sort: relevance desc; tiebreak: newer year first
-      .sort((a, b) => (b._relevance - a._relevance) || ((b.year || 0) - (a.year || 0)))
-      // Strip internal helper fields before returning to the client
-      .map(({ _keep, ...rest }) => rest)
-  } else {
-    list.sort((a, b) => (b.year || 0) - (a.year || 0))
-  }
-
-  return list
 }
 
 /* ------------------------------ /api/search ------------------------------- */
@@ -1166,12 +337,61 @@ async function handleSupplementsDsldSearch(request) {
 }
 
 async function handleSupplementsPrices(request) {
-  // Serve the cached prices JSON to the client. Read-only from the browser;
-  // scraper script writes directly to the file.
+  // Serve the cached prices JSON to the client. Merges bundled JSON with
+  // any MongoDB overlay written by the scraper via POST /api/supplements/prices.
+  // Falls back to bundled-only if Mongo is unreachable so a DB outage never
+  // breaks supplement browsing.
+  try {
+    const merged = await getMergedPrices()
+    return NextResponse.json(merged)
+  } catch (err) {
+    return NextResponse.json({
+      meta: PRICES_JSON?._meta || {},
+      prices: PRICES_JSON?.prices || {},
+      count: Object.keys(PRICES_JSON?.prices || {}).length,
+      _error: String(err?.message || err),
+    })
+  }
+}
+
+async function handleSupplementsPricesWrite(request) {
+  // Admin-token gated: production price scraper POSTs fresh prices here so
+  // it doesn't need to write the bundled prices.json (filesystem may be
+  // read-only). Token comes from the PRICES_ADMIN_TOKEN env var and is
+  // supplied in the x-prices-admin-token header.
+  const expected = process.env.PRICES_ADMIN_TOKEN || ''
+  if (!expected) {
+    return NextResponse.json(
+      { error: 'PRICES_ADMIN_TOKEN not configured on server' },
+      { status: 503 },
+    )
+  }
+  const supplied = request.headers.get('x-prices-admin-token') || ''
+  if (!supplied || supplied !== expected) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const mode = (body?.mode || 'replace').toLowerCase()
+  if (mode !== 'replace' && mode !== 'merge') {
+    return NextResponse.json({ error: 'mode must be "replace" or "merge"' }, { status: 400 })
+  }
+
+  const result = mode === 'merge' ? await mergeOverlay(body) : await replaceOverlay(body)
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error || 'Write failed' }, { status: 500 })
+  }
   return NextResponse.json({
-    meta: PRICES_JSON?._meta || {},
-    prices: PRICES_JSON?.prices || {},
-    count: Object.keys(PRICES_JSON?.prices || {}).length,
+    ok: true,
+    mode,
+    wrote: result.wrote,
+    updatedAt: result.updatedAt,
   })
 }
 
@@ -1719,6 +939,12 @@ export async function POST(request, { params }) {
   // Backward-compat aliases so existing clients keep working during migration
   if (route === 'analyze') return handleScoreReliability(request)
   if (route === 'genome') return handleInterpretGenome(request)
+
+  // Supplement price scraper — admin-token gated write. See
+  // /app/lib/supplements/pricesStore.js for the storage layer.
+  if (route === 'supplements' && subRoute === 'prices') {
+    return handleSupplementsPricesWrite(request)
+  }
 
   // Admin endpoints
   if (route === 'admin' && subRoute === 'login')  return handleAdminLogin(request)

@@ -108,7 +108,295 @@ user_problem_statement: |
   APIs and render results in the Section E result-card format. No AI scoring yet.
 
 backend:
-  - task: "GET /api/supplements/dsld/search — NIH DSLD proxy (Supplement Protocol Intelligence Phase 1)"
+  - task: "POST /api/supplements/prices — admin-token gated overlay writes (MongoDB-backed)"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js, /app/lib/supplements/pricesStore.js, /app/lib/mongo.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            New endpoint so the production supplement price scraper can push
+            fresh prices without needing to write the bundled prices.json
+            (filesystem is read-only in production).
+
+            Storage: MongoDB collection `supplement_prices`, single document
+            _id='overlay' with { prices, meta, updatedAt }. Reads/writes are
+            wrapped in try/catch so a Mongo outage falls back to the bundled
+            JSON only \u2014 the app never 500s because Mongo is down.
+
+            Auth: PRICES_ADMIN_TOKEN env var (added to /app/.env). Scraper
+            supplies the token in the `x-prices-admin-token` header. Missing
+            env var -> 503. Bad token -> 401.
+
+            POST body:
+              { "mode": "replace" | "merge",
+                "source": "string",       // free-form provenance tag
+                "notes":  "string",
+                "prices": {
+                  "<brand>::<ingredient>": {
+                    "perServing": number,
+                    "currency": "USD",
+                    "updated": "YYYY-MM",
+                    "source": "scraped"|"curated",
+                    "productUrl": "https://..."
+                  }, ...
+                }
+              }
+
+            Sanitisation guardrails:
+              * perServing must be numeric and in [0, 100]
+              * currency clamped to 8 chars uppercase (defaults USD)
+              * updated must match YYYY-MM (auto-defaults to current month)
+              * productUrl must be http(s) < 512 chars
+              * Keys must contain '::' and be 3\u2013200 chars
+
+            GET behaviour changed: /api/supplements/prices now returns the
+            MERGED payload (bundled JSON < Mongo overlay). Meta includes
+            `source: 'bundled+overlay'` when an overlay exists.
+
+            Manual verification (all 6 curl cases passed):
+              1) GET (baseline)            -> 200, meta.source='bundled'
+              2) POST no token             -> 401 Unauthorized
+              3) POST replace with token   -> 200 { ok, mode:'replace', wrote:2 }
+              4) GET after POST            -> 200, thorne::creatine now $0.62
+                 (was $0.55 bundled), overlayCount=2, source='bundled+overlay'
+              5) POST merge                -> 200 { ok, mode:'merge', wrote:1 }
+              6) POST invalid mode         -> 400 "mode must be replace or merge"
+
+            Please verify (needs_retesting=true):
+              a) GET /api/supplements/prices returns proper merged JSON shape
+              b) POST rejects missing / invalid token with 401
+              c) POST replace mode fully replaces prices (previous keys removed)
+              d) POST merge mode leaves other keys intact
+              e) Sanitisation drops bad entries silently (bad perServing,
+                 keys without '::', over-length URLs)
+              f) 60s in-process cache doesn't leak stale data after a POST
+                 (POST invalidates the cache; next GET should reflect changes)
+              g) Mongo outage graceful fallback (skip if you can't easily
+                 stop Mongo \u2014 low priority)
+        -working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE BACKEND TESTING COMPLETED (9/9 scenarios passed):
+            
+            Test 1: GET /api/supplements/prices baseline → 200
+              - Response has correct shape: meta, prices, count fields present
+              - meta.source = 'bundled+overlay' (overlay exists from previous test)
+              - All required fields validated
+            
+            Test 2: POST without x-prices-admin-token header → 401 Unauthorized
+              - Correctly rejected with error: "Unauthorized"
+            
+            Test 3: POST with incorrect token → 401 Unauthorized
+              - Correctly rejected with error: "Unauthorized"
+            
+            Test 4: POST with correct token, mode='replace' → 200
+              - Successfully wrote 2 prices (thorne::creatine, test brand::test ingredient)
+              - Response: { ok: true, mode: 'replace', wrote: 2, updatedAt: ISO timestamp }
+            
+            Test 5: GET after POST shows merged prices → 200
+              - meta.source = 'bundled+overlay'
+              - meta.overlayCount = 2
+              - thorne::creatine.perServing = 0.99 (overriding bundled value)
+              - Cache invalidation working correctly
+            
+            Test 6: POST with mode='merge' → 200
+              - Successfully wrote 1 price (now foods::vitamin d)
+              - Previous keys preserved (thorne::creatine, test brand::test ingredient)
+              - meta.overlayCount = 3 (all keys present)
+              - Merge mode correctly preserves existing overlay entries
+            
+            Test 7: POST with mode='delete' → 400
+              - Correctly rejected with error: 'mode must be "replace" or "merge"'
+            
+            Test 8: POST with malformed JSON body → 400
+              - Correctly rejected with error: "Invalid JSON body"
+            
+            Test 9: POST sanitization with mixed valid/invalid entries → 200
+              - Payload contained: valid::ingredient (valid), no_delimiter_key (invalid - no ::),
+                negative::price (invalid - negative perServing), toohigh::price (invalid - >100),
+                badurl::key (invalid - javascript: URL)
+              - Result: wrote=2 (valid::ingredient + badurl::key with URL stripped)
+              - Sanitization correctly filtered: entries without '::', negative prices,
+                prices >100, and stripped dangerous URLs
+              - Only valid entries persisted to database
+            
+            All authentication, authorization, mode validation, JSON parsing, sanitization,
+            cache invalidation, and merge/replace logic working correctly. MongoDB overlay
+            storage functioning as designed.
+
+
+  - task: "REFACTOR — split /app/app/api/[[...path]]/route.js search adapters into /app/lib/search/*"
+    implemented: true
+    working: true
+    file: "/app/lib/search/index.js, /app/lib/search/http.js, /app/lib/search/common.js, /app/lib/search/pubmed.js, /app/lib/search/semanticScholar.js, /app/lib/search/europePMC.js, /app/lib/search/clinicalTrials.js, /app/lib/search/omim.js, /app/lib/search/disgenet.js, /app/lib/search/openAlex.js, /app/lib/search/crossref.js, /app/lib/search/semantic.js, /app/lib/search/relevance.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Pure refactor \u2014 zero behaviour change. The 2083-line
+            /app/app/api/[[...path]]/route.js catch-all was becoming
+            unmaintainable with every external search adapter (PubMed,
+            Europe PMC, OpenAlex, Crossref, S2, ClinicalTrials.gov, OMIM,
+            DisGeNET) inlined alongside the route handlers.
+
+            Extracted into /app/lib/search/:
+              * http.js         \u2014 fetchWithTimeout, safeJson, safeText
+              * common.js       \u2014 yearFromPubdate, detectPreprint,
+                                    OPENALEX_MAILTO (shared between adapters)
+              * pubmed.js       \u2014 searchPubmed (uses NCBI_KEY / PUBMED_BASE
+                                    now scoped to the module)
+              * semanticScholar.js \u2014 searchSemanticScholar
+              * europePMC.js    \u2014 searchEuropePMC
+              * clinicalTrials.js \u2014 searchClinicalTrials
+              * omim.js         \u2014 searchOMIM
+              * disgenet.js     \u2014 searchDisGeNET
+              * openAlex.js     \u2014 searchOpenAlex + reconstructOpenAlexAbstract
+              * crossref.js     \u2014 searchCrossref + stripJats
+              * semantic.js     \u2014 llmExpandQuery, llmRerankResults
+                                    (calls @/lib/ai.js's expandSemantic /
+                                    rerankSemantic)
+              * relevance.js    \u2014 parseQuery, scoreRelevance, mergeResults,
+                                    STOPWORDS, PROVIDER_RANK
+              * index.js        \u2014 barrel re-export so route.js does a
+                                    single `import { ... } from '@/lib/search'`
+
+            route.js changes:
+              * Deleted the extracted blocks (838 lines removed, went from
+                2083 -> 1252 lines).
+              * Added one import block pulling from '@/lib/search'.
+              * Kept handleSemanticExpand / handleSemanticRerank / handleSearch
+                / handleSupplementsPrices etc. as they are ROUTE handlers,
+                not adapters.
+
+            Manual verification post-refactor:
+              * GET /api                                     -> 200 metadata OK
+              * GET /api/search?q=MTHFR%20C677T&limit=5      -> 200, 5 results
+                sources: { pubmed:100, semanticScholar:0, openAlex:50,
+                crossref:40, europePMC:50, omim:0, disgenet:0,
+                clinicalTrials:20 }
+              * POST /api/semantic-expand { query: 'MTHFR' } -> 200
+                expansions: ["MTHFR polymorphism","folic acid metabolism",
+                "homocysteine regulation","methionine cycle","one-carbon metabolism"]
+              * GET /api/clinical-trials/gene?gene=MTHFR     -> 200 (unaffected)
+              * GET /api/supplements/prices                  -> 200 (unaffected)
+
+            Please verify (needs_retesting=true):
+              a) /api/search returns the same merged/deduped shape as before
+                 with all 8 sources contributing.
+              b) Relevance filtering still drops off-topic results
+                 (e.g. "zone 2 training" should NOT surface "Work Zone
+                 Safety Gamification").
+              c) Preprint detection still tags biorxiv/medrxiv/arxiv
+                 correctly for both S2 + OpenAlex results.
+              d) Semantic expand / rerank endpoints still work under LLM
+                 rate limits (may return empty [] under 429; that's expected).
+              e) No regression on /api/pubmed-search (Dashboard's separate
+                 endpoint at /app/app/api/pubmed-search/route.js was NOT
+                 touched by this refactor).
+        -working: true
+          agent: "testing"
+          comment: |
+            ✅ COMPREHENSIVE BACKEND TESTING COMPLETED (10/10 scenarios passed):
+            
+            Test 10: GET /api/search?q=MTHFR C677T&limit=5 → 200
+              - Response shape correct: total, sources, results, clinicalTrials fields present
+              - total = 5 (within expected range 1-5)
+              - sources object contains all 8 expected keys: pubmed, semanticScholar, openAlex,
+                crossref, europePMC, omim, disgenet, clinicalTrials
+              - results array non-empty with 5 results
+              - Each result has required fields: provider, source, title, journal, url
+              - clinicalTrials array present with 20 trials
+              - All search adapters contributing correctly post-refactor
+            
+            Test 11: GET /api/search?q=zone 2 training&limit=10 → 200 (Relevance filter)
+              - 10 results returned
+              - Top 5 results checked for relevance
+              - NO irrelevant results found (no "war zone", "work zone safety", "training zone hypermodel")
+              - Relevance filtering successfully drops off-topic keyword-overlap noise
+              - Query wrapping in quotes + relevance scoring working as designed
+            
+            Test 12: GET /api/search?q=creatine supplementation&limit=5 → 200
+              - 5 results returned
+              - 5/5 results about creatine (100% topic relevance)
+              - All results contain "creatine" in title or abstract
+            
+            Test 13: GET /api/search?q=rapamycin&limit=5 → 200 (Single-token path)
+              - 5 results returned
+              - 5/5 results about rapamycin (100% topic relevance)
+              - Single-token query handling working correctly
+            
+            Test 14: POST /api/semantic-expand { query: "MTHFR" } → 200
+              - Response contains expansions field (array type)
+              - 5 expansion terms returned
+              - LLM semantic expansion working (may return empty [] on 429, which is acceptable)
+            
+            Test 15: POST /api/semantic-rerank { query: "MTHFR", items: [...] } → 200
+              - Response contains order field
+              - order = ['a', 'b'] (correctly ranked array)
+              - LLM semantic reranking working
+            
+            Test 16: GET /api/clinical-trials/gene?gene=MTHFR → 200
+              - All required fields present: gene, total, recruiting, completed, terminated,
+                other, active, top
+              - gene = 'MTHFR' (correct)
+              - total = 88, recruiting = 6
+              - Separate dedicated endpoint unaffected by refactor, working correctly
+            
+            Test 17: GET /api/pubmed-search?gene=COMT&limit=2 → 200
+              - Endpoint working correctly
+              - Separate endpoint at /app/app/api/pubmed-search/route.js
+              - NOT touched by refactor, confirmed no regression
+            
+            Test 18: GET /api/supplements/dsld/search?q=methylfolate&size=3 → 200
+              - 3 results returned (correct size limit)
+              - Unchanged endpoint, working correctly
+            
+            Test 19: GET /api/nutrition/product?barcode=0038000845017 → 200
+              - Endpoint working correctly
+              - Separate endpoint, unaffected by refactor
+            
+            REFACTOR VERIFICATION COMPLETE:
+            - All 8 search sources (pubmed, semanticScholar, openAlex, crossref, europePMC,
+              omim, disgenet, clinicalTrials) contributing correctly
+            - Relevance filtering working (drops off-topic results)
+            - Semantic expand/rerank endpoints functional
+            - No regressions on separate endpoints (pubmed-search, clinical-trials/gene,
+              supplements/dsld, nutrition/product)
+            - Search adapter extraction to /app/lib/search/* successful with zero behavior change
+
+
+  - task: "GET /api/clinical-trials/gene — lightweight per-gene ClinicalTrials.gov proxy"
+    implemented: true
+    working: true
+    file: "/app/app/api/clinical-trials/gene/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Added as part of the Dashboard gene-chip trial-badge feature.
+            Endpoint: GET /api/clinical-trials/gene?gene=<SYMBOL>
+            Returns { gene, total, recruiting, completed, terminated, other,
+            active, top: [{ nctId, title, status, phase, year, url }, x2] }.
+            Server-side Next.js data cache: revalidate=86400 (24h).
+            Manual verification:
+              MTHFR -> total 88, recruiting 6, top[0] = NCT04974138 (China
+                Stroke Primary Prevention Trial 2, RECRUITING, Phase4, 2024)
+              COMT  -> total 192, recruiting 6, top[0] = NCT06928168 (Effect
+                of Sleep Extension in Prevention to Sleep Deprivation, 2025)
+            Response times ~0.4-1.2s cold, ~50ms warm (Next.js data cache).
+
+
     implemented: true
     working: true
     file: "/app/app/api/[[...path]]/route.js"
@@ -1771,7 +2059,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Dashboard Gene Chip Clinical Trial badges + popover (deep-link into Search)"
+    - "POST /api/supplements/prices — admin-token gated overlay writes (MongoDB-backed)"
+    - "REFACTOR — split /app/app/api/[[...path]]/route.js search adapters into /app/lib/search/*"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
