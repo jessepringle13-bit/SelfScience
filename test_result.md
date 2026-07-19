@@ -794,6 +794,54 @@ frontend:
             genome content ever leaves the browser). LocalStorage cache is
             keyed by uppercase gene symbol only.
 
+        -working: true
+          agent: "main"
+          comment: |
+            Fixed two mobile bugs surfaced during frontend testing:
+
+            **Bug 1 (P0): Mobile bottom sheet didn't open on tap**
+            Root cause was a two-part race:
+              1. On emulated mobile viewports Playwright still reports
+                 `(hover: hover)` as TRUE, so `onMouseEnter` fired with the
+                 synthesized mousemove that precedes a tap.
+              2. `onMouseEnter` set `open=true`, then the click event that
+                 immediately followed toggled it BACK to false, leaving the
+                 sheet unrendered.
+            Fix: Switched the hover-vs-tap detection from `(hover: hover)`
+            matchMedia to a `window.innerWidth < 768` `isMobile` state (with
+            a resize listener). Mobile tap = toggle; desktop click =
+            `setOpen(true)` (idempotent \u2014 hover-out is the primary close).
+            Mouse hover handlers now no-op when `isMobile` is true.
+
+            **Bug 2 (P0): Bottom sheet rendered as tiny 149px-wide box
+            inside the pillar tile instead of full-width at the viewport
+            bottom.**
+            Root cause: The `position: fixed` bottom sheet was a child of
+            the chip's `<span>` wrapper. Pillar tiles use CSS transforms on
+            hover which establish a new containing block \u2014 that captured
+            the fixed positioning, making inset-0 relative to the pillar
+            tile instead of the viewport.
+            Fix: Wrapped the mobile backdrop + sheet in
+            `createPortal(..., document.body)` so they render at the DOM
+            root, escaping any transform-containing-block ancestors. Bumped
+            z-index to z-[60]/z-[61] to sit above the Dashboard's other
+            fixed elements. Also swapped the sheet's outer `<span>`s to
+            `<div>`s (nested block content inside an inline element was
+            causing subtle layout issues).
+
+            Verified via screenshot at 375\u00d7812:
+              * Bottom sheet renders at { x:0, y:552, w:375, h:260 } \u2014
+                anchored to viewport bottom, full-width.
+              * Backdrop covers the full viewport.
+              * Content displays cleanly: "COMT \u00b7 Clinical trials" header,
+                "6 Recruiting \u00b7 34 Completed \u00b7 3 Terminated \u00b7 7 Other",
+                two trial titles, and both green "View recruiting trials" +
+                outlined "View all trials" CTAs.
+              * Backdrop tap closes the sheet (dialog element removed from
+                DOM after tap).
+              * Desktop hover popover (1400\u00d7900) still works as before
+                (regression-verified).
+
   - task: "Complete reading list feature — /lib/books.js + list page + book detail + genome recommendations"
     implemented: true
     working: true

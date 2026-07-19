@@ -28,6 +28,7 @@
 // avoid the invalid "button inside anchor" HTML.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { ExternalLink, X, TestTube2 } from 'lucide-react'
 import { getGeneTrials, readCache } from '@/lib/geneTrialsCache'
@@ -119,6 +120,24 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
   const total = data?.total || 0
   const hasAny = total > 0
 
+  // Detect whether we're on a mobile-sized viewport. We branch UI + event
+  // handling on this because:
+  //   * mobile (< 768px)  \u2192 tap toggles a bottom sheet, hover events ignored
+  //   * desktop (>= 768px) \u2192 hover opens a floating popover, click keeps
+  //                            it open
+  // Using viewport width (not `(hover: hover)`) so emulated mobile
+  // viewports \u2014 which incorrectly report hover:hover as true \u2014 still get
+  // the mobile behaviour. Real touch devices at desktop widths (tablets)
+  // are fine on the hover path.
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   const stop = useCallback((e) => {
     // Prevent the parent <Link> or clickable card from swallowing the click.
     e.stopPropagation()
@@ -127,7 +146,10 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
 
   const onChipClick = (e) => {
     stop(e)
-    setOpen((v) => !v)
+    // Mobile: toggle sheet. Desktop: hover controls open; click just
+    // ensures the popover is open (useful for keyboard users too).
+    if (isMobile) setOpen((v) => !v)
+    else setOpen(true)
   }
 
   // Size tokens (matches the original static chip so nothing shifts).
@@ -162,14 +184,10 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
           if (e.key === 'Enter' || e.key === ' ') onChipClick(e)
         }}
         onMouseEnter={() => {
-          if (typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches) {
-            setOpen(true)
-          }
+          if (!isMobile) setOpen(true)
         }}
         onMouseLeave={() => {
-          if (typeof window !== 'undefined' && window.matchMedia?.('(hover: hover)').matches) {
-            setOpen(false)
-          }
+          if (!isMobile) setOpen(false)
         }}
         title={dotTitle || G}
         className={`relative inline-flex cursor-pointer items-center gap-1 rounded-full bg-ss-orange/15 font-mono font-bold uppercase tracking-wider text-ss-orange transition hover:bg-ss-orange/25 focus:outline-none focus:ring-2 focus:ring-ss-teal/40 ${chipSize}`}
@@ -208,25 +226,27 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
         </span>
       )}
 
-      {/* MOBILE BOTTOM SHEET — hidden on desktop via md:hidden */}
-      {open && (
+      {/* MOBILE BOTTOM SHEET — rendered via portal to escape any
+          transform-containing-block ancestors (pillar tiles use hover
+          transforms which otherwise capture our position:fixed). */}
+      {open && isMobile && typeof document !== 'undefined' && createPortal(
         <>
-          <span
+          <div
             aria-hidden="true"
             onClick={(e) => {
               stop(e)
               setOpen(false)
             }}
-            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            className="fixed inset-0 z-[60] bg-black/40 md:hidden"
           />
-          <span
+          <div
             role="dialog"
             aria-modal="true"
             aria-label={`Clinical trials for ${G}`}
-            className="fixed inset-x-0 bottom-0 z-50 block max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 pb-8 shadow-2xl md:hidden"
+            className="fixed inset-x-0 bottom-0 z-[61] block max-h-[80vh] overflow-y-auto rounded-t-2xl bg-white p-4 pb-8 shadow-2xl md:hidden"
             onClick={stop}
           >
-            <span className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2 text-sm font-bold text-ss-teal">
                 <TestTube2 size={14} className="text-ss-teal" />
                 {G} · Clinical trials
@@ -242,7 +262,7 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
               >
                 <X size={16} />
               </button>
-            </span>
+            </div>
             <PopoverBody
               gene={G}
               data={data}
@@ -251,8 +271,9 @@ export default function GeneChip({ gene, size = 'sm', className = '' }) {
               onClose={() => setOpen(false)}
               mobile
             />
-          </span>
-        </>
+          </div>
+        </>,
+        document.body,
       )}
     </span>
   )
