@@ -2269,7 +2269,86 @@ test_plan:
 
     -agent: "main"
       message: |
-        PHASE 4 SHIPPED (2026-07 session) — Message 580 Sections 9, 10, 11.
+        PHASE 5 SHIPPED (2026-07 session) — Message 580 Sections 12 + 8
+        + Global cleanup. Completes the full 12-section pass.
+
+        SECTION 12 — About page
+        Files changed:
+        * /app/app/about/page.js
+            - Preserved the existing narrative sections (Why This
+              Exists / The Journey / What SelfScience Is / What
+              SelfScience Is Not / The Mission).
+            - APPENDED four spec-required sections:
+                * "How SelfScience Works — Methodology": data sources
+                  (PubMed, EuropePMC, ClinVar, PharmGKB, CPIC, gnomAD,
+                  ClinicalTrials.gov v2, DSLD), variant matching
+                  approach (deterministic rsID lookup, NOT AI
+                  interpretation), reliability rubric explanation,
+                  limitations (single-SNP, consumer-array, not
+                  clinical-grade), privacy (client-side parse,
+                  variant-only send).
+                * "Team & Credentials": honest disclosure the founder
+                  is a self-experimenter, not a clinician; scientific
+                  accuracy grounded in public sources.
+                * "What's New — Changelog": in-code CHANGELOG array
+                  (reverse-chronological), 4 entries covering
+                  Apr 2026 → Jul 2026 versions.
+                * "Variant Database Version": RULES_VERSION +
+                  VARIANT_DB_UPDATED_ISO surfaced from
+                  /app/lib/reportVersion.js, update cadence stated
+                  (6-8 weeks).
+
+        SECTION 8 — Mobile pass @ 375px
+        Audited at 375px:
+        * /genome upload page (hero, 3-step explainer, sample button)
+        * /search page (search bar, pillar chip row, filter chips,
+          reliability chips, sort chips)
+        * /about page (methodology, changelog, DB version blocks)
+        * Bottom tab bar visible on all pages (Home / Search /
+          Genome / Tools)
+        * All chip rows wrap correctly without horizontal overflow
+        * Text is legible (all body copy >= 14px equivalent)
+        * Bookmark toast + PrintGateModal + OnboardingTour all use
+          16px input font-size to prevent iOS zoom
+        * PrintGateModal + BookmarkToast + OnboardingTour all use
+          bottom: 24 / 6.5rem so they clear the mobile bottom tab bar
+
+        GLOBAL IMPLEMENTATION NOTES — verified
+        * ss_last_visit snapshot-before-overwrite: prevVisitISO is
+          captured on first mount then LS is overwritten, so the
+          Dashboard "new since your last visit" delta computes
+          against the previous session (verified in Dashboard.jsx).
+        * ss_onboarding_complete short-circuit: OnboardingTour returns
+          null before any DOM is mounted when the flag is true
+          (verified in OnboardingTour.jsx).
+        * All new pages reachable from top nav: /about via About
+          dropdown; Reading List, Search, Tools all top-nav visible.
+        * Practitioner report PDF works offline: uses only client-
+          side data + inline SVG icons + reportVersion.js constants;
+          no network fetches at print time.
+        * Escape dismisses: BookmarkToast (X button), PrintGateModal
+          (Escape/backdrop/X), OnboardingTour (Escape/backdrop).
+
+        NAMESPACING — final audit passes:
+        * ss_dashboard_pillar_filter
+        * ss_last_visit
+        * ss_onboarding_complete
+        * ss_reading_list_notes
+        * ss_reading_list_read
+        * ss:saved-studies (legacy — preserved)
+
+        ================================================================
+        MESSAGE 580 COMPLETE
+        ================================================================
+        All 12 sections shipped across 5 phases:
+          Phase 1: Sections 1, 2, 3 (Upload / Dashboard / Pillar Overview)
+          Phase 2: Sections 4, 5, 7 (Search / Nav Dropdowns / Tools)
+          Phase 3: Section 6 (Practitioner Report — 3 sub-slices)
+          Phase 4: Sections 9, 10, 11 (Onboarding / Discover / Reading List)
+          Phase 5: Sections 12, 8, Global (About / Mobile / Cleanup)
+
+        + LLM Provider timeout fix (18s → 30s per tier + Gemini 2.5
+          Flash tertiary fallback) shipped mid-phase.
 
         SLICE 4A — Onboarding Flow (Section 9)
         Files added:

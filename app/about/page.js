@@ -1,5 +1,55 @@
 import ContentPage, { Section } from '@/components/content-page'
 import PageCTA from '@/components/page-cta'
+import { RULES_VERSION, VARIANT_DB_UPDATED_ISO, formatDbDate } from '@/lib/reportVersion'
+
+// Section 12 spec — reverse-chronological list of major platform updates.
+// Kept as an in-code array so it never falls out of sync with the app's
+// actual behavior. Add newer entries to the TOP of the list.
+const CHANGELOG = [
+  {
+    date: 'Jul 2026',
+    title: 'Practitioner Report v2 · Onboarding overhaul · Discover feed',
+    items: [
+      'New Clinical Summary page (Executive Summary) added to the Practitioner Report — urgent PGx findings, top 3 awareness findings, active medication flags, chief concern.',
+      'Practitioner Report gains clinical-priority sorting + red/amber row borders in Section 3A, green/amber/red borders on PGx phenotype rows in Section 3C, and a database-version footer on every printed page.',
+      'Onboarding: 3-step processing screen, "What we found" reveal screen, first-time 4-step tooltip tour, plain-English error recovery.',
+      'Discover tab now surfaces curated feeds — trending papers, new-this-month research, gene-specific mini-feeds, and open clinical trials near you.',
+      'Reading List: pillar filter chips, unread state, per-paper notes (500 chars), CSV export.',
+      'Genome parse pipeline hardened: 30s per-provider timeout + Google Gemini 2.5 Flash tertiary fallback for reliability.',
+    ],
+  },
+  {
+    date: 'Jun 2026',
+    title: 'Nutrition Hub · Drug Check · Supplement Discovery expansion',
+    items: [
+      '7-Day Meal Planner with genome-aware timing rules (MTNR1B, CLOCK).',
+      'DSLD barcode scanner + BrandScore™ transparency ranking for supplements.',
+      'Drug Check now surfaces PGx conflicts and My-Medications persistence.',
+      'My Stack builder + Stack Quality widget on the Dashboard.',
+    ],
+  },
+  {
+    date: 'May 2026',
+    title: 'Training Protocol · Pillar overhaul · Mobile',
+    items: [
+      'Genome-driven Training Protocol tool (Zone 2, sport affinity, tempo).',
+      'Biomarker Panel logging + genome-marker correlations.',
+      '10-pillar system: added Environmental Sensitivity, Hormones, and Developmental & Lifespan Wellness.',
+      'Mobile "More" sheet + bottom tab bar polish.',
+    ],
+  },
+  {
+    date: 'Apr 2026',
+    title: 'Public launch',
+    items: [
+      'Deterministic 2-step genome analysis (variant classifier + AI plain-language layer).',
+      'AI-scored search across PubMed, EuropePMC, ClinicalTrials.gov, and OpenAlex.',
+      'Population Compare tool and Ancestry Report.',
+      'Practitioner Report v1 (Patient context + Biomarker + Genetic variant summary).',
+    ],
+  },
+]
+
 
 export const metadata = {
   title: 'About SelfScience',
@@ -86,6 +136,73 @@ export default function AboutPage() {
         </p>
         <p>
           The research exists. SelfScience helps you find it, understand it, and know what questions to ask next.
+        </p>
+      </Section>
+
+      <Section heading="How SelfScience Works — Methodology">
+        <p>
+          SelfScience is built on a strict deterministic pipeline. When you upload your raw DNA file, we read it entirely in your browser — no upload of the raw file, no server-side processing of your genome. Only anonymous variant calls (rsID + two-base genotype) are used to generate your results, and even those are cleared when you close the tab.
+        </p>
+        <p>
+          <strong>Data sources.</strong> Our variant-to-research mapping draws from{' '}
+          <strong>PubMed</strong> and <strong>EuropePMC</strong> for peer-reviewed literature, <strong>ClinVar</strong> for clinical significance annotations, <strong>PharmGKB</strong> and{' '}
+          <strong>CPIC</strong> for pharmacogenomic classifications, <strong>gnomAD</strong> for population allele frequencies, <strong>ClinicalTrials.gov v2</strong> for open recruiting studies, and{' '}
+          <strong>DSLD</strong> for supplement label data.
+        </p>
+        <p>
+          <strong>How variants are matched.</strong> We use deterministic rsID lookup against a curated variant library — not AI interpretation of your raw sequence. Each recognised rsID has a hand-audited genotype-to-classification rule (Benefit / Aware / Neutral) grounded in current research. The AI layer sits on top: it rewrites the underlying research into plain-English cards, but it never invents variants or clinical implications.
+        </p>
+        <p>
+          <strong>Reliability scoring.</strong> Every search result is scored by a separate AI pass against a rubric that looks at study design (RCT vs. observational vs. mechanistic), sample size, funding source, and citation depth. The tier label (Strong / Moderate / Limited) is displayed alongside the paper — never a false claim of certainty.
+        </p>
+        <p>
+          <strong>Limitations.</strong> SelfScience relies on single-SNP inference from consumer-grade genotyping arrays (23andMe / AncestryDNA / MyHeritage). It is <strong>not clinical-grade</strong>. It does not detect star-alleles, copy-number variants, or rare mutations. It cannot substitute for a clinical PGx panel, a genetic counselor, or a licensed physician. Every finding is a research association, not a diagnosis.
+        </p>
+        <p>
+          <strong>Privacy.</strong> Genomic data never leaves your device. Raw files are parsed client-side, variant calls are sent to our AI providers only for text generation and reliability scoring, and no user-identifiable information (name, email, IP location) is ever tied to a variant. Your Reading List, notes, meal plans, supplement stack, and every persistent preference live in your browser's own storage — clear your browser and they are gone.
+        </p>
+      </Section>
+
+      <Section heading="Team & Credentials">
+        <p>
+          SelfScience was founded and is built by an independent solo team. The founder is not a clinician or a bioinformatician by training — this platform exists because a lifelong self-experimenter went deep on their own genome and wanted to build the tool they wished had existed. The technical stack is engineered by experienced software developers; the scientific accuracy of the variant library and reliability scoring is grounded in <strong>publicly-audited sources</strong> (CPIC, ClinVar, PharmGKB) rather than proprietary interpretation.
+        </p>
+        <p>
+          We deliberately do not present ourselves as a medical authority. When you use the practitioner report, you are handing a research summary to your clinician — <em>they</em> are the authority. That is the point.
+        </p>
+        <p className="text-xs italic text-ss-muted">
+          If you are a clinician, geneticist, or biomedical researcher who would like to contribute to the variant library or review our methodology, please reach out via the support link in the top navigation.
+        </p>
+      </Section>
+
+      <Section heading="What's New — Changelog">
+        <ul className="mt-2 list-none space-y-3 pl-0">
+          {CHANGELOG.map((entry) => (
+            <li key={entry.date} className="border-l-2 border-ss-teal/60 pl-4">
+              <div className="text-[10px] font-extrabold uppercase tracking-widest text-ss-orange">
+                {entry.date}
+              </div>
+              <div className="mt-0.5 text-sm font-bold text-ss-teal">{entry.title}</div>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[13px] text-ss-text">
+                {entry.items.map((it, i) => <li key={i}>{it}</li>)}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section heading="Variant Database Version">
+        <p>
+          <strong>Rules version:</strong>{' '}
+          <span className="font-mono text-ss-teal">{RULES_VERSION}</span>
+          <br />
+          <strong>Variant database last updated:</strong>{' '}
+          <span className="font-mono text-ss-teal">{formatDbDate()}</span> ({VARIANT_DB_UPDATED_ISO})
+          <br />
+          <strong>Update cadence:</strong> The variant library is refreshed against upstream sources approximately every 6–8 weeks. Rule-set changes (classification logic, priority thresholds) may ship independently between library refreshes.
+        </p>
+        <p className="text-[12px] italic text-ss-muted">
+          These identifiers appear on every printed page of the Practitioner Report so a clinician can tell exactly which snapshot of our library any given report was generated against.
         </p>
       </Section>
 
