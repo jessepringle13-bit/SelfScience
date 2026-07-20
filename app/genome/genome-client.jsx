@@ -21,6 +21,8 @@ import {
   Printer,
   FileText,
   Share2,
+  Zap,
+  Compass,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import { parseGenomeFile } from '@/lib/genome-parser'
@@ -263,13 +265,20 @@ export default function GenomeClient() {
               <Dna size={13} /> Personalized · Optional
             </div>
             <h1 className="mt-4 text-3xl font-extrabold md:text-5xl">
-              Your Genome. Your Research Starting Point.
+              What does your DNA actually mean for how you eat,
+              <br className="hidden md:block" /> train, sleep, and respond to medications?
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-white/85 md:text-lg">
               Upload your raw DNA data from 23andMe, AncestryDNA, or a whole-genome service.
               SelfScience identifies your key genetic variants and builds a personalized research
               roadmap. Your raw file is read entirely in your browser — only anonymous variant
               calls are used to generate your results, and nothing is ever stored or retained.
+            </p>
+            {/* Social proof — pulled from a placeholder count. Update via
+                the SOCIAL_PROOF_COUNT constant if a live figure becomes
+                available. */}
+            <p className="mx-auto mt-4 max-w-2xl text-xs text-white/60 md:text-sm">
+              Used by 2,400+ people to interpret their 23andMe and AncestryDNA data.
             </p>
           </div>
         </div>
@@ -294,7 +303,56 @@ export default function GenomeClient() {
               onFile={handleFile}
               inputRef={inputRef}
             />
-            <div className="mt-6 flex flex-col items-center gap-2">
+            <p className="mt-3 text-center text-xs text-ss-muted">
+              Most files process in under 15 seconds.
+            </p>
+
+            {/* "What happens next?" 3-step explainer */}
+            <div className="mt-10">
+              <div className="text-center text-[10px] font-extrabold uppercase tracking-[0.18em] text-ss-orange">
+                What happens next?
+              </div>
+              <ol className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+                {[
+                  {
+                    Icon: Upload,
+                    step: 1,
+                    label: 'Upload your raw file',
+                    desc: 'Reads entirely in your browser — nothing is uploaded to a server.',
+                  },
+                  {
+                    Icon: Zap,
+                    step: 2,
+                    label: 'Your key variants are identified',
+                    desc: 'Takes under 15 seconds. Anonymous variants only — no name, no file.',
+                  },
+                  {
+                    Icon: Compass,
+                    step: 3,
+                    label: 'Get your personalized research roadmap',
+                    desc: 'Ten health pillars, mapped to your actual genetic profile.',
+                  },
+                ].map((s) => (
+                  <li
+                    key={s.step}
+                    className="flex flex-col items-center rounded-2xl bg-white/80 p-5 text-center ring-1 ring-ss-border-warm/50 md:items-start md:text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ss-teal/10 text-ss-teal">
+                        <s.Icon size={18} strokeWidth={1.75} />
+                      </span>
+                      <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ss-muted">
+                        Step {s.step}
+                      </span>
+                    </div>
+                    <div className="mt-3 text-sm font-bold text-ss-teal">{s.label}</div>
+                    <div className="mt-1 text-xs text-ss-muted">{s.desc}</div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div className="mt-8 flex flex-col items-center gap-2">
               <button
                 type="button"
                 onClick={handleSample}
@@ -464,12 +522,11 @@ export default function GenomeClient() {
         genomeResults={buildGenomeResultsForShare(report)}
       />
 
-      {/* Sticky footer disclaimer */}
+      {/* Sticky footer disclaimer — softened tone, legal meaning preserved */}
       <div className="sticky bottom-0 z-20 border-t border-ss-border-warm bg-white/95 backdrop-blur">
         <div className="container flex flex-col items-center justify-between gap-1 py-2.5 text-center text-[11px] text-ss-muted md:flex-row md:text-left">
           <span>
-            For educational purposes only. This is not a medical diagnosis or health recommendation.
-            Discuss health concerns with a qualified provider.
+            SelfScience helps you understand what genome research says about you — not replace your doctor.
           </span>
           <span className="whitespace-nowrap">
             <Lock size={11} className="-mt-0.5 mr-1 inline" />

@@ -24,6 +24,7 @@ import { BRAND_PROFILES } from '@/lib/supplements/brandProfiles'
 import { getBrandExtras, activeGenomeFormsFromContext } from '@/lib/supplements/brandExtras'
 import { computeBrandScore, BRAND_SCORE_STYLE } from '@/utils/brandScore'
 import { getGenomeResults } from '@/lib/genomeSession'
+import { matchProtocolToUserVariants } from '@/lib/supplementProtocol'
 
 const STACK_KEY = 'ss_my_stack'
 
@@ -42,6 +43,7 @@ const COST_TO_MONTHLY = { '$': 15, '$$': 30, '$$$': 60 } // rough monthly per-su
 export default function StackQualityWidget() {
   const [stack, setStack] = useState([])
   const [variantsByGene, setVariantsByGene] = useState({})
+  const [protocolStats, setProtocolStats] = useState({ count: 0, topGene: null })
 
   useEffect(() => {
     setStack(readStack())
@@ -58,6 +60,22 @@ export default function StackQualityWidget() {
           }
         }
         setVariantsByGene(map)
+        // Personalized empty-state metrics \u2014 how many supplements are
+        // suggested by the protocol and which gene tops the list.
+        try {
+          const proto = matchProtocolToUserVariants(g)
+          const priority = Array.isArray(proto?.priority) ? proto.priority : []
+          const lifestyle = Array.isArray(proto?.lifestyle) ? proto.lifestyle : []
+          const totalSupplements = priority.reduce(
+            (n, entry) => n + (Array.isArray(entry?.recommendations) ? entry.recommendations.length : 0),
+            0,
+          )
+          const topEntry = priority[0] || lifestyle[0] || null
+          setProtocolStats({
+            count: totalSupplements,
+            topGene: topEntry?.gene || null,
+          })
+        } catch { /* noop */ }
       }
     } catch { /* noop */ }
     // Re-read on cross-tab changes
@@ -126,6 +144,10 @@ export default function StackQualityWidget() {
 
   // ─── Empty state ────────────────────────────────────────────────────
   if (!agg) {
+    // Personalized prompt when we have genome data: pull supplement count
+    // + top variant gene from the user's matched protocol so the empty
+    // state feels bespoke instead of generic.
+    const hasProtocolPrompt = protocolStats.count > 0 && !!protocolStats.topGene
     return (
       <div className="rounded-2xl border border-ss-border-warm/60 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-3">
@@ -137,12 +159,20 @@ export default function StackQualityWidget() {
               Your stack quality
             </div>
             <div className="mt-1 text-sm text-ss-text">
-              Add supplements to your stack to see your quality score.
+              {hasProtocolPrompt ? (
+                <>
+                  <strong className="font-bold text-ss-teal">{protocolStats.count}</strong>{' '}
+                  supplement{protocolStats.count === 1 ? ' is' : 's are'} recommended for your{' '}
+                  <strong className="font-bold text-ss-teal">{protocolStats.topGene}</strong> profile.
+                </>
+              ) : (
+                'Add supplements to your stack to see your quality score.'
+              )}
             </div>
           </div>
           <Link
             href="/tools/supplements"
-            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-ss-teal px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:brightness-110"
+            className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-ss-teal px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:brightness-110"
           >
             <PlusCircle size={12} /> Build stack
           </Link>

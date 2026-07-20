@@ -11,21 +11,64 @@
 // graceful loading + empty/error states — PubMed failures never break the
 // rest of the dashboard.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, ExternalLink, Sparkles, ShieldAlert, Loader2, Dna, Globe2, TestTube2, Activity, Pill, Compass, FileText } from 'lucide-react'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { matchProtocolToUserVariants, flattenReportCards } from '@/lib/supplementProtocol'
 import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
-import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
+import { usePillarFilter } from '@/components/PillarFilter'
+import PillarChipBar from '@/components/dashboard/PillarChipBar'
+import TimeAwareBanner from '@/components/dashboard/TimeAwareBanner'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
 import StackQualityWidget from '@/components/supplements/StackQualityWidget'
 
+// localStorage keys \u2014 must stay ss_-namespaced per global rules.
+const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
+const LS_LAST_VISIT = 'ss_last_visit'
+
 export default function Dashboard() {
   const [report, setReport] = useState(null)
   const { pillar: activePillar, setPillar, clear: clearPillar, isFiltering } = usePillarFilter()
+  const topFindingsRef = useRef(null)
+
+  // \u2014 Persist pillar chip to ss_dashboard_pillar_filter and read it back on
+  //   first mount if the URL didn't already carry a ?pillar=. The URL is
+  //   still the source of truth so deep-links, back/forward, and refresh
+  //   keep working; the localStorage layer is just a preference echo.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (activePillar) {
+      try { window.localStorage.setItem(LS_DASH_PILLAR, activePillar) } catch {}
+    } else {
+      try { window.localStorage.removeItem(LS_DASH_PILLAR) } catch {}
+    }
+  }, [activePillar])
+  // Restore preference on first mount only if no ?pillar= param is set.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (activePillar) return
+    try {
+      const saved = window.localStorage.getItem(LS_DASH_PILLAR)
+      if (saved) setPillar(saved)
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Snapshot the last-visit timestamp on first render so the "new since
+  // your last visit" delta can be computed BEFORE we overwrite the
+  // timestamp for this session. Update ss_last_visit after snapshotting.
+  const [prevVisitISO, setPrevVisitISO] = useState(null)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const prev = window.localStorage.getItem(LS_LAST_VISIT)
+      setPrevVisitISO(prev || null)
+      window.localStorage.setItem(LS_LAST_VISIT, new Date().toISOString())
+    } catch {}
+  }, [])
 
   // Hydrate from sessionStorage after mount so we don't hit SSR issues.
   useEffect(() => {
@@ -168,33 +211,27 @@ export default function Dashboard() {
             <p className="mt-2 max-w-2xl text-ss-muted">
               Personalized snapshot of your top findings, protocol, and matching research — all in one place.
             </p>
+            {/* Ambient time- and genome-aware note (rendered only when a
+                matching variant is present). */}
+            <TimeAwareBanner report={report} />
           </div>
           <Link
             href="/genome/overview"
             className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
           >
-            See full results <ArrowRight size={14} />
+            See your full genome report <ArrowRight size={14} />
           </Link>
         </div>
 
-        {/* Pillar filter — persists to URL as ?pillar=<name>. Filters the
-            findings, strengths, protocol preview and research-matched
-            sections below. The PillarFilterBanner surfaces the active
-            filter with a clear button. */}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          <PillarFilter value={activePillar} onChange={setPillar} />
-          {!isFiltering && (
-            <span className="text-[11px] italic text-ss-muted">
-              Filter your findings by a specific pillar.
-            </span>
-          )}
+        {/* Horizontal, scrollable pillar chip bar. Replaces the older
+            dropdown filter per Section 2 spec. Persisted to both the URL
+            (?pillar=) and localStorage (ss_dashboard_pillar_filter). */}
+        <div className="mt-6">
+          <PillarChipBar value={activePillar} onChange={setPillar} />
         </div>
-        {isFiltering && (
-          <PillarFilterBanner pillar={activePillar} onClear={clearPillar} className="mt-3" />
-        )}
       </div>
 
-      <div className="container mt-10 space-y-14">
+      <div ref={topFindingsRef} className="container mt-10 space-y-14">
         {/* 1. TOP FINDINGS (Be Aware) */}
         <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">
           {areas.length === 0 ? (
@@ -202,7 +239,10 @@ export default function Dashboard() {
           ) : (
             <CardRow items={areas} tone="aware" />
           )}
-          <SeeAllLink href="/genome/findings" label="See all findings" />
+          <SeeAllLink
+            href="/genome/findings"
+            label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
+          />
         </DashSection>
 
         {/* 2. STRENGTHS */}
@@ -212,20 +252,50 @@ export default function Dashboard() {
           ) : (
             <CardRow items={strengths} tone="strength" />
           )}
-          <SeeAllLink href="/genome/strengths" label="See all strengths" />
+          <SeeAllLink
+            href="/genome/strengths"
+            label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
+          />
         </DashSection>
 
         {/* 3. PILLAR SCORE OVERVIEW */}
-        <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars. Click any to cross-reference the pillar with your tagged genes." toneClass="text-ss-teal">
+        <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars. Tap any pillar to filter your dashboard by it." toneClass="text-ss-teal">
+          {/* Legend */}
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" /> Benefit
+            </span>
+            <span className="text-ss-border-warm">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-ss-amber" aria-hidden="true" /> Aware
+            </span>
+            <span className="text-ss-border-warm">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-2 w-2 rounded-full bg-ss-border-warm" aria-hidden="true" /> Neutral
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {PILLARS.map((p) => (
-              <PillarTile key={p.key} pillar={p} summary={pillarSummary[p.name]} genes={pillarGenes[p.name] || []} />
+              <PillarTile
+                key={p.key}
+                pillar={p}
+                summary={pillarSummary[p.name]}
+                genes={pillarGenes[p.name] || []}
+                onSelect={() => {
+                  setPillar(p.name)
+                  // Smoothly scroll to Top Findings section so the user
+                  // sees the filter take effect immediately.
+                  requestAnimationFrame(() => {
+                    topFindingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  })
+                }}
+              />
             ))}
           </div>
         </DashSection>
 
         {/* 4. RESEARCH MATCHED TO YOU */}
-        <ResearchMatched genes={topGenes} />
+        <ResearchMatched genes={topGenes} prevVisitISO={prevVisitISO} />
 
         {/* Stack Quality Widget */}
         <div className="mt-8">
@@ -370,21 +440,25 @@ function CardRow({ items, tone }) {
   )
 }
 
-function PillarTile({ pillar, summary, genes = [] }) {
+function PillarTile({ pillar, summary, genes = [], onSelect }) {
   const positive = summary?.positive || 0
   const awareness = summary?.awareness || 0
   const neutral = summary?.neutral || 0
   const total = positive + awareness + neutral
-  // Build the same pillar+genes hand-off href the "Explore Your Pillars"
-  // card uses, so clicking any pillar in the Score Overview also fans out
-  // to per-gene searches instead of a bare pillar-only search.
-  const params = new URLSearchParams({ pillar: pillar.name })
-  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
-  return (
-    <Link
-      href={`/search?${params.toString()}`}
-      className="flex flex-col rounded-xl bg-white p-4 ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
-    >
+
+  // Section 3 spec: high-Aware pillars (\u22653 aware, 0 benefit) get a
+  // reassurance line so users don't over-react to yellow-heavy pillars
+  // like Environmental Sensitivity.
+  const showHighAwareNote = awareness >= 3 && positive === 0
+
+  // Section 3 spec: zero-variant pillars ("no notable variants detected")
+  // \u2014 replace the count row with a favorable-signal line.
+  const isZeroVariant = total === 0
+
+  const tileClass = 'flex w-full flex-col rounded-xl bg-white p-4 text-left ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md'
+
+  const inner = (
+    <>
       <div className="flex items-center gap-2">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
           <pillar.Icon size={16} strokeWidth={1.5} />
@@ -402,9 +476,15 @@ function PillarTile({ pillar, summary, genes = [] }) {
           </>
         )}
       </div>
-      <div className="mt-2 text-[10px] text-ss-muted">
-        {positive}·Benefit &nbsp;{awareness}·Aware &nbsp;{neutral}·Neutral
-      </div>
+      {isZeroVariant ? (
+        <div className="mt-2 text-[10.5px] italic text-ss-muted">
+          No notable variants detected — a favorable signal.
+        </div>
+      ) : (
+        <div className="mt-2 text-[10px] text-ss-muted">
+          {positive}·Benefit &nbsp;{awareness}·Aware &nbsp;{neutral}·Neutral
+        </div>
+      )}
       {/* Compact gene chip preview so users can see WHICH of their genes
           will fan out when they click this tile. Each chip is now
           interactive: it shows a clinical-trial status dot + popover
@@ -419,6 +499,29 @@ function PillarTile({ pillar, summary, genes = [] }) {
           )}
         </div>
       )}
+      {showHighAwareNote && (
+        <div className="mt-2 border-t border-ss-border-warm/60 pt-2 text-[10.5px] leading-snug text-ss-muted">
+          These findings relate to manageable exposures — not deterministic health outcomes.
+        </div>
+      )}
+    </>
+  )
+
+  // If an onSelect handler is passed (dashboard usage), render as a
+  // button that filters in place rather than a Link that navigates away.
+  if (typeof onSelect === 'function') {
+    return (
+      <button type="button" onClick={onSelect} className={tileClass}>
+        {inner}
+      </button>
+    )
+  }
+  // Fallback: legacy Link behavior for any callers not passing onSelect.
+  const params = new URLSearchParams({ pillar: pillar.name })
+  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
+  return (
+    <Link href={`/search?${params.toString()}`} className={tileClass}>
+      {inner}
     </Link>
   )
 }
@@ -516,7 +619,7 @@ function ResearchMatchedSkeleton({ count = 6 }) {
   )
 }
 
-function ResearchMatched({ genes }) {
+function ResearchMatched({ genes, prevVisitISO }) {
   const [loading, setLoading] = useState(false)
   const [papers, setPapers] = useState([]) // deduped, max 6
   const [attempted, setAttempted] = useState(false)
@@ -598,16 +701,47 @@ function ResearchMatched({ genes }) {
     return `/search?${params.toString()}`
   }, [genes])
 
+  // "New since your last visit" delta \u2014 count papers whose year is
+  // greater than the year of the previous visit timestamp, or whose
+  // pubDate (if present) is after the previous visit. Skipped entirely
+  // for first-time visitors (prevVisitISO === null).
+  const newSincePrev = useMemo(() => {
+    if (!prevVisitISO || papers.length === 0) return 0
+    const prev = new Date(prevVisitISO)
+    if (Number.isNaN(prev.getTime())) return 0
+    const prevYear = prev.getFullYear()
+    let count = 0
+    for (const p of papers) {
+      let isNew = false
+      if (p.pubDate) {
+        const d = new Date(p.pubDate)
+        if (!Number.isNaN(d.getTime()) && d > prev) isNew = true
+      }
+      if (!isNew && p.year && Number(p.year) > prevYear) isNew = true
+      if (isNew) count += 1
+    }
+    return count
+  }, [papers, prevVisitISO])
+
   // Never show empty state unless we've completed a fetch AND all genes
   // returned zero results.
   const allFailed = attempted && !loading && papers.length === 0
 
   return (
-    <DashSection
-      title="Research Matched to You"
-      subtitle="Recent papers touching your top variant genes."
-      toneClass="text-ss-teal"
-    >
+    <section>
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-extrabold text-ss-teal">
+            Research Matched to You
+            {newSincePrev > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-ss-orange/15 px-2 py-0.5 align-middle text-[10px] font-extrabold uppercase tracking-wide text-ss-orange">
+                <Sparkles size={10} /> {newSincePrev} new since your last visit
+              </span>
+            )}
+          </h2>
+          <p className="mt-1 text-sm text-ss-muted">Recent papers touching your top variant genes.</p>
+        </div>
+      </div>
       {loading ? (
         <ResearchMatchedSkeleton count={6} />
       ) : allFailed ? (
@@ -633,7 +767,7 @@ function ResearchMatched({ genes }) {
           </div>
         </>
       )}
-    </DashSection>
+    </section>
   )
 }
 

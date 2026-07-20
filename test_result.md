@@ -2254,17 +2254,115 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.5"
-  test_sequence: 5
+  version: "1.6"
+  test_sequence: 6
   run_ui: false
 
 test_plan:
   current_focus:
-    - "POST /api/supplements/prices — admin-token gated overlay writes (MongoDB-backed)"
-    - "REFACTOR — split /app/app/api/[[...path]]/route.js search adapters into /app/lib/search/*"
+    - "PHASE 1 — Upload page + Dashboard + Pillar Overview refinements (Message 580, Sections 1-3)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+
+    -agent: "main"
+      message: |
+        PHASE 1 SHIPPED (2026-07 session) — Message 580 Sections 1-3.
+        Frontend-only changes, no backend logic touched.
+
+        SECTION 1 — Upload / Start Here (/genome + /app/app/page.js)
+        1) Hero headline rewritten to outcome-specific voice:
+           "What does your DNA actually mean for how you eat, train,
+           sleep, and respond to medications?" (updated in BOTH the
+           dedicated /genome page and the marketing hero card on /).
+        2) Social proof line added below the hero paragraph:
+           "Used by 2,400+ people to interpret their 23andMe and
+           AncestryDNA data." (styled muted small text, centered).
+        3) 3-step "What happens next?" explainer added between the drop
+           zone and the "Try with sample data" button. Icons: Upload,
+           Zap, Compass. Collapses to single-column on mobile.
+        4) "Most files process in under 15 seconds." muted line added
+           directly below the drop zone.
+        5) Sticky footer disclaimer softened:
+           "SelfScience helps you understand what genome research says
+           about you — not replace your doctor." (Lock + session-only
+           note on the right kept unchanged.)
+
+        SECTION 2 — Dashboard (/app/components/Dashboard.jsx +
+                                /app/components/supplements/StackQualityWidget.jsx)
+        1) Stack Quality widget empty-state replaced with a genome-
+           derived personalized prompt: "[N] supplements are recommended
+           for your [top variant] profile." Pulls counts from
+           matchProtocolToUserVariants(). Reverts to generic copy only
+           when no genome is loaded.
+        2) New TimeAwareBanner component (/app/components/dashboard/
+           TimeAwareBanner.jsx) — reads MTNR1B rs10830963 from the
+           report and current local time; renders ambient muted note
+           either "eating window closes at 6:30 PM tonight" (within 2h
+           of cutoff) or "today's eating window should close by 6:30 PM"
+           (morning). Silent when no matching variant.
+        3) Old PillarFilter dropdown replaced with new PillarChipBar
+           component (/app/components/dashboard/PillarChipBar.jsx) —
+           horizontal scrollable chip row matching Search-page style.
+           Persisted to BOTH the URL (?pillar=) and localStorage
+           (ss_dashboard_pillar_filter). URL remains the source of
+           truth; localStorage is a preference echo restored on first
+           mount only when the URL doesn't already carry ?pillar=.
+        4) "See all →" links now include dynamic counts:
+             * "See all N awareness findings →"
+             * "See all N strengths →"
+             * "See your full genome report →" (was "See full results →")
+        5) "New since your last visit" badge added to the Research
+           Matched section header. Snapshots ss_last_visit ISO on first
+           mount (setPrevVisitISO) THEN overwrites the LS value with a
+           fresh now(). Delta is computed against the snapshotted value.
+           Badge appears only when the count > 0 (first-time visitors
+           see nothing).
+
+        SECTION 3 — Pillar Score Overview (inside Dashboard.jsx PillarTile)
+        1) Legend rendered above the pillar grid:
+             "● Benefit · ● Aware · ● Neutral"
+        2) High-Aware framing note: when a pillar has ≥3 Aware and 0
+           Benefit findings (e.g. Environmental Sensitivity), a muted
+           border-topped line appears in the tile:
+             "These findings relate to manageable exposures — not
+              deterministic health outcomes."
+        3) Zero-variant pillars replace the 0-Benefit / 0-Aware / 0-
+           Neutral row with:
+             "No notable variants detected — a favorable signal."
+        4) Pillar tiles now filter the dashboard IN PLACE instead of
+           navigating to /search. Clicking a tile calls setPillar() and
+           smooth-scrolls to the Top Findings section (topFindingsRef).
+           Legacy Link behavior remains as a fallback when no onSelect
+           callback is passed.
+
+        NAMESPACING
+        * All new localStorage keys ss_-prefixed:
+            LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
+            LS_LAST_VISIT  = 'ss_last_visit'
+
+        VERIFIED MANUALLY (1280px):
+        * /genome hero + social proof + 3-step explainer renders.
+        * Dashboard chip bar renders as scrollable pill row.
+        * StackQualityWidget shows "4 supplements are recommended for
+          your MTHFR profile" on sample data.
+        * "See all 1 awareness finding →" dynamic count renders.
+        * Research Matched section renders (badge silent on first
+          visit).
+        VERIFIED MOBILE (375px): drop zone + hint + 3-step explainer
+          collapses to single column correctly.
+
+        FILES CHANGED:
+        * /app/app/genome/genome-client.jsx  (hero, 3-step, disclaimer)
+        * /app/app/page.js                    (marketing hero copy)
+        * /app/components/Dashboard.jsx       (chip bar, See all, new-badge, pillar tile)
+        * /app/components/supplements/StackQualityWidget.jsx (empty state)
+        * /app/components/dashboard/TimeAwareBanner.jsx  (NEW)
+        * /app/components/dashboard/PillarChipBar.jsx     (NEW)
+
+        NEXT: Frontend testing agent to verify Phase 1 end-to-end
+        before moving to Phase 2 (Search + Nav).
 
 
     -agent: "main"

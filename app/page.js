@@ -421,10 +421,13 @@ function DiscoverHome() {
                 <Dna size={14} /> Personalized · Optional
               </div>
               <h2 className="mt-4 text-3xl font-extrabold text-ss-teal md:text-4xl">
-                Your Genome. Your Research Starting Point.
+                What does your DNA actually mean for how you eat, train, sleep, and respond to medications?
               </h2>
               <p className="mt-4 max-w-xl text-ss-text">
                 Upload your raw DNA data file from 23andMe, AncestryDNA, or a whole genome service. Get a personalized research roadmap built around your specific genetic variants. Your raw file is read entirely in your browser — only anonymous variant calls are used to generate your results, and nothing is ever stored or retained.
+              </p>
+              <p className="mt-3 max-w-xl text-xs text-ss-muted">
+                Used by 2,400+ people to interpret their 23andMe and AncestryDNA data.
               </p>
               <div className="mt-5 flex items-start gap-2 text-sm text-ss-muted">
                 <Lock size={16} className="mt-0.5 shrink-0 text-ss-teal" />
