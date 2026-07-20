@@ -45,6 +45,7 @@ import PractitionerSupplementBlock from '@/components/practitioner/PractitionerS
 import GeneticVariantSummary from '@/components/practitioner/GeneticVariantSummary'
 import DisclaimerPage from '@/components/practitioner/DisclaimerPage'
 import DashboardBackLink from '@/components/DashboardBackLink'
+import PrintGateModal, { shouldPromptGate } from '@/components/practitioner/PrintGateModal'
 
 export default function PractitionerReportClient() {
   const [report, setReport] = useState(null)
@@ -55,6 +56,11 @@ export default function PractitionerReportClient() {
   const [ready, setReady] = useState(false)
   const [reportDate, setReportDate] = useState('')
   const [previewMode, setPreviewMode] = useState(false)
+  // Section 6 spec: gate the print action behind an optional prompt for
+  // medications / allergies / chief-concern. `pendingPrint` is true when
+  // the user tapped Print and we're either showing the gate modal or
+  // about to fire window.print().
+  const [gateOpen, setGateOpen] = useState(false)
 
   useEffect(() => {
     setReport(getGenomeResults())
@@ -114,11 +120,44 @@ export default function PractitionerReportClient() {
   }
 
   const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      // Small delay so React finishes any pending state flushes before print.
-      setTimeout(() => window.print(), 60)
+    if (typeof window === 'undefined') return
+    // Section 6 spec: if any of the three "most useful" fields
+    // (medications / allergies / chief concern) is empty, prompt the
+    // user to fill them in first. The prompt is non-blocking — either
+    // button ("Complete now" or "Generate anyway") proceeds to print.
+    if (shouldPromptGate(intake)) {
+      setGateOpen(true)
+      return
     }
+    firePrint()
   }
+  const firePrint = () => {
+    // Small delay so React finishes any pending state flushes before print.
+    setTimeout(() => window.print(), 60)
+  }
+  const handleGateProceed = () => {
+    setGateOpen(false)
+    // Re-read intake in case the user filled fields via "Complete now",
+    // then fire the print.
+    setIntake(loadIntake())
+    firePrint()
+  }
+
+  // Section 6 spec: dynamic section numbering. Currently Section 1 goes
+  // to PatientContext, Section 2 to Biomarkers, Section 3 to Genetic
+  // variants. If a user toggles PatientContext off, Biomarkers should
+  // renumber to Section 1 and Genetic variants to Section 2 — no gap.
+  // BiomarkerSummary is now rendered whenever `sections.biomarkers` is
+  // on (even if `hasBiomarkers` is false) so the numbering stays stable
+  // and the clinician sees an explicit "No biomarker values recorded"
+  // note instead of a silently missing section.
+  const sectionNums = useMemo(() => {
+    const visible = []
+    if (sections.patientContext) visible.push('patientContext')
+    if (sections.biomarkers)     visible.push('biomarkers')
+    if (sections.variants)       visible.push('variants')
+    return Object.fromEntries(visible.map((k, i) => [k, i + 1]))
+  }, [sections.patientContext, sections.biomarkers, sections.variants])
 
   return (
     <div className="min-h-screen bg-ss-bg">
@@ -211,11 +250,21 @@ export default function PractitionerReportClient() {
             {sections.clinicianNote && <ClinicianNote />}
 
             {/* Page 3 — Patient context (toggleable) */}
-            {sections.patientContext && <PatientContextTable intake={intake} />}
+            {sections.patientContext && (
+              <PatientContextTable intake={intake} sectionNum={sectionNums.patientContext} />
+            )}
 
-            {/* Page 4 — Biomarkers (toggleable, auto-hidden if empty) */}
-            {sections.biomarkers && hasBiomarkers && (
-              <BiomarkerSummary values={labs} history={history} sex={intake?.sex || 'male'} />
+            {/* Page 4 — Biomarkers (toggleable). Section 6 spec: always
+                render when toggled on (even if empty) so the section
+                numbering stays contiguous. Empty state is handled
+                inside the component. */}
+            {sections.biomarkers && (
+              <BiomarkerSummary
+                values={labs}
+                history={history}
+                sex={intake?.sex || 'male'}
+                sectionNum={sectionNums.biomarkers}
+              />
             )}
 
             {/* Supplement considerations (auto-hidden if no signals) */}
@@ -231,6 +280,7 @@ export default function PractitionerReportClient() {
                 rawVariants={report._variants}
                 rawRows={rawRows}
                 includeRawAppendix={!!sections.rawAppendix}
+                sectionNum={sectionNums.variants}
               />
             )}
 
@@ -239,6 +289,14 @@ export default function PractitionerReportClient() {
           </div>
         )}
       </div>
+
+      {/* Section 6 spec: gate modal for medications / allergies / chief
+          concern. Non-blocking \u2014 both buttons proceed to print. */}
+      <PrintGateModal
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        onProceed={handleGateProceed}
+      />
 
       {/* Toggle: hide the print sheet on-screen unless preview mode is on. */}
       <style jsx global>{`

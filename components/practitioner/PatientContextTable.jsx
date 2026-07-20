@@ -4,7 +4,7 @@
 
 import { ageFromDob, bmiFrom, cmToFtIn, kgToLb } from '@/lib/practitionerIntake'
 
-export default function PatientContextTable({ intake }) {
+export default function PatientContextTable({ intake, sectionNum = 1 }) {
   const age = ageFromDob(intake?.dob)
   const bmi = bmiFrom(intake?.heightCm, intake?.weightKg)
   const ftin = cmToFtIn(intake?.heightCm)
@@ -34,7 +34,7 @@ export default function PatientContextTable({ intake }) {
     <section className="page-break-before avoid-break mt-8 print:mt-0 print:pt-8">
       <div className="border-b border-ss-teal/40 pb-2">
         <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ss-orange">
-          Section 1
+          Section {sectionNum}
         </div>
         <h2 className="mt-1 text-lg font-extrabold text-ss-teal">Patient-reported context</h2>
         <p className="mt-1 text-[11px] italic text-ss-muted">

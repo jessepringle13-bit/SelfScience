@@ -2269,7 +2269,83 @@ test_plan:
 
     -agent: "main"
       message: |
-        LLM PROVIDER TIMEOUT FIX (2026-07) — critical infra fix per user
+        SLICE 3B SHIPPED (2026-07 session) — Message 580 Section 6,
+        items 2 + 6 + 7.
+
+        FILES ADDED:
+        * /app/components/practitioner/PrintGateModal.jsx (NEW)
+            Dismissible modal that prompts the user to fill in
+            currentMedications / allergies / reasonForVisit BEFORE the
+            PDF is generated. Non-blocking: two buttons ("Complete
+            now" + "Generate anyway") both proceed to print.
+            Exports shouldPromptGate(intake) helper so the caller
+            never opens the modal when all three fields are populated.
+
+        FILES CHANGED:
+        * /app/app/practitioner-report/practitioner-report-client.jsx
+            - New gateOpen state + handlePrint checks
+              shouldPromptGate(intake) before firing window.print().
+            - handleGateProceed reads the freshly-saved intake before
+              printing so the cover page reflects the just-entered
+              medications/allergies/concern.
+            - New sectionNums useMemo dynamically renumbers
+              PatientContext / Biomarkers / Genetic-variants based on
+              which SectionToggles are visible. Fixes the "1 -> 3
+              numbering gap" from Section 6 spec item 6.
+            - BiomarkerSummary now ALWAYS renders when its toggle is
+              on (removed the `&& hasBiomarkers` gate) so the section
+              numbering stays contiguous. The empty state message
+              inside the component covers the no-data case.
+            - <PrintGateModal /> mounted at the bottom of the render.
+        * /app/components/practitioner/PrintCoverPage.jsx
+            - "Prepared for (patient)" field now shows
+              "[Patient name not provided]" (italic, muted) when the
+              intake patientName is blank, instead of a bare em-dash.
+            - "For the attention of" field now shows
+              "[Clinician name not provided]" the same way.
+            - New `placeholder` prop on CoverField switches the value
+              to italic + muted styling.
+        * /app/components/practitioner/PatientContextTable.jsx
+            - Accepts sectionNum prop (default 1) so it can be
+              renumbered when Biomarkers is toggled off.
+        * /app/components/practitioner/BiomarkerSummary.jsx
+            - Accepts sectionNum prop (default 2). Empty state now
+              also uses the dynamic number.
+
+        VERIFIED MANUALLY (1280 px):
+        * /practitioner-report with sample genome loaded:
+            * Clicking "Print / Save as PDF" opens the PrintGateModal
+              with the three optional textareas + hint text.
+            * Modal has "Generate anyway" (secondary) and "Complete
+              now & generate" (primary, teal fill) buttons.
+            * X close button and Escape key both dismiss the modal.
+            * Backdrop click also dismisses.
+            * Body scroll locked while modal is open.
+            * When all three fields are pre-filled in intake, tapping
+              Print skips the modal and fires window.print() directly.
+        * Section-numbering fix: because BiomarkerSummary renders as
+          Section 2 whenever its toggle is on, the numbering is 1 -> 2
+          -> 3 in the default configuration. When PatientContext is
+          toggled off, Biomarkers becomes Section 1 and Variants
+          becomes Section 2 — no gaps.
+        * Cover-page placeholders: the italic
+          "[Patient name not provided]" and "[Clinician name not
+          provided]" strings render correctly with sample data (which
+          does not populate intake by default).
+
+        NAMESPACING:
+        * No new localStorage keys added — reuses existing
+          `selfscience_practitioner_intake` (legacy prefix, from
+          before ss_ convention). Kept for backwards compatibility.
+
+        NEXT SLICE 3C:
+        * Executive Summary Page 1 (Urgent PGx + Top 3 Awareness +
+          Active meds flags + Chief concern)
+        * Section 3B (Strengths) cosmetic-variant cleanup
+          (HERC2/TAS2R38/SLC24A5/EDAR filtered out of print)
+        * Section 3D (Neutrals) removed from PDF -> replaced with a
+          single footnote line under 3C
+        * Database version + rules date footer
         request. Previously: 18s per-tier timeout + 38s total budget was
         causing Llama 3.3 70B (Together AI primary) to time out
         consistently before returning, then Llama 3.1 70B (OpenRouter

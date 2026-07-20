@@ -49,15 +49,26 @@ export default function PrintCoverPage({ intake, reportDate, reportId }) {
             </p>
           </div>
 
-          {/* Prepared-for block */}
+          {/* Prepared-for block. Section 6 spec: when either name is
+              blank we render an explicit placeholder ("[Patient name
+              not provided]" / "[Clinician name not provided]") instead
+              of a bare em-dash so the clinician can see the field was
+              acknowledged but left empty (rather than looking like an
+              accidental omission). */}
           <div className="mt-10 grid grid-cols-2 gap-6">
-            <CoverField label="Prepared for (patient)" value={intake?.patientName || '—'} />
-            <CoverField label="For the attention of"
+            <CoverField
+              label="Prepared for (patient)"
+              value={intake?.patientName || '[Patient name not provided]'}
+              placeholder={!intake?.patientName}
+            />
+            <CoverField
+              label="For the attention of"
               value={
                 intake?.practitionerName
                   ? intake.practitionerName + (intake.practitionerRole ? ` — ${intake.practitionerRole}` : '')
-                  : '—'
+                  : '[Clinician name not provided]'
               }
+              placeholder={!intake?.practitionerName}
             />
             <CoverField label="Date of birth" value={intake?.dob || '—'} />
             <CoverField label="Age / Sex" value={[age != null ? `${age} yrs` : null, intake?.sex || null].filter(Boolean).join(' · ') || '—'} />
@@ -105,11 +116,13 @@ export default function PrintCoverPage({ intake, reportDate, reportId }) {
   )
 }
 
-function CoverField({ label, value }) {
+function CoverField({ label, value, placeholder = false }) {
   return (
     <div className="border-b border-ss-border-warm/70 pb-1">
       <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ss-muted">{label}</div>
-      <div className="mt-1 text-[13px] font-semibold text-ss-text">{value}</div>
+      <div className={`mt-1 text-[13px] ${placeholder ? 'italic text-ss-muted' : 'font-semibold text-ss-text'}`}>
+        {value}
+      </div>
     </div>
   )
 }

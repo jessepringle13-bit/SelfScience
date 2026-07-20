@@ -5,7 +5,7 @@
 
 import { STATUS, evaluateBiomarker, getBiomarkersForSex } from '@/lib/biomarkers/status'
 
-export default function BiomarkerSummary({ values, history, sex = 'male' }) {
+export default function BiomarkerSummary({ values, history, sex = 'male', sectionNum = 2 }) {
   // Prefer the most-recent history snapshot if the user has been tracking;
   // fallback to the single-panel values map.
   const source = pickLatest(values, history)
@@ -24,7 +24,7 @@ export default function BiomarkerSummary({ values, history, sex = 'male' }) {
   if (filled.length === 0) {
     return (
       <section className="page-break-before avoid-break mt-8 print:mt-0 print:pt-8">
-        <SectionHeader n={2} title="Biomarker summary" />
+        <SectionHeader n={sectionNum} title="Biomarker summary" />
         <div className="mt-3 rounded border border-dashed border-ss-border-warm/70 p-4 text-center text-[11px] italic text-ss-muted">
           No biomarker values have been recorded. Visit <span className="font-mono">/biomarkers</span> to enter recent lab values.
         </div>
@@ -34,7 +34,7 @@ export default function BiomarkerSummary({ values, history, sex = 'male' }) {
 
   return (
     <section className="page-break-before avoid-break mt-8 print:mt-0 print:pt-8">
-      <SectionHeader n={2} title="Biomarker summary (self-reported)" subtitle={source?.dateISO ? `Snapshot date: ${source.dateISO}` : 'Single-panel entry'} />
+      <SectionHeader n={sectionNum} title="Biomarker summary (self-reported)" subtitle={source?.dateISO ? `Snapshot date: ${source.dateISO}` : 'Single-panel entry'} />
 
       <table className="mt-3 w-full border-collapse text-left text-[11px]">
         <thead>
