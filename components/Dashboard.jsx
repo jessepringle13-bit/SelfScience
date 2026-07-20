@@ -24,6 +24,7 @@ import TimeAwareBanner from '@/components/dashboard/TimeAwareBanner'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
 import StackQualityWidget from '@/components/supplements/StackQualityWidget'
+import OnboardingTour from '@/components/dashboard/OnboardingTour'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -233,33 +234,38 @@ export default function Dashboard() {
 
       <div ref={topFindingsRef} className="container mt-10 space-y-14">
         {/* 1. TOP FINDINGS (Be Aware) */}
-        <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">
-          {areas.length === 0 ? (
-            <EmptyRow copy="No awareness findings surfaced — every recognized variant is in favorable or neutral range." />
-          ) : (
-            <CardRow items={areas} tone="aware" />
-          )}
-          <SeeAllLink
-            href="/genome/findings"
-            label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
-          />
-        </DashSection>
+        <div data-tour-target="top-findings">
+          <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">
+            {areas.length === 0 ? (
+              <EmptyRow copy="No awareness findings surfaced — every recognized variant is in favorable or neutral range." />
+            ) : (
+              <CardRow items={areas} tone="aware" />
+            )}
+            <SeeAllLink
+              href="/genome/findings"
+              label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
+            />
+          </DashSection>
+        </div>
 
         {/* 2. STRENGTHS */}
-        <DashSection title="Your Strengths" subtitle="Your top favorable variants." toneClass="text-ss-green">
-          {strengths.length === 0 ? (
-            <EmptyRow copy="No positive findings surfaced yet — explore your full report for the complete picture." />
-          ) : (
-            <CardRow items={strengths} tone="strength" />
-          )}
-          <SeeAllLink
-            href="/genome/strengths"
-            label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
-          />
-        </DashSection>
+        <div data-tour-target="strengths">
+          <DashSection title="Your Strengths" subtitle="Your top favorable variants." toneClass="text-ss-green">
+            {strengths.length === 0 ? (
+              <EmptyRow copy="No positive findings surfaced yet — explore your full report for the complete picture." />
+            ) : (
+              <CardRow items={strengths} tone="strength" />
+            )}
+            <SeeAllLink
+              href="/genome/strengths"
+              label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
+            />
+          </DashSection>
+        </div>
 
         {/* 3. PILLAR SCORE OVERVIEW */}
-        <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars. Tap any pillar to filter your dashboard by it." toneClass="text-ss-teal">
+        <div data-tour-target="pillar-grid">
+          <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars. Tap any pillar to filter your dashboard by it." toneClass="text-ss-teal">
           {/* Legend */}
           <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
             <span className="inline-flex items-center gap-1.5">
@@ -293,6 +299,7 @@ export default function Dashboard() {
             ))}
           </div>
         </DashSection>
+        </div>
 
         {/* 4. RESEARCH MATCHED TO YOU */}
         <ResearchMatched genes={topGenes} prevVisitISO={prevVisitISO} />
@@ -381,6 +388,10 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      {/* Slice 4A: first-time tooltip tour. Only renders when the
+          ss_onboarding_complete flag is falsy. Safe to mount always \u2014
+          the component short-circuits internally. */}
+      <OnboardingTour />
     </div>
   )
 }

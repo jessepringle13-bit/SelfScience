@@ -213,7 +213,7 @@ export function SiteNav({ variant = 'light' }) {
               <LayoutDashboard size={14} /> Dashboard
             </a>
           )}
-          <a href="/search" className={linkClass('/search')}>Search</a>
+          <a href="/search" data-tour-target="nav-search" className={linkClass('/search')}>Search</a>
 
           {/* Pillars dropdown — click to open, click outside/Escape to close */}
           <div className="relative" ref={pillarsRef}>

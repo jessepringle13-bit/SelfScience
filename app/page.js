@@ -18,6 +18,7 @@ import { EditorialFeatured } from '@/components/editorial-featured'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import { hasGenomeResults } from '@/lib/genomeSession'
 import Dashboard from '@/components/Dashboard'
+import DiscoverFeed from '@/components/dashboard/DiscoverFeed'
 
 /* -------------------------------- Sample data ------------------------------ */
 
@@ -250,7 +251,9 @@ function App() {
         </div>
       )}
 
-      {hasGenome && view === 'dashboard' ? <Dashboard /> : <DiscoverHome />}
+      {hasGenome && view === 'dashboard' && <Dashboard />}
+      {hasGenome && view === 'discover' && <DiscoverFeed />}
+      {!hasGenome && <DiscoverHome />}
     </>
   )
 }

@@ -2269,7 +2269,113 @@ test_plan:
 
     -agent: "main"
       message: |
-        SLICE 3C SHIPPED (2026-07 session) — Message 580 Section 6,
+        PHASE 4 SHIPPED (2026-07 session) — Message 580 Sections 9, 10, 11.
+
+        SLICE 4A — Onboarding Flow (Section 9)
+        Files added:
+        * /app/components/genome/SummaryScreen.jsx (NEW) — "What we
+          found" reveal screen with total variant count, category
+          breakdown (awareness/strengths/neutral tiles), top 3 finding
+          cards, primary CTA "See your full dashboard →", secondary
+          "Go straight to dashboard" link, tertiary "stay here" link.
+          Staggered fade-up entrance animation. Only shown for real
+          file uploads — sample-data path skips it.
+        * /app/components/dashboard/OnboardingTour.jsx (NEW) —
+          4-step tooltip tour highlighting Top Findings → Strengths →
+          Explore Pillars → Search nav. Uses data-tour-target
+          attributes for anchoring. On mobile renders as bottom sheet
+          instead of floating tooltips. Stores ss_onboarding_complete
+          flag. Never renders DOM when flag is true (per spec addendum
+          — no tooltip nodes for completed users). Escape + backdrop
+          click dismiss (interpreted as skip).
+
+        Files changed:
+        * /app/app/genome/genome-client.jsx — new 'summary' stage
+          inserted between 'processing' and 'results'. Processing
+          screen redesigned with 3-step visual stepper (Reading file →
+          Identifying variants → Building your profile), current-step
+          indicator + Working spinner on active step. "Usually under
+          15 seconds" reassurance line added. SelfScience logo mark
+          above card. Error screen rewritten with three recovery
+          buttons (Try a different file / Try with sample data / Get
+          help) + a clearer plain-English error message that detects
+          "not a 23andMe/Ancestry/VCF" case explicitly.
+        * /app/components/Dashboard.jsx — data-tour-target attributes
+          added on the Top Findings, Strengths, and Pillar Grid
+          sections. OnboardingTour mounted at the end of the tree.
+        * /app/components/site-nav.jsx — data-tour-target="nav-search"
+          on the Search top-nav link.
+
+        SLICE 4B — Discover Tab (Section 10)
+        Files added:
+        * /app/components/dashboard/DiscoverFeed.jsx (NEW) —
+          Distinct-from-search curated feed with 5 sections:
+            1. Pillar carousel (quick-jump anchors)
+            2. Trending in your pillars (highest-cited)
+            3. New this month (last 30 days)
+            4. Based on your <top variant> gene (curated mini-feed)
+            5. Clinical trials open near you (recruiting studies
+               filtered by top genes, US-only fallback via
+               ClinicalTrials.gov v2)
+          Bookmark parity with Search — every card fires the same
+          selfscience:bookmark-toast event, respects the shared
+          ss:saved-studies store.
+
+        Files changed:
+        * /app/app/page.js — DiscoverFeed rendered when
+          hasGenome && view === 'discover'. DiscoverHome remains for
+          un-genomed users.
+
+        SLICE 4C — Reading List enhancements (Section 11)
+        Files added:
+        * /app/lib/readingListMeta.js (NEW) — annotations + read-state
+          helpers using ss_reading_list_notes and ss_reading_list_read
+          localStorage keys. MAX_NOTE_LENGTH = 500. Exports
+          buildReadingListCSV() and downloadReadingListCSV() for the
+          Export list feature.
+
+        Files changed:
+        * /app/app/reading-list/reading-list-client.jsx —
+          SavedStudiesSection now includes:
+            * Pillar filter chip bar (All / Unread only / <each
+              pillar with saved papers>).
+            * Unread indicator (orange dot + bold title) on saved
+              papers whose id is NOT in ss_reading_list_read.
+            * "Add note" / "Edit note" per paper with a NoteEditor
+              that stays under MAX_NOTE_LENGTH characters, iOS-zoom-
+              safe (16px font). Notes stored in ss_reading_list_notes
+              keyed by study id.
+            * "Mark as read" / "Mark as unread" toggle on each card.
+            * "Export list" button in the header downloads a CSV
+              containing title, authors, journal, year, url, pillars,
+              reliability tier, read state, and note.
+            * Header now shows total + unread count pill.
+
+        NAMESPACING:
+        * All new localStorage keys prefixed with ss_:
+            ss_onboarding_complete
+            ss_reading_list_notes
+            ss_reading_list_read
+        * (Existing ss:saved-studies key unchanged for backwards
+          compatibility.)
+
+        VERIFIED MANUALLY (1280 px):
+        * /reading-list with 3 seeded saved studies + 1 read + 1 note
+          renders correctly:
+            - "Your Saved Studies (3) · 2 unread" header pills
+            - Export list + Clear all buttons in the top-right
+            - Filter chip bar: All (3) · Unread only (2) · Nutrition
+              · Mental Health · Performance
+            - Unread dots + bold titles on the 2 unread papers
+            - Note visible on the annotated paper with Edit link
+            - "Mark as read/unread" toggle at bottom of each card
+        * /genome upload/processing/error screens compile cleanly.
+          Existing sample-data flow still bypasses the new summary
+          screen.
+
+        PHASE 4 COMPLETE. Awaiting testing agent run per user's
+        cadence, then ready to move to Phase 5 (Section 12 About +
+        Section 8 Mobile pass).
         items 1 + 4 + 5 + 7. Completes Phase 3.
 
         FILES ADDED:

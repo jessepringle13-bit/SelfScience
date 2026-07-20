@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { BookOpen, Search, ArrowRight, Bookmark, ExternalLink, Trash2 } from 'lucide-react'
+import { BookOpen, Search, ArrowRight, Bookmark, ExternalLink, Trash2, Download, Circle, MessageSquare, X } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import SiteFooter from '@/components/site-footer'
 import { BOOKS, PILLAR_LABELS, PILLARS_ORDERED, TOPIC_COLLECTIONS, fetchOpenLibraryCover } from '@/lib/books'
@@ -13,6 +13,10 @@ import {
   clearSavedStudies,
   SAVED_STUDIES_CHANGE_EVENT,
 } from '@/lib/savedStudies'
+import {
+  getNote, saveNote, isRead, markRead, markUnread,
+  downloadReadingListCSV, MAX_NOTE_LENGTH, READING_LIST_META_CHANGE_EVENT,
+} from '@/lib/readingListMeta'
 import { reliabilityTier } from '@/components/result-card'
 
 // Palette per pillar (used as cover fallback background)
@@ -52,24 +56,63 @@ function BookCover({ book }) {
 }
 
 function SavedStudiesSection() {
-  // localStorage-backed reading list of studies saved from Search. Rehydrates
-  // on mount and subscribes to the shared change event so removing a study
-  // from the search page immediately reflects here.
+  // localStorage-backed reading list of studies saved from Search.
+  // Slice 4C enhancements: pillar filter, unread state, per-paper notes,
+  // CSV export.
   const router = useRouter()
   const [items, setItems] = useState([])
+  const [filter, setFilter] = useState('all')   // 'all' | 'unread' | pillar-key
+  const [openNoteId, setOpenNoteId] = useState(null)
+  const [, forceRender] = useState(0) // triggered when notes / read state change
   useEffect(() => {
     setItems(getSavedStudies())
-    const onChange = () => setItems(getSavedStudies())
-    window.addEventListener(SAVED_STUDIES_CHANGE_EVENT, onChange)
-    return () => window.removeEventListener(SAVED_STUDIES_CHANGE_EVENT, onChange)
+    const onSaved = () => setItems(getSavedStudies())
+    const onMeta = () => forceRender((n) => n + 1)
+    window.addEventListener(SAVED_STUDIES_CHANGE_EVENT, onSaved)
+    window.addEventListener(READING_LIST_META_CHANGE_EVENT, onMeta)
+    return () => {
+      window.removeEventListener(SAVED_STUDIES_CHANGE_EVENT, onSaved)
+      window.removeEventListener(READING_LIST_META_CHANGE_EVENT, onMeta)
+    }
   }, [])
-  if (items.length === 0) return null
 
   const TIER_DOT = {
     strong:   'bg-ss-green',
     moderate: 'bg-ss-amber',
     limited:  'bg-[#c2513a]',
   }
+
+  // ─── Derive per-item pillar (best-effort) ──────────────────────────
+  // Saved-study objects don't always carry a pillar[] array. Fall back to
+  // whatever the ResultCard stored (matchedGenes hint, pillar field, or
+  // classification tag).
+  const pillarOf = (s) => {
+    if (Array.isArray(s.pillars) && s.pillars.length) return s.pillars[0]
+    if (typeof s.pillar === 'string') return s.pillar
+    return null
+  }
+
+  const availablePillars = useMemo(() => {
+    const set = new Set()
+    for (const s of items) {
+      const p = pillarOf(s)
+      if (p) set.add(p)
+    }
+    return [...set]
+  }, [items])
+
+  const filtered = useMemo(() => {
+    if (filter === 'all') return items
+    if (filter === 'unread') return items.filter((s) => !isRead(s.id))
+    return items.filter((s) => pillarOf(s) === filter)
+  }, [items, filter])
+
+  const unreadCount = useMemo(
+    () => items.filter((s) => !isRead(s.id)).length,
+    [items],
+  )
+
+  if (items.length === 0) return null
 
   return (
     <section className="border-b border-ss-border-warm bg-ss-bg">
@@ -82,9 +125,22 @@ function SavedStudiesSection() {
               <span className="ml-2 inline-flex items-center rounded-full bg-ss-teal px-2 py-0.5 text-[11px] font-bold text-white">
                 {items.length}
               </span>
+              {unreadCount > 0 && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-ss-orange px-2 py-0.5 text-[11px] font-bold text-white" title={`${unreadCount} unread`}>
+                  {unreadCount} unread
+                </span>
+              )}
             </h2>
           </div>
-          {items.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => downloadReadingListCSV(items)}
+              className="inline-flex min-h-9 items-center gap-1 rounded-full border border-ss-border-warm bg-white px-3 py-1.5 text-[11px] font-semibold text-ss-teal transition hover:border-ss-teal"
+              title="Export as CSV"
+            >
+              <Download size={12} /> Export list
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -94,80 +150,214 @@ function SavedStudiesSection() {
             >
               <Trash2 size={12} /> Clear all
             </button>
-          )}
+          </div>
         </div>
+
+        {/* Filter chip bar */}
+        <div className="mb-3 -mx-1 flex flex-wrap gap-2 px-1">
+          <FilterChip active={filter === 'all'} onClick={() => setFilter('all')}>All ({items.length})</FilterChip>
+          <FilterChip active={filter === 'unread'} onClick={() => setFilter('unread')} tone="orange">
+            Unread only ({unreadCount})
+          </FilterChip>
+          {availablePillars.map((p) => (
+            <FilterChip key={p} active={filter === p} onClick={() => setFilter(p)}>
+              {PILLAR_LABELS[p] || p}
+            </FilterChip>
+          ))}
+        </div>
+
         <p className="mb-4 text-xs italic text-ss-muted">
-          Studies you bookmark from Search appear here, kept locally on this
-          device. Clear your browser data and they&rsquo;re gone — nothing
-          is stored on our servers.
+          Studies you bookmark from Search appear here, kept locally on this device. Bold titles are unread; tap "Add note" to attach a private annotation.
         </p>
+
         <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {items.map((s) => {
+          {filtered.map((s) => {
             const tier = reliabilityTier(s.reliability)
             const dotClass = tier ? TIER_DOT[tier] : 'bg-ss-muted/50'
+            const unread = !isRead(s.id)
+            const note = getNote(s.id)
+            const isEditingNote = openNoteId === s.id
             return (
               <li
                 key={s.id}
-                className="group flex items-start gap-3 rounded-2xl border border-ss-border-warm bg-white p-3 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
+                className="group flex flex-col rounded-2xl border border-ss-border-warm bg-white p-3 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
               >
-                <span
-                  className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white ${dotClass}`}
-                  title={tier ? `${tier} evidence` : 'not yet scored'}
-                />
-                <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try { sessionStorage.setItem(`ss:study:${s.id}`, JSON.stringify(s)) } catch {}
-                      router.push(`/study/${encodeURIComponent(s.id)}`)
-                    }}
-                    className="block text-left text-sm font-bold text-ss-teal hover:underline line-clamp-2"
-                  >
-                    {s.plainTitle || s.title}
-                  </button>
-                  {s.plainTitle && s.plainTitle.toLowerCase() !== (s.title || '').toLowerCase() && (
-                    <div className="mt-0.5 text-[11px] italic text-ss-muted line-clamp-1" title={s.title}>
-                      {s.title}
-                    </div>
-                  )}
-                  <div className="mt-0.5 text-[11px] text-ss-muted line-clamp-1">
-                    {s.journal || '—'}{s.year ? ` · ${s.year}` : ''}
-                  </div>
-                  {Array.isArray(s.matchedGenes) && s.matchedGenes.length > 0 && (
-                    <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-semibold text-ss-teal">
-                      Matches your {s.matchedGenes[0]}
-                      {s.matchedGenes.length > 1 ? ` +${s.matchedGenes.length - 1}` : ''}
-                    </div>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  {s.url && (
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ss-muted transition hover:bg-ss-bg hover:text-ss-teal"
-                      title="Open full study"
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white ${dotClass}`}
+                    title={tier ? `${tier} evidence` : 'not yet scored'}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markRead(s.id)
+                        try { sessionStorage.setItem(`ss:study:${s.id}`, JSON.stringify(s)) } catch {}
+                        router.push(`/study/${encodeURIComponent(s.id)}`)
+                      }}
+                      className={`block text-left text-sm text-ss-teal hover:underline line-clamp-2 ${unread ? 'font-extrabold' : 'font-semibold'}`}
                     >
-                      <ExternalLink size={14} />
-                    </a>
+                      {unread && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-ss-orange align-middle" aria-label="unread" />}
+                      {s.plainTitle || s.title}
+                    </button>
+                    {s.plainTitle && s.plainTitle.toLowerCase() !== (s.title || '').toLowerCase() && (
+                      <div className="mt-0.5 text-[11px] italic text-ss-muted line-clamp-1" title={s.title}>
+                        {s.title}
+                      </div>
+                    )}
+                    <div className="mt-0.5 text-[11px] text-ss-muted line-clamp-1">
+                      {s.journal || '—'}{s.year ? ` · ${s.year}` : ''}
+                    </div>
+                    {Array.isArray(s.matchedGenes) && s.matchedGenes.length > 0 && (
+                      <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-ss-teal/10 px-2 py-0.5 text-[10px] font-semibold text-ss-teal">
+                        Matches your {s.matchedGenes[0]}
+                        {s.matchedGenes.length > 1 ? ` +${s.matchedGenes.length - 1}` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {s.url && (
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        onClick={() => markRead(s.id)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ss-muted transition hover:bg-ss-bg hover:text-ss-teal"
+                        title="Open full study"
+                      >
+                        <ExternalLink size={14} />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => unsaveStudy(s.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ss-muted transition hover:bg-ss-bg hover:text-ss-orange"
+                      title="Remove from reading list"
+                      aria-label="Remove from reading list"
+                    >
+                      <Bookmark size={14} fill="currentColor" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Note row */}
+                <div className="mt-2 border-t border-ss-border-warm/50 pt-2">
+                  {isEditingNote ? (
+                    <NoteEditor
+                      initial={note}
+                      onSave={(val) => { saveNote(s.id, val); setOpenNoteId(null) }}
+                      onCancel={() => setOpenNoteId(null)}
+                    />
+                  ) : note ? (
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[11px] italic leading-relaxed text-ss-text">
+                        <MessageSquare size={11} className="mr-1 inline text-ss-muted" />
+                        {note}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setOpenNoteId(s.id)}
+                        className="shrink-0 text-[10px] font-semibold text-ss-muted underline hover:text-ss-teal"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setOpenNoteId(s.id)}
+                      className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-ss-muted transition hover:text-ss-teal"
+                    >
+                      <MessageSquare size={11} /> Add note
+                    </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => unsaveStudy(s.id)}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-ss-muted transition hover:bg-ss-bg hover:text-ss-orange"
-                    title="Remove from reading list"
-                    aria-label="Remove from reading list"
-                  >
-                    <Bookmark size={14} fill="currentColor" />
-                  </button>
+                  <div className="mt-1 flex items-center gap-2">
+                    {unread ? (
+                      <button
+                        type="button"
+                        onClick={() => markRead(s.id)}
+                        className="text-[10px] font-semibold text-ss-muted underline hover:text-ss-teal"
+                      >
+                        Mark as read
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => markUnread(s.id)}
+                        className="text-[10px] font-semibold text-ss-muted underline hover:text-ss-teal"
+                      >
+                        Mark as unread
+                      </button>
+                    )}
+                  </div>
                 </div>
               </li>
             )
           })}
         </ul>
+        {filtered.length === 0 && (
+          <p className="mt-3 rounded-xl border border-dashed border-ss-border-warm/60 p-4 text-center text-xs italic text-ss-muted">
+            No saved studies match this filter.
+          </p>
+        )}
       </div>
     </section>
+  )
+}
+
+function FilterChip({ active, onClick, tone = 'teal', children }) {
+  const activeClass = tone === 'orange'
+    ? 'border-ss-orange bg-ss-orange text-white'
+    : 'border-ss-teal bg-ss-teal text-white'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+        active ? activeClass : 'border-ss-border-warm bg-white text-ss-teal hover:border-ss-teal'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function NoteEditor({ initial, onSave, onCancel }) {
+  const [val, setVal] = useState(initial || '')
+  const remaining = MAX_NOTE_LENGTH - val.length
+  return (
+    <div>
+      <textarea
+        autoFocus
+        value={val}
+        onChange={(e) => setVal(e.target.value.slice(0, MAX_NOTE_LENGTH))}
+        placeholder="Your private note — up to 500 characters. Stays on this device."
+        rows={2}
+        className="w-full rounded-md border border-ss-border-warm bg-white px-2.5 py-1.5 text-xs text-ss-text placeholder:text-ss-muted focus:border-ss-teal focus:outline-none focus:ring-1 focus:ring-ss-teal"
+        style={{ fontSize: '16px' }} // prevent iOS zoom
+      />
+      <div className="mt-1 flex items-center justify-between text-[10px]">
+        <span className={remaining < 40 ? 'text-ss-orange' : 'text-ss-muted'}>
+          {remaining}/{MAX_NOTE_LENGTH} characters
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full px-2.5 py-1 text-[10.5px] font-semibold text-ss-muted hover:text-ss-teal"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(val.trim())}
+            className="inline-flex items-center gap-1 rounded-full bg-ss-teal px-2.5 py-1 text-[10.5px] font-bold text-white hover:brightness-110"
+          >
+            Save note
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

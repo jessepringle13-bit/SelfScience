@@ -40,6 +40,7 @@ import YourProtocolTab from '@/components/YourProtocolTab'
 import { saveGenomeResults, clearGenomeResults, notifyGenomeResultsChanged } from '@/lib/genomeSession'
 import GenomeSupplementLinks from '@/components/genome/GenomeSupplementLinks'
 import { YOUTH_VARIANT_CROSSREFS } from '@/lib/youth-content'
+import SummaryScreen from '@/components/genome/SummaryScreen'
 import { normalizePillarName } from '@/lib/pillars'
 import { usePillarFilter, PillarFilter, PillarFilterBanner } from '@/components/PillarFilter'
 import DashboardBackLink from '@/components/DashboardBackLink'
@@ -62,7 +63,7 @@ export default function GenomeClient() {
   const router = useRouter()
   const inputRef = useRef(null)
 
-  const [stage, setStage] = useState('upload') // upload | processing | results | error
+  const [stage, setStage] = useState('upload') // upload | processing | summary | results | error
   const [progress, setProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
   const [errorMsg, setErrorMsg] = useState(null)
@@ -105,6 +106,18 @@ export default function GenomeClient() {
    *
    * Returns a stop() function the caller invokes when the API returns.
    */
+  /**
+   * Slice 4A spec: derive which of the 3 high-level steps the user is on
+   * from the fine-grained progress ticker label. The processing screen
+   * shows a stepped visualization (Reading file → Identifying variants
+   * → Building your profile) rather than raw ticker copy.
+   */
+  const currentProcessingStep = useMemo(() => {
+    if (progress >= 65) return 2  // Building your profile
+    if (progress >= 25) return 1  // Identifying variants
+    return 0                       // Reading file
+  }, [progress])
+
   const startProgressTicker = () => {
     const stages = [
       { at: 0,     pct: 8,  label: 'Reading your variants…' },
@@ -134,7 +147,8 @@ export default function GenomeClient() {
     return () => { stopped = true; clearInterval(iv) }
   }
 
-  const runAnalysis = useCallback(async (parsed) => {
+  const runAnalysis = useCallback(async (parsed, opts = {}) => {
+    const { skipSummary = false } = opts
     setStage('processing')
     setVariants(parsed.variants)
     setStats(parsed.stats)
@@ -160,9 +174,13 @@ export default function GenomeClient() {
       } catch { /* noop */ }
       stopTicker()
       setProgress(100)
-      setProgressLabel('Report ready ✓')
+      setProgressLabel('Report ready \u2713')
       await sleep(300)
-      setStage('results')
+      // Slice 4A spec: real file uploads land on the "What we found"
+      // summary screen (the reveal moment) before the full report.
+      // Sample-data flow skips it \u2014 users clicking "Try sample" are
+      // already familiar with the app.
+      setStage(skipSummary ? 'results' : 'summary')
     } catch (err) {
       stopTicker()
       setErrorMsg(err.message || 'Analysis failed')
@@ -181,17 +199,23 @@ export default function GenomeClient() {
     setErrorMsg(null)
     setStage('processing')
     setProgress(5)
-    setProgressLabel('Reading your file…')
+    setProgressLabel('Reading your file\u2026')
     try {
       const parsed = await parseGenomeFile(file)
       if (!parsed.variants || Object.keys(parsed.variants).length === 0) {
-        throw new Error(
-          'We couldn’t find any recognized variants in this file. Make sure it’s a raw 23andMe / AncestryDNA / MyHeritage file.'
-        )
+        // Slice 4A spec: plain-English error messages instead of generic
+        // "no variants" copy. Detect the most likely failure modes.
+        const looksLike23andMe = ['txt', 'zip'].includes(ext)
+        const looksLikeAncestry = ['txt', 'zip'].includes(ext)
+        const looksLikeVcf = ext === 'vcf'
+        if (!looksLike23andMe && !looksLikeAncestry && !looksLikeVcf) {
+          throw new Error("This doesn't appear to be a 23andMe, AncestryDNA, or VCF file. Please upload the raw data file you downloaded from your DNA testing service.")
+        }
+        throw new Error("We couldn't find any recognisable variants in this file. It may be corrupted, empty, or in an unexpected format \u2014 double-check that it's the raw data file you downloaded from 23andMe, AncestryDNA, or MyHeritage.")
       }
       await runAnalysis(parsed)
     } catch (err) {
-      setErrorMsg(err.message || 'Something went wrong.')
+      setErrorMsg(err.message || 'Something went wrong reading your file. Please try again.')
       setStage('error')
     }
   }, [runAnalysis])
@@ -200,7 +224,7 @@ export default function GenomeClient() {
     await runAnalysis({
       variants: SAMPLE_VARIANTS,
       stats: { totalDataLines: 0, recognized: Object.keys(SAMPLE_VARIANTS).length, format: 'Sample data' },
-    })
+    }, { skipSummary: true })
   }, [runAnalysis])
 
   const reset = () => {
@@ -368,55 +392,140 @@ export default function GenomeClient() {
         </section>
       )}
 
-      {/* Stage: processing */}
+      {/* Stage: processing — Slice 4A spec redesign. 3-step visual
+          progress bar keeps the user oriented on what SelfScience is
+          actually doing at any moment. */}
       {stage === 'processing' && (
-        <section className="container py-20">
-          <div className="mx-auto max-w-xl rounded-xl bg-white p-8 shadow-sm ring-1 ring-black/5">
-            <div className="flex items-center justify-center">
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-ss-teal/10 text-ss-teal">
-                <Dna size={26} className="animate-pulse" />
+        <section className="container py-14 md:py-20">
+          <div className="mx-auto max-w-xl">
+            {/* Logo mark, centered above the card */}
+            <div className="flex justify-center">
+              <div className="inline-flex items-center gap-2 text-ss-teal">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-ss-teal text-white">
+                  <Dna size={18} />
+                </span>
+                <span className="text-lg font-extrabold">SelfScience</span>
               </div>
             </div>
-            <div className="mt-6 text-center">
-              <div className="text-lg font-bold text-ss-teal">Processing your genome…</div>
-              <div className="mt-1 text-sm text-ss-muted">{progressLabel}</div>
+
+            <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5 md:p-8">
+              <div className="text-center">
+                <div className="text-lg font-bold text-ss-teal md:text-xl">
+                  Processing your genome
+                </div>
+                <div className="mt-1 text-xs text-ss-muted">
+                  {progressLabel || 'Reading your file\u2026'}
+                </div>
+                <div className="mt-2 text-[11px] italic text-ss-muted">
+                  Usually under 15 seconds. Your file never leaves this browser.
+                </div>
+              </div>
+
+              {/* 3-step stepper */}
+              <ol className="mt-6 grid grid-cols-3 gap-2" aria-label="Processing steps">
+                {[
+                  { key: 0, label: 'Reading file' },
+                  { key: 1, label: 'Identifying variants' },
+                  { key: 2, label: 'Building your profile' },
+                ].map((step) => {
+                  const isDone = step.key < currentProcessingStep
+                  const isActive = step.key === currentProcessingStep
+                  return (
+                    <li key={step.key} className="flex flex-col items-center text-center">
+                      <div
+                        aria-current={isActive ? 'step' : undefined}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition ${
+                          isDone
+                            ? 'bg-ss-green text-white'
+                            : isActive
+                              ? 'bg-ss-teal text-white ring-4 ring-ss-teal/20'
+                              : 'bg-ss-border-warm/60 text-ss-muted'
+                        }`}
+                      >
+                        {isDone ? '\u2713' : step.key + 1}
+                      </div>
+                      <div className={`mt-1.5 text-[10px] font-semibold leading-tight ${isActive || isDone ? 'text-ss-teal' : 'text-ss-muted'}`}>
+                        {step.label}
+                      </div>
+                      {isActive && (
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-[9px] uppercase tracking-wider text-ss-orange">
+                          <Loader2 size={9} className="animate-spin" /> Working
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ol>
+
+              {/* Fine-grained progress bar underneath the stepper for
+                  reassurance the whole flow is moving forward. */}
+              <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-ss-border-warm/40" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-ss-teal to-ss-orange transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="mt-4 text-center text-[10.5px] text-ss-muted">
+                Only your variant list is sent to our AI — never your raw file, name, or any identifiers.
+              </p>
             </div>
-            <div className="mt-6 h-2 overflow-hidden rounded-full bg-ss-border-warm/50">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-ss-teal to-ss-orange transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="mt-4 text-center text-xs text-ss-muted">
-              Runs entirely in your browser. Only the variant list is sent to our AI.
-            </p>
           </div>
         </section>
       )}
 
-      {/* Stage: error */}
+      {/* Stage: summary — Slice 4A "reveal moment" between the
+          processing screen and the full report. Only shown for real
+          file uploads (sample-data path skips it). */}
+      {stage === 'summary' && report && (
+        <SummaryScreen
+          report={report}
+          stats={stats}
+          onSeeDashboard={() => router.push('/')}
+          onSeeRoadmap={() => setStage('results')}
+        />
+      )}
+
+      {/* Stage: error — Slice 4A spec. Clear heading, plain-English
+          reason, three recovery paths, no stack traces. */}
       {stage === 'error' && (
-        <section className="container py-20">
-          <div className="mx-auto max-w-xl rounded-xl bg-white p-8 shadow-sm ring-1 ring-black/5">
-            <div className="flex items-center gap-3 text-ss-amber">
-              <AlertTriangle />
-              <div className="text-lg font-bold">We couldn’t process that file</div>
+        <section className="container py-14 md:py-20">
+          <div className="mx-auto max-w-xl rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/5 md:p-8">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ss-amber/15 text-ss-amber">
+                <AlertTriangle size={20} />
+              </span>
+              <h1 className="text-xl font-extrabold text-ss-teal md:text-2xl">
+                We couldn&apos;t read this file
+              </h1>
             </div>
-            <p className="mt-3 text-sm text-ss-text">{errorMsg}</p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <p className="mt-3 text-sm leading-relaxed text-ss-text">
+              {errorMsg}
+            </p>
+            <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
               <button
-                onClick={reset}
-                className="inline-flex items-center gap-2 rounded-full bg-ss-teal px-5 py-2 text-sm font-semibold text-white hover:bg-ss-teal-dark"
+                type="button"
+                onClick={() => { reset(); setTimeout(() => inputRef.current?.click?.(), 60) }}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-ss-teal px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
               >
-                <RotateCcw size={14} /> Try again
+                <RotateCcw size={14} /> Try a different file
               </button>
               <button
+                type="button"
                 onClick={handleSample}
-                className="inline-flex items-center gap-2 rounded-full border border-ss-teal px-5 py-2 text-sm font-semibold text-ss-teal hover:bg-ss-teal hover:text-white"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
               >
-                <Sparkles size={14} /> Use sample data instead
+                <Sparkles size={14} /> Try with sample data
               </button>
+              <a
+                href="mailto:support@selfscience.io?subject=Genome%20file%20wouldn%27t%20parse"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-ss-border-warm bg-white px-4 py-2 text-sm font-semibold text-ss-text transition hover:border-ss-teal hover:text-ss-teal"
+              >
+                <BookOpen size={14} /> Get help
+              </a>
             </div>
+            <p className="mt-5 text-[11px] italic text-ss-muted">
+              SelfScience supports raw 23andMe (.txt / .zip), AncestryDNA (.txt / .zip), MyHeritage (.csv / .zip), and standard VCF (.vcf / .vcf.gz) files. If your file is one of these formats and still fails, please contact support with the file&apos;s extension and source \u2014 never the file itself.
+            </p>
           </div>
         </section>
       )}
