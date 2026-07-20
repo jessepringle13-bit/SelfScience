@@ -13,6 +13,7 @@ import {
   getPGxPhenotypePriority,
   PRIORITY_BORDER_CLASS,
 } from '@/lib/clinicalPriority'
+import { filterCosmeticStrengths } from '@/lib/reportVersion'
 
 export default function GeneticVariantSummary({
   areas = [],
@@ -28,6 +29,16 @@ export default function GeneticVariantSummary({
   // Each returned row carries a `_priority` field the FindingTable reads
   // to paint the left-border indicator.
   const sortedAreas = sortAwarenessByPriority(areas, phenotypes)
+
+  // Slice 3C spec: cosmetic / trait-only strengths (eye color, bitter
+  // taste, skin pigmentation, hair follicle density, etc.) are hidden
+  // from the clinical PDF but kept in the consumer dashboard.
+  const { kept: clinicalStrengths } = filterCosmeticStrengths(strengths)
+
+  // Slice 3C spec: Section 3D (Neutral variants) removed from PDF.
+  // Instead we surface a footnote under 3C stating the count. Neutrals
+  // are still available on the consumer dashboard.
+  const neutralCount = Array.isArray(neutrals) ? neutrals.length : 0
 
   return (
     <section className="page-break-before mt-8 print:mt-0 print:pt-8">
@@ -58,9 +69,11 @@ export default function GeneticVariantSummary({
       <div className="mt-6 avoid-break">
         <SubHeader>{sectionNum}b · Strengths</SubHeader>
         <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
-          Variants associated with favorable research signals.
+          Variants associated with favorable research signals. Trait-only variants (eye colour, taste, hair follicle density) are excluded from this clinical view but remain visible in the patient's SelfScience dashboard.
         </p>
-        {strengths.length === 0 ? <EmptyRow>No strength findings.</EmptyRow> : <FindingTable items={strengths} />}
+        {clinicalStrengths.length === 0
+          ? <EmptyRow>No clinically-relevant strength findings.</EmptyRow>
+          : <FindingTable items={clinicalStrengths} />}
       </div>
 
       {/* PGx phenotype snapshot */}
@@ -72,23 +85,19 @@ export default function GeneticVariantSummary({
         {/* Slice 3A PGx legend */}
         <PGxPhenotypeLegend />
         {phenotypes ? <PGxTable phenotypes={phenotypes} rawVariants={rawVariants} /> : <EmptyRow>No PGx data.</EmptyRow>}
+        {/* Slice 3C footnote replacing the old Section 3D table. */}
+        {neutralCount > 0 && (
+          <p className="mt-3 text-[10.5px] italic text-ss-muted">
+            {neutralCount} additional variant{neutralCount === 1 ? ' was' : 's were'} identified with no current research-associated favorable or unfavorable interpretation. The complete list is available in the patient's SelfScience dashboard.
+          </p>
+        )}
       </div>
 
-      {/* Neutral additional findings */}
-      {neutrals.length > 0 && (
-        <div className="mt-6 avoid-break">
-          <SubHeader>{sectionNum}d · Additional recognised variants (neutral)</SubHeader>
-          <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
-            Included for completeness — no research-associated favorable or unfavorable interpretation applies to these genotypes.
-          </p>
-          <FindingTable items={neutrals} compact />
-        </div>
-      )}
-
-      {/* Raw appendix — optional (long) */}
+      {/* Raw appendix — optional (long). Renumbered from 3e → 3d because
+          the neutral-variants table (previously 3d) has been removed. */}
       {includeRawAppendix && rawRows?.length > 0 && (
         <div className="page-break-before mt-6 print:mt-0 print:pt-8">
-          <SubHeader>{sectionNum}e · Raw genotype appendix</SubHeader>
+          <SubHeader>{sectionNum}d · Raw genotype appendix</SubHeader>
           <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
             Full list of rsIDs SelfScience recognised in the uploaded file and the raw two-base call at each.
           </p>

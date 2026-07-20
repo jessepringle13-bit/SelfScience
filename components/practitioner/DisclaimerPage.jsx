@@ -2,6 +2,8 @@
 // Mandatory final printed page — full legal disclaimer.
 // Cannot be toggled off (locked ON).
 
+import { reportFooterLine } from '@/lib/reportVersion'
+
 export default function DisclaimerPage({ reportId, reportDate }) {
   return (
     <section className="page-break-before avoid-break mt-8 print:mt-0 print:pt-8">
@@ -41,7 +43,7 @@ export default function DisclaimerPage({ reportId, reportDate }) {
           <span className="font-semibold">9. Governing terms.</span> Use of SelfScience and this report is subject to the Terms of Use and Privacy Policy published at selfscience.io. In the event of any conflict between this notice and the online Terms of Use, the online Terms of Use control.
         </p>
         <p className="mt-4 border-t border-ss-border-warm pt-3 text-[9px] italic text-ss-muted">
-          Report ID: <span className="font-mono">{reportId || '—'}</span> · Generated: {reportDate || '—'} · Prepared with SelfScience — <span className="underline">selfscience.io</span>. By presenting or reviewing this document, the patient and the practitioner acknowledge they have read and understood the foregoing notice in its entirety.
+          Report ID: <span className="font-mono">{reportId || '—'}</span> · Generated: {reportDate || '—'} · {reportFooterLine()} · Prepared with SelfScience — <span className="underline">selfscience.io</span>. By presenting or reviewing this document, the patient and the practitioner acknowledge they have read and understood the foregoing notice in its entirety.
         </p>
       </div>
     </section>

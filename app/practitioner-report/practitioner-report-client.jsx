@@ -46,6 +46,8 @@ import GeneticVariantSummary from '@/components/practitioner/GeneticVariantSumma
 import DisclaimerPage from '@/components/practitioner/DisclaimerPage'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import PrintGateModal, { shouldPromptGate } from '@/components/practitioner/PrintGateModal'
+import ExecutiveSummary from '@/components/practitioner/ExecutiveSummary'
+import { reportFooterLine } from '@/lib/reportVersion'
 
 export default function PractitionerReportClient() {
   const [report, setReport] = useState(null)
@@ -246,6 +248,9 @@ export default function PractitionerReportClient() {
             {/* Page 1 — Cover + HIPAA + signatures (LOCKED ON) */}
             <PrintCoverPage intake={intake} reportDate={reportDate} reportId={reportId} />
 
+            {/* Page 1a — Executive Summary (LOCKED ON). Slice 3C. */}
+            <ExecutiveSummary intake={intake} areas={areas} phenotypes={phenotypes} />
+
             {/* Page 2 — Clinician context (toggleable) */}
             {sections.clinicianNote && <ClinicianNote />}
 
@@ -298,6 +303,14 @@ export default function PractitionerReportClient() {
         onProceed={handleGateProceed}
       />
 
+      {/* Print-only running footer: rules + variant DB version on every
+          printed page. Chrome + Firefox both honour position:fixed in
+          print media for a repeating page footer. Hidden entirely on
+          screen so the preview stays clean. */}
+      <div className="ss-print-running-footer" aria-hidden="true" style={{ display: 'none' }}>
+        {reportFooterLine()}
+      </div>
+
       {/* Toggle: hide the print sheet on-screen unless preview mode is on. */}
       <style jsx global>{`
         .ss-screen-only-preview-hidden {
@@ -305,6 +318,17 @@ export default function PractitionerReportClient() {
         }
         @media print {
           .ss-screen-only-preview-hidden {
+            display: block !important;
+          }
+          .ss-print-running-footer {
+            position: fixed;
+            bottom: 0.25in;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8px;
+            font-style: italic;
+            color: #7A7974;
             display: block !important;
           }
         }

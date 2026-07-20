@@ -4,6 +4,7 @@
 // the HIPAA Confidentiality & Acknowledgment block, and dual signature lines.
 
 import { ageFromDob, bmiFrom, formatHeightBoth, formatWeightBoth } from '@/lib/practitionerIntake'
+import { reportFooterLine } from '@/lib/reportVersion'
 
 export default function PrintCoverPage({ intake, reportDate, reportId }) {
   const age = ageFromDob(intake?.dob)
@@ -110,6 +111,12 @@ export default function PrintCoverPage({ intake, reportDate, reportId }) {
 
         <div className="mt-6 text-center text-[9px] uppercase tracking-[0.2em] text-ss-muted">
           selfscience · deterministic 2-step genome analysis · page 1
+        </div>
+        {/* Slice 3C footer: rules + variant DB version, on every page.
+            Kept as normal-case small text so a clinician can quickly
+            eyeball which library snapshot was used. */}
+        <div className="mt-1 text-center text-[9px] italic text-ss-muted">
+          {reportFooterLine()}
         </div>
       </div>
     </section>
