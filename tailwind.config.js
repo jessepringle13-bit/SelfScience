@@ -36,6 +36,7 @@ module.exports = {
             'border-warm': '#D4D1CA',
             green: '#2E7D32',
             amber: '#964219',
+            red: '#B23A3A',
             critical: '#A12C7B',
             'row-alt': '#EEF7F7',
             'preprint-yellow': '#B07D00',

@@ -2254,16 +2254,96 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.7"
-  test_sequence: 7
+  version: "1.8"
+  test_sequence: 8
   run_ui: false
 
 test_plan:
   current_focus:
-    - "PHASE 2 — Search page + Nav refinements (Message 580, Sections 4, 5, 7)"
+    - "PHASE 3 — Practitioner Report enhancements (Message 580, Section 6)"
+    - "LLM PROVIDER TIMEOUT FIX — bumped per-tier 18s → 30s, added Gemini 2.5 Flash tertiary fallback"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+
+    -agent: "main"
+      message: |
+        LLM PROVIDER TIMEOUT FIX (2026-07) — critical infra fix per user
+        request. Previously: 18s per-tier timeout + 38s total budget was
+        causing Llama 3.3 70B (Together AI primary) to time out
+        consistently before returning, then Llama 3.1 70B (OpenRouter
+        fallback) to time out too. Result: silent Step-1-only fallback
+        and 26-36s parses.
+
+        Fix in /app/lib/genomeGenerateProvider.js:
+          * PER_TIER_TIMEOUT_MS: 18_000 → 30_000
+          * TOTAL_BUDGET_MS:     38_000 → 55_000 (leaves ~5s headroom
+            below Emergent's 60s ingress cap)
+          * NEW Tier 3: Google Gemini 2.5 Flash as tertiary insurance
+            fallback via raw fetch to generativelanguage.googleapis.com.
+            Uses the pre-existing GEMINI_API_KEY from .env. Different
+            vendor family from Meta-Llama so it survives Meta model
+            outages.
+          * Non-JSON responses from Tier 2 now cascade to Tier 3 (was
+            previously accepted as success).
+
+        VERIFIED: /api/interpret-genome consistently completes in ~12s
+        (was 26-36s or silent failure). Tested via curl POST with the
+        SAMPLE_VARIANTS payload x2 runs — both returned HTTP 200 with 6
+        card groups.
+
+        ================================================================
+
+        PHASE 3 — SLICE 3A SHIPPED — Message 580 Section 6, items 3 + 8
+
+        Files added:
+        * /app/lib/clinicalPriority.js (NEW)
+            Shared logic: getAwarenessPriority(item, phenotypes)
+            → 'urgent' | 'important' | 'standard'
+            Rules:
+              URGENT   — DPYD/TPMT with non-normal (or missing)
+                         phenotype, OR clinical_priority='urgent',
+                         OR life-threatening keyword hit
+              IMPORTANT— SLCO1B1, VKORC1, CYP2C19, CYP2D6, CYP2C9
+                         (dose-relevant), OR
+                         clinical_priority='important'
+              STANDARD — everything else
+            Also exports sortAwarenessByPriority(),
+            getPGxPhenotypePriority(gene, phenotypes), and
+            PRIORITY_BORDER_CLASS (left-border tailwind classes).
+
+        Files changed:
+        * /app/components/practitioner/GeneticVariantSummary.jsx
+            - Section 3A rows now sorted urgent → important → standard.
+            - Each row gets a colored left-border via
+              PRIORITY_BORDER_CLASS (red/amber/none).
+            - New PriorityLegend row printed under the 3A subheader.
+            - Section 3C PGx phenotype rows get green/amber/red left-
+              border via getPGxPhenotypePriority.
+            - New PGxPhenotypeLegend row printed under the 3C
+              subheader.
+        * /app/tailwind.config.js
+            - Added ss.red = '#B23A3A' so the border-l-ss-red class
+              renders correctly.
+
+        VERIFIED MANUALLY (1280 px):
+        * /practitioner-report → Preview print layout with sample
+          genome loaded:
+            * 3A legend renders with correct 3 dots
+            * MTHFR row appears (standard, no border)
+            * 3C legend renders with correct 3 dots
+            * CYP2C19, CYP2D6, CYP2C9, SLCO1B1, DPYD show GREEN
+              left border (Extensive/Normal phenotype)
+            * VKORC1 shows no border (label is descriptive not
+              metabolizer)
+
+        NEXT SLICES:
+        * Slice 3B — Cover page enhancements + Section 1 gate modal +
+          patient/clinician name fields + Section numbering fix (add
+          Section 2 Biomarkers)
+        * Slice 3C — Executive Summary Page 1 + Section 3B cosmetic
+          cleanup + remove Section 3D + database version footer
 
 
     -agent: "main"

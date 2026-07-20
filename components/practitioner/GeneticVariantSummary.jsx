@@ -2,6 +2,17 @@
 // Print section — Genetic variant summary. Composes the awareness /
 // strengths / neutral tables + PGx phenotype snapshot into a single
 // printable section with page breaks.
+//
+// Slice 3A adds:
+//   * Clinical-priority sort + red/amber left-border on Section 3A rows
+//   * Green/Amber/Red left-border on Section 3C PGx phenotype rows
+//   * One-line legends beneath each of those subheaders
+
+import {
+  sortAwarenessByPriority,
+  getPGxPhenotypePriority,
+  PRIORITY_BORDER_CLASS,
+} from '@/lib/clinicalPriority'
 
 export default function GeneticVariantSummary({
   areas = [],
@@ -13,6 +24,11 @@ export default function GeneticVariantSummary({
   includeRawAppendix,
   sectionNum = 3,
 }) {
+  // Sort Section 3A by clinical priority: urgent → important → standard.
+  // Each returned row carries a `_priority` field the FindingTable reads
+  // to paint the left-border indicator.
+  const sortedAreas = sortAwarenessByPriority(areas, phenotypes)
+
   return (
     <section className="page-break-before mt-8 print:mt-0 print:pt-8">
       <div className="border-b border-ss-teal/40 pb-2 avoid-break">
@@ -27,16 +43,20 @@ export default function GeneticVariantSummary({
 
       {/* Awareness */}
       <div className="mt-4 avoid-break">
-        <SubHeader>3a · Awareness findings</SubHeader>
+        <SubHeader>{sectionNum}a · Awareness findings</SubHeader>
         <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
           Variants flagged for provider discussion — none are diagnoses.
         </p>
-        {areas.length === 0 ? <EmptyRow>No awareness findings.</EmptyRow> : <FindingTable items={areas} />}
+        {/* Slice 3A legend */}
+        <PriorityLegend />
+        {sortedAreas.length === 0
+          ? <EmptyRow>No awareness findings.</EmptyRow>
+          : <FindingTable items={sortedAreas} usePriority />}
       </div>
 
       {/* Strengths */}
       <div className="mt-6 avoid-break">
-        <SubHeader>3b · Strengths</SubHeader>
+        <SubHeader>{sectionNum}b · Strengths</SubHeader>
         <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
           Variants associated with favorable research signals.
         </p>
@@ -45,17 +65,19 @@ export default function GeneticVariantSummary({
 
       {/* PGx phenotype snapshot */}
       <div className="mt-6 avoid-break">
-        <SubHeader>3c · Estimated pharmacogenomic phenotypes</SubHeader>
+        <SubHeader>{sectionNum}c · Estimated pharmacogenomic phenotypes</SubHeader>
         <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
           Single-SNP inference — <span className="font-semibold">confirm star-allele status with a clinical PGx test</span> before any dosing decision.
         </p>
+        {/* Slice 3A PGx legend */}
+        <PGxPhenotypeLegend />
         {phenotypes ? <PGxTable phenotypes={phenotypes} rawVariants={rawVariants} /> : <EmptyRow>No PGx data.</EmptyRow>}
       </div>
 
       {/* Neutral additional findings */}
       {neutrals.length > 0 && (
         <div className="mt-6 avoid-break">
-          <SubHeader>3d · Additional recognised variants (neutral)</SubHeader>
+          <SubHeader>{sectionNum}d · Additional recognised variants (neutral)</SubHeader>
           <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
             Included for completeness — no research-associated favorable or unfavorable interpretation applies to these genotypes.
           </p>
@@ -66,7 +88,7 @@ export default function GeneticVariantSummary({
       {/* Raw appendix — optional (long) */}
       {includeRawAppendix && rawRows?.length > 0 && (
         <div className="page-break-before mt-6 print:mt-0 print:pt-8">
-          <SubHeader>3e · Raw genotype appendix</SubHeader>
+          <SubHeader>{sectionNum}e · Raw genotype appendix</SubHeader>
           <p className="mt-0.5 text-[10.5px] italic text-ss-muted">
             Full list of rsIDs SelfScience recognised in the uploaded file and the raw two-base call at each.
           </p>
@@ -93,7 +115,44 @@ function EmptyRow({ children }) {
   )
 }
 
-function FindingTable({ items, compact = false }) {
+// One-line legend printed under Section 3A. Print-safe (uses solid
+// coloured squares that render on B&W printers as gradients rather than
+// disappearing altogether).
+function PriorityLegend() {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9.5px] text-ss-muted">
+      <LegendDot color="bg-ss-red" label="Urgent — discuss before prescribing" />
+      <span className="text-ss-border-warm">·</span>
+      <LegendDot color="bg-ss-amber" label="Important — note for dosing" />
+      <span className="text-ss-border-warm">·</span>
+      <LegendDot color="bg-ss-border-warm" label="Standard — for awareness" />
+    </div>
+  )
+}
+
+// One-line legend printed under Section 3C.
+function PGxPhenotypeLegend() {
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[9.5px] text-ss-muted">
+      <LegendDot color="bg-ss-green" label="Normal / extensive / rapid metabolizer" />
+      <span className="text-ss-border-warm">·</span>
+      <LegendDot color="bg-ss-amber" label="Intermediate metabolizer" />
+      <span className="text-ss-border-warm">·</span>
+      <LegendDot color="bg-ss-red" label="Poor / reduced / deficient" />
+    </div>
+  )
+}
+
+function LegendDot({ color, label }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`inline-block h-2 w-2 rounded-full ${color}`} aria-hidden="true" />
+      <span>{label}</span>
+    </span>
+  )
+}
+
+function FindingTable({ items, compact = false, usePriority = false }) {
   return (
     <div className="mt-2 overflow-x-auto">
       <table className="w-full border-collapse text-left text-[11px]">
@@ -106,21 +165,27 @@ function FindingTable({ items, compact = false }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((c, i) => (
-            <tr key={(c.rsid || '') + i} className="border-b border-ss-border-warm/30 align-top last:border-0">
-              <td className="py-1 pr-2">
-                <div className="font-semibold text-ss-text">{c.name || c.gene || c.rsid}</div>
-                {c.trait && !compact && <div className="text-[10px] text-ss-muted">{c.trait}</div>}
-              </td>
-              <td className="py-1 pr-2 font-mono text-[10.5px]">{c.rsid || '—'}</td>
-              <td className="py-1 pr-2 font-semibold">{c.genotype || '—'}</td>
-              {!compact && (
-                <td className="py-1 pr-2 leading-relaxed">
-                  {truncate(c.plain || c.classification_text || '', 240)}
+          {items.map((c, i) => {
+            const border = usePriority ? PRIORITY_BORDER_CLASS[c._priority] || '' : ''
+            return (
+              <tr
+                key={(c.rsid || '') + i}
+                className={`border-b border-ss-border-warm/30 align-top last:border-0 ${border}`}
+              >
+                <td className="py-1 pl-2 pr-2">
+                  <div className="font-semibold text-ss-text">{c.name || c.gene || c.rsid}</div>
+                  {c.trait && !compact && <div className="text-[10px] text-ss-muted">{c.trait}</div>}
                 </td>
-              )}
-            </tr>
-          ))}
+                <td className="py-1 pr-2 font-mono text-[10.5px]">{c.rsid || '—'}</td>
+                <td className="py-1 pr-2 font-semibold">{c.genotype || '—'}</td>
+                {!compact && (
+                  <td className="py-1 pr-2 leading-relaxed">
+                    {truncate(c.plain || c.classification_text || '', 240)}
+                  </td>
+                )}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -152,9 +217,14 @@ function PGxTable({ phenotypes, rawVariants }) {
           {genes.map(({ code, drugs }) => {
             const ph = phenotypes?.[code]
             const supporting = supportingCalls(code, rawVariants)
+            const priority = getPGxPhenotypePriority(code, phenotypes)
+            const border = PRIORITY_BORDER_CLASS[priority] || ''
             return (
-              <tr key={code} className="border-b border-ss-border-warm/30 align-top last:border-0">
-                <td className="py-1 pr-2 font-mono font-semibold text-ss-teal">{code}</td>
+              <tr
+                key={code}
+                className={`border-b border-ss-border-warm/30 align-top last:border-0 ${border}`}
+              >
+                <td className="py-1 pl-2 pr-2 font-mono font-semibold text-ss-teal">{code}</td>
                 <td className="py-1 pr-2 font-semibold">{ph?.label || '—'}</td>
                 <td className="py-1 pr-2 font-mono text-[10.5px] text-ss-muted">
                   {supporting || '(no supporting SNPs found)'}
