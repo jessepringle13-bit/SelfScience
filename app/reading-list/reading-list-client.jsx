@@ -120,7 +120,7 @@ function SavedStudiesSection() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bookmark size={16} className="text-ss-orange" fill="currentColor" />
-            <h2 className="text-lg font-extrabold text-ss-teal">
+            <h2 data-testid="saved-studies-heading" className="text-lg font-extrabold text-ss-teal">
               Your Saved Studies
               <span className="ml-2 inline-flex items-center rounded-full bg-ss-teal px-2 py-0.5 text-[11px] font-bold text-white">
                 {items.length}
