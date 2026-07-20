@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ExternalLink,
@@ -326,6 +326,11 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
   const [expanded, setExpanded] = useState(false)
   const [copyState, setCopyState] = useState('idle')  // idle | copied
   const [saved, setSaved] = useState(false)
+  // Section 4 spec: after 3 s of the card being visible with no reliability
+  // resolved and no explicit analysis error, treat scoring as failed and
+  // show a permanent "Unscored" fallback. Prevents "Analyzing\u2026" from
+  // showing forever when the LLM scorer silently drops a request.
+  const [scoreTimedOut, setScoreTimedOut] = useState(false)
   const router = useRouter()
 
   // Subscribe to save-state changes so the bookmark icon reflects other tabs.
@@ -342,6 +347,17 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
   const analysisError = item._analysisError === true
   const fundingWarn = item.funding && item.funding.score <= 2
   const tier = reliabilityTier(item.reliability)
+
+  // 3-second grace period, then flip to a permanent "Unscored" state so
+  // the shimmer doesn't hang forever.
+  useEffect(() => {
+    if (hasReliability || analysisError) {
+      setScoreTimedOut(false)
+      return
+    }
+    const t = setTimeout(() => setScoreTimedOut(true), 3000)
+    return () => clearTimeout(t)
+  }, [hasReliability, analysisError, item?.id])
 
   // Genes to visually highlight in the title/abstract + surface as chips at
   // the top of the card. Combines any gene the server-side fan-out flagged
@@ -401,6 +417,19 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
     e.stopPropagation()
     const nowSaved = toggleSaveStudy(item)
     setSaved(nowSaved)
+    // Section 4 spec: fire a global bookmark-toast event so the app-shell
+    // BookmarkToast listener can render a confirmation snackbar with an
+    // undo option. Kept as an event so the toast lives outside the card
+    // and survives the card unmounting (e.g. on filter change).
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('selfscience:bookmark-toast', {
+        detail: {
+          message: nowSaved ? 'Saved to Reading List' : 'Removed from Reading List',
+          saved: nowSaved,
+          item,
+        },
+      }))
+    }
   }
 
   // Plain-English title if available, else fall back to the academic title.
@@ -409,11 +438,60 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
   const plainTitle = (item.plainTitle || '').trim()
   const showBothTitles = !!plainTitle && plainTitle.toLowerCase() !== (item.title || '').toLowerCase().replace(/[.!?]+$/, '')
 
+  // Section 4 spec: desktop-only hover abstract preview. Fires after a
+  // 400 ms hover on cards >= 1024px viewport. Never triggers on mobile
+  // \u2014 the existing Show-more expander already covers that case.
+  const [hoverPreview, setHoverPreview] = useState(false)
+  const hoverTimerRef = useRef(null)
+  const isDesktop = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  const handleMouseEnter = () => {
+    if (!isDesktop()) return
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => setHoverPreview(true), 400)
+  }
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null }
+    setHoverPreview(false)
+  }
+  useEffect(() => () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current) }, [])
+  // Prefer the LLM plain-language summary if we already have it (cheaper
+  // signal + already user-friendly), else fall back to the raw abstract.
+  const previewAbstract = (item.plainLanguageSummary || item.abstract || item.summary || '').trim()
+  const previewClipped = previewAbstract.length > 300
+    ? previewAbstract.slice(0, 300).replace(/\s+\S*$/, '') + '\u2026'
+    : previewAbstract
+
   return (
     <article
-      className={`group flex ${widthClass} flex-col rounded-2xl border border-ss-border-warm bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md md:p-5`}
+      className={`group relative flex ${widthClass} flex-col rounded-2xl border border-ss-border-warm bg-white p-4 shadow-sm ring-1 ring-black/5 transition hover:shadow-md md:p-5`}
       style={{ borderLeft: `4px solid ${leftBorderColor}` }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
+      {/* Desktop hover abstract preview \u2014 400 ms hover threshold, only
+          renders at >= 1024 px. Never renders on mobile; the Show-more
+          expander below handles that case. */}
+      {hoverPreview && previewClipped && !expanded && (
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute left-full top-4 z-30 ml-3 hidden w-80 rounded-xl border border-ss-border-warm bg-white p-4 text-left shadow-2xl lg:block xl:w-96"
+        >
+          <div className="text-[10px] font-extrabold uppercase tracking-widest text-ss-orange">
+            Abstract preview
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-ss-text">{previewClipped}</p>
+          <div className="mt-3 flex items-center justify-between text-[11px] font-semibold text-ss-teal">
+            <button
+              type="button"
+              className="pointer-events-auto hover:underline"
+              onClick={(e) => { e.stopPropagation(); setExpanded(true); setHoverPreview(false) }}
+            >
+              Read abstract \u2192
+            </button>
+            <span className="text-ss-muted">{previewAbstract.length}c</span>
+          </div>
+        </div>
+      )}
       {/* --- COLLAPSED HEADER — always visible --- */}
       <div className="flex items-start justify-between gap-3">
         {/* Left: badges (single row, scrolls on mobile) */}
@@ -452,15 +530,22 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
           )}
           {hasReliability ? (
             <ReliabilityDot score={item.reliability} label={item.reliabilityLabel} className="shrink-0" />
-          ) : analysisError ? (
-            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-ss-muted">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-ss-muted" />
-              <span className="hidden sm:inline">Score unavailable</span>
+          ) : analysisError || scoreTimedOut ? (
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-ss-muted" title="Reliability score unavailable">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-ss-muted/60" />
+              <span className="hidden sm:inline">Unscored</span>
             </span>
           ) : (
-            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-ss-muted">
-              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-ss-muted/50" />
-              <span className="hidden sm:inline">Analyzing…</span>
+            /* Section 4 spec: shimmer placeholder \u2014 no "Analyzing\u2026" text.
+               Auto-resolves to Strong/Moderate/Limited when the score
+               arrives, or flips to "Unscored" after 3 s. */
+            <span
+              className="inline-flex shrink-0 items-center gap-1"
+              aria-label="Loading reliability score"
+              aria-busy="true"
+            >
+              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-ss-muted/40" />
+              <span className="hidden h-2.5 w-16 animate-pulse rounded-full bg-ss-muted/20 sm:inline-block" />
             </span>
           )}
         </div>
@@ -571,7 +656,7 @@ export function ResultCard({ item, variant = 'stacked', highlightGenes = [], cor
                 label={item.reliabilityLabel}
                 note={item.reliabilityNote}
               />
-            ) : analysisError ? (
+            ) : analysisError || scoreTimedOut ? (
               <ReliabilityError />
             ) : (
               <ReliabilityPending />

@@ -9,6 +9,7 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
@@ -237,7 +238,7 @@ export default function SearchClient() {
   // pillar was explicitly requested. Same behaviour as `submit()` \u2014 keeps
   // the user's typed text as the search term and layers the pillar on top.
   const rawInitialPillar = params.get('pillar') || ''
-  const initialPillar = rawInitialPillar || (isYouthQuery(initialQ) ? 'Pediatric & Youth Wellness' : '')
+  const initialPillar = rawInitialPillar || (isYouthQuery(initialQ) ? 'Developmental & Lifespan Wellness' : '')
   // Pillar hand-off from Dashboard: /search?pillar=X&genes=A,B,C carries the
   // user's classified genes for that pillar so we can fan out per-gene queries
   // AND highlight the matches on each result card.
@@ -670,7 +671,7 @@ export default function SearchClient() {
     // top so results still match what they actually asked for.
     let effectivePillar = pillar
     if (!effectivePillar && isYouthQuery(q)) {
-      effectivePillar = 'Pediatric & Youth Wellness'
+      effectivePillar = 'Developmental & Lifespan Wellness'
       setPillar(effectivePillar)
     }
     trackEvent(EVENTS.SEARCH_PERFORMED, {
@@ -709,6 +710,10 @@ export default function SearchClient() {
 
   // Horizontal-scroll carousel plumbing for the "Your Genes" chip row.
   const chipScrollerRef = useRef(null)
+  // Mobile sticky chip bar: collapsed by default so it only takes one
+  // pill of vertical space at 375 px. Tap the pill to reveal the full
+  // gene list.
+  const [stickyChipsOpen, setStickyChipsOpen] = useState(false)
   const scrollChips = (dir) => {
     const el = chipScrollerRef.current
     if (!el) return
@@ -1000,38 +1005,96 @@ export default function SearchClient() {
             ))}
           </div>
 
-          {/* "Your genes" chip carousel — appears only when the user has
-              an analysed genome in sessionStorage. Chips are toggleable
-              (multi-select) and drive the fan-out cross-reference search.
-              Horizontal-scroll carousel keeps 40+ genes accessible without
-              eating vertical real estate. */}
-          {yourGenes.length > 0 && (
-            <div className="mx-auto mt-4 max-w-4xl">
-              {/* Pillar-filter context banner. Only shown when a pillar is
-                  active AND we have genes to display. Matches the tone of
-                  the "Showing genes relevant to: X" copy used on Dashboard. */}
+          {/* Gene chip bar was previously here. It is now rendered as its
+              own sticky section below the hero (Section 4 spec) so the
+              chips remain visible while the user scrolls through
+              results. */}
+        </div>
+      </section>
+
+      {/* Sticky Gene Chip Bar \u2014 Section 4 spec. Lives outside the hero so
+          it stays visible below the fixed nav as the user scrolls. On
+          mobile it collapses into a single "Genome filter" pill that
+          expands on tap; on md+ the full carousel is always visible. */}
+      {yourGenes.length > 0 && (
+        <section
+          className="sticky top-16 z-30 border-b border-ss-border-warm bg-white/95 backdrop-blur shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+          aria-label="Genome filter"
+        >
+          <div className="container py-2 md:py-3">
+            {/* MOBILE: single pill + expand toggle */}
+            <div className="md:hidden">
+              <button
+                type="button"
+                onClick={() => setStickyChipsOpen((v) => !v)}
+                aria-expanded={stickyChipsOpen}
+                aria-controls="sticky-gene-chips-mobile"
+                className="flex w-full items-center justify-between gap-2 rounded-full border border-ss-teal/40 bg-white px-3 py-1.5 text-[11px] font-semibold text-ss-teal shadow-sm"
+              >
+                <span className="inline-flex items-center gap-1.5 truncate">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-ss-orange" />
+                  Genome filter:{' '}
+                  <strong className="font-bold">
+                    {activeGenes.length === 0
+                      ? 'All genes'
+                      : activeGenes.length === 1
+                        ? activeGenes[0]
+                        : `${activeGenes.length} selected`}
+                  </strong>
+                </span>
+                <ChevronDown size={13} className={`shrink-0 transition ${stickyChipsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {stickyChipsOpen && (
+                <div id="sticky-gene-chips-mobile" className="mt-2 -mx-2 overflow-x-auto px-2 pb-1">
+                  <div className="flex snap-x snap-mandatory gap-2 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+                    {yourGenes.map(({ symbol, classification }) => {
+                      const isSelected = activeGenes.includes(symbol)
+                      let cls
+                      if (isSelected) cls = 'border-ss-orange bg-ss-orange text-white'
+                      else if (classification === 'awareness') cls = 'border-ss-amber/60 bg-white text-ss-amber'
+                      else if (classification === 'strength' || classification === 'positive') cls = 'border-ss-green/60 bg-white text-ss-green'
+                      else cls = 'border-ss-border-warm bg-white text-ss-teal'
+                      return (
+                        <button
+                          key={symbol}
+                          type="button"
+                          onClick={() => toggleGene(symbol)}
+                          className={`shrink-0 snap-start rounded-full border px-3 py-1 font-mono text-[11px] font-semibold tracking-wider transition ${cls}`}
+                          aria-pressed={isSelected}
+                        >
+                          {symbol}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* DESKTOP: full carousel */}
+            <div className="hidden md:block">
               {pillar && (
-                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] text-white/90">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] text-ss-muted">
                   <span>
                     Showing genes relevant to:{' '}
-                    <strong className="font-bold">
+                    <strong className="font-bold text-ss-teal">
                       {PILLARS.find((p) => p.name === pillar)?.short || pillar}
                     </strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => setPillar('')}
-                    className="rounded-full border border-white/30 px-2 py-0.5 text-[10px] font-semibold text-white/90 hover:bg-white/10"
+                    className="rounded-full border border-ss-border-warm px-2 py-0.5 text-[10px] font-semibold text-ss-teal hover:bg-ss-bg"
                   >
                     Show all
                   </button>
                 </div>
               )}
-              <div className="flex items-center justify-between gap-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
+              <div className="flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-ss-muted">
                 <div className="flex items-center gap-2">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-ss-orange" />
                   <span>
-                    Your genome · tap to cross-reference
+                    Your genome \u00b7 tap to cross-reference
                     {activeGenes.length > 0 && (
                       <span className="ml-2 rounded-full bg-ss-orange px-2 py-0.5 text-[9px] font-bold tracking-widest text-white">
                         {activeGenes.length} selected
@@ -1039,17 +1102,16 @@ export default function SearchClient() {
                     )}
                   </span>
                 </div>
-                <span className="text-[10px] normal-case tracking-normal text-white/50">
+                <span className="text-[10px] normal-case tracking-normal text-ss-muted/70">
                   {yourGenes.length} recognised
                 </span>
               </div>
-              <div className="relative mt-2">
-                {/* Left / right scroll affordances (desktop only) */}
+              <div className="relative mt-1.5">
                 <button
                   type="button"
                   onClick={() => scrollChips('left')}
                   aria-label="Scroll gene chips left"
-                  className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/90 p-1.5 text-ss-teal shadow-md ring-1 ring-black/10 transition hover:bg-white md:inline-flex"
+                  className="absolute -left-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white p-1.5 text-ss-teal shadow-md ring-1 ring-black/10 transition hover:bg-ss-bg md:inline-flex"
                 >
                   <ChevronLeft size={14} />
                 </button>
@@ -1057,41 +1119,30 @@ export default function SearchClient() {
                   type="button"
                   onClick={() => scrollChips('right')}
                   aria-label="Scroll gene chips right"
-                  className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/90 p-1.5 text-ss-teal shadow-md ring-1 ring-black/10 transition hover:bg-white md:inline-flex"
+                  className="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white p-1.5 text-ss-teal shadow-md ring-1 ring-black/10 transition hover:bg-ss-bg md:inline-flex"
                 >
                   <ChevronRight size={14} />
                 </button>
-
                 <div
                   ref={chipScrollerRef}
-                  className="flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth px-1 pb-2 [&::-webkit-scrollbar]:hidden"
+                  className="flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth px-1 pb-1 [&::-webkit-scrollbar]:hidden"
                   style={{ scrollbarWidth: 'none' }}
                 >
                   {yourGenes.map(({ symbol, classification }) => {
                     const isSelected = activeGenes.includes(symbol)
                     const base = 'shrink-0 snap-start rounded-full border px-3 py-1 font-mono text-xs font-semibold tracking-wider transition'
                     let cls
-                    if (isSelected) {
-                      // Selected → solid orange highlight regardless of classification
-                      cls = 'border-ss-orange bg-ss-orange text-white shadow-md ring-2 ring-white/40'
-                    } else if (classification === 'awareness') {
-                      cls = 'border-ss-amber/70 bg-white/5 text-ss-amber hover:bg-ss-amber hover:text-white'
-                    } else if (classification === 'strength' || classification === 'positive') {
-                      cls = 'border-ss-green/70 bg-white/5 text-ss-green hover:bg-ss-green hover:text-white'
-                    } else {
-                      cls = 'border-white/25 bg-white/5 text-white/85 hover:bg-white/15'
-                    }
+                    if (isSelected) cls = 'border-ss-orange bg-ss-orange text-white shadow ring-2 ring-ss-orange/20'
+                    else if (classification === 'awareness') cls = 'border-ss-amber/60 bg-white text-ss-amber hover:bg-ss-amber hover:text-white'
+                    else if (classification === 'strength' || classification === 'positive') cls = 'border-ss-green/60 bg-white text-ss-green hover:bg-ss-green hover:text-white'
+                    else cls = 'border-ss-border-warm bg-white text-ss-teal hover:bg-ss-bg'
                     return (
                       <button
                         key={symbol}
                         type="button"
                         onClick={() => toggleGene(symbol)}
                         className={`${base} ${cls}`}
-                        title={
-                          isSelected
-                            ? `Remove ${symbol} from cross-reference`
-                            : `Add ${symbol} to cross-reference`
-                        }
+                        title={isSelected ? `Remove ${symbol}` : `Add ${symbol} to cross-reference`}
                         aria-pressed={isSelected}
                       >
                         {symbol}
@@ -1101,9 +1152,9 @@ export default function SearchClient() {
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* Filter row */}
       <section className="border-b border-ss-border-warm bg-white">
@@ -1296,32 +1347,46 @@ export default function SearchClient() {
                 Hide animal / in-vitro
               </label>
 
-              {/* Recency toggle \u2014 default ON (last 5 years). Turn off to
-                  include foundational + older mechanistic research. */}
-              <label className="ml-2 inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-semibold text-ss-muted">
-                <input
-                  type="checkbox"
-                  checked={recentOnly}
-                  onChange={(e) => setRecentOnly(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-ss-teal"
+              {/* Section 4 spec: promote "Last 5y" and "Smart Search" from
+                  checkbox rows into proper toggle pills matching the
+                  evidence-tier + filter chip aesthetic above. Both remain
+                  keyboard/aria accessible via aria-pressed. */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={recentOnly}
+                onClick={() => setRecentOnly((v) => !v)}
+                className={`ml-2 inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  recentOnly
+                    ? 'border-ss-teal bg-ss-teal text-white shadow-sm'
+                    : 'border-ss-border-warm bg-white text-ss-teal hover:border-ss-teal'
+                }`}
+                title="Restrict results to the last 5 years"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-2 w-2 rounded-full ${recentOnly ? 'bg-white' : 'bg-ss-teal/40'}`}
                 />
                 Last 5y
-              </label>
-
-              {/* Smart Search toggle \u2014 default ON. Turns on the semantic
-                  expansion + rerank pass. */}
-              <label
-                className="ml-2 inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-ss-teal/40 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ss-teal"
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={smartSearch}
+                onClick={() => setSmartSearch((v) => !v)}
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                  smartSearch
+                    ? 'border-ss-orange bg-ss-orange text-white shadow-sm'
+                    : 'border-ss-border-warm bg-white text-ss-orange hover:border-ss-orange'
+                }`}
                 title="Uses AI to expand your query with related terms and reorder results by meaning"
               >
-                <input
-                  type="checkbox"
-                  checked={smartSearch}
-                  onChange={(e) => setSmartSearch(e.target.checked)}
-                  className="h-3.5 w-3.5 accent-ss-teal"
+                <span
+                  aria-hidden="true"
+                  className={`inline-block h-2 w-2 rounded-full ${smartSearch ? 'bg-white' : 'bg-ss-orange/40'}`}
                 />
                 Smart Search
-              </label>
+              </button>
 
               {refining && (
                 <span className="ml-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-ss-teal">

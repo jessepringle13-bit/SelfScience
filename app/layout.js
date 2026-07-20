@@ -4,6 +4,7 @@ import PWAInstallPrompt from '@/components/PWAInstallPrompt'
 import PWAUpdater from '@/components/PWAUpdater'
 import MobileNav from '@/components/MobileNav'
 import ChunkReloader from '@/components/ChunkReloader'
+import BookmarkToast from '@/components/BookmarkToast'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
 
@@ -85,6 +86,7 @@ export default function RootLayout({ children }) {
         <MobileNav />
         <PWAInstallPrompt />
         <PWAUpdater />
+        <BookmarkToast />
         <Analytics />
         <ChunkReloader />
       </body>

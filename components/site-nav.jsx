@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { Coffee, DollarSign, LayoutDashboard } from 'lucide-react'
-import { hasGenomeResults } from '@/lib/genomeSession'
+import { hasGenomeResults, getGenomeResults } from '@/lib/genomeSession'
+import { normalizePillarName } from '@/lib/pillars'
 import {
   Menu,
   X,
@@ -37,7 +38,11 @@ export const PILLARS = [
   { key: 'mental-health',      name: 'Mental Health & Neurochemistry',  short: 'Mental Health',     Icon: Brain,     description: 'The genetics of mood, stress response, dopamine, serotonin, and brain chemistry.' },
   { key: 'environment',        name: 'Environmental Sensitivity',       short: 'Environment',       Icon: Leaf,      description: 'How your genes influence your response to environmental exposures, toxins, and chemical sensitivity.' },
   { key: 'hormones',           name: 'Hormones & Endocrine Health',     short: 'Hormones',          Icon: Droplet,   description: 'Testosterone, estrogen, thyroid, cortisol, leptin, and the genetics of hormonal health.' },
-  { key: 'pediatric',          name: 'Pediatric & Youth Wellness',      short: 'Youth Wellness',    Icon: Baby,      description: 'Growth, development, nutrition, sleep, ADHD, allergies, and the research shaping children\u2019s health from infancy through adolescence.', route: '/pillars/youth' },
+  // Section 5 rename: broadened from "Pediatric & Youth Wellness" so
+  // adults researching their own developmental biology see themselves in
+  // the pillar too. Route + key kept as `pediatric` / `/pillars/youth`
+  // so existing bookmarks and internal links do not break.
+  { key: 'pediatric',          name: 'Developmental & Lifespan Wellness', short: 'Development',    Icon: Baby,      description: 'Growth, development, nutrition, sleep, ADHD, allergies, and the research shaping health across the lifespan.', route: '/pillars/youth' },
 ]
 
 export function SiteNav({ variant = 'light' }) {
@@ -52,12 +57,41 @@ export function SiteNav({ variant = 'light' }) {
   // without hunting for the SelfScience logo. Re-checks on the
   // selfscience:genome-changed event that /lib/genomeSession fires.
   const [genomeLoaded, setGenomeLoaded] = useState(false)
+  // Section 5 spec: variant counts per pillar. Refreshed when the
+  // genome-changed event fires so the dropdown always reflects the
+  // current session. Silent when no genome is loaded.
+  const [pillarCounts, setPillarCounts] = useState({})
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const check = () => setGenomeLoaded(hasGenomeResults())
-    check()
-    window.addEventListener('selfscience:genome-changed', check)
-    return () => window.removeEventListener('selfscience:genome-changed', check)
+    const recompute = () => {
+      setGenomeLoaded(hasGenomeResults())
+      try {
+        const g = getGenomeResults()
+        if (!g) { setPillarCounts({}); return }
+        const counts = {}
+        // Walk both the flat recognized list and the fullReport groups
+        // so we mirror the Pillar Score Overview totals exactly.
+        const bump = (name) => {
+          const normal = normalizePillarName(name)
+          if (!normal) return
+          counts[normal] = (counts[normal] || 0) + 1
+        }
+        for (const v of g.variants_recognized || []) {
+          const pillars = Array.isArray(v?.pillar) ? v.pillar : v?.pillar ? [v.pillar] : []
+          for (const p of pillars) bump(p)
+        }
+        for (const grp of g.fullReport || []) {
+          for (const v of grp.variants || []) {
+            const pillars = Array.isArray(v?.pillar) ? v.pillar : v?.pillar ? [v.pillar] : []
+            for (const p of pillars) bump(p)
+          }
+        }
+        setPillarCounts(counts)
+      } catch { setPillarCounts({}) }
+    }
+    recompute()
+    window.addEventListener('selfscience:genome-changed', recompute)
+    return () => window.removeEventListener('selfscience:genome-changed', recompute)
   }, [])
   const pillarsRef = useRef(null)
   const toolsRef = useRef(null)
@@ -127,20 +161,21 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/how-it-works',  label: 'How It Works',  blurb: 'A tour under the hood.' },
   ]
   const aboutActive = ABOUT_ITEMS.some((i) => i.href === pathname)
-  // Deep-dive tools that used to live as individual header links. Grouped
-  // under a single "Tools" dropdown so the desktop nav stays scannable.
-  // On mobile the drawer still lists them individually so nothing is hidden.
+  // Section 7 spec: order by most commonly used first. Nutrition Hub,
+  // Drug Check, and Supplement Discovery lead. "Supplements" was
+  // renamed to "Supplement Discovery" and "Biomarkers" to "Lab
+  // Biomarkers" to match the spec-required labels.
   const TOOL_ITEMS = [
-    { href: '/get-started',         label: 'Get Started',       Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
-    { href: '/nutrition',           label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
-    { href: '/biomarkers',         label: 'Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
-    { href: '/tools/training',     label: 'Training Protocol', Icon: Activity,  blurb: 'Genome-driven training plan for your sport.' },
-    { href: '/tools/supplements',  label: 'Supplements',       Icon: Pill,      blurb: 'Discover supplements by ingredient FORM. NIH label data. Brand-direct only.' },
-    { href: '/tools/supplements/brands',  label: 'Brand Leaderboard', Icon: Award,    blurb: 'Every curated supplement brand ranked by transparency score.' },
-    { href: '/drug-check',         label: 'Drug Check',        Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
-    { href: '/population-compare', label: 'Population Compare',Icon: Globe2,    blurb: 'How your variants compare globally.' },
-    { href: '/ancestry',            label: 'Ancestry Report',      Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
-    { href: '/practitioner-report', label: 'Practitioner Report',  Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
+    { href: '/nutrition',                 label: 'Nutrition Hub',         Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
+    { href: '/drug-check',                label: 'Drug Check',            Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
+    { href: '/tools/supplements',         label: 'Supplement Discovery',  Icon: Pill,      blurb: 'Discover supplements by ingredient form. NIH label data. Brand-direct only.' },
+    { href: '/biomarkers',                label: 'Lab Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
+    { href: '/tools/training',            label: 'Training Protocol',     Icon: Activity,  blurb: 'Genome-driven training plan for your sport.' },
+    { href: '/population-compare',        label: 'Population Compare',    Icon: Globe2,    blurb: 'How your variants compare globally.' },
+    { href: '/ancestry',                  label: 'Ancestry Report',       Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
+    { href: '/practitioner-report',       label: 'Practitioner Report',   Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
+    { href: '/tools/supplements/brands',  label: 'Brand Leaderboard',     Icon: Award,     blurb: 'Every curated supplement brand ranked by transparency score.' },
+    { href: '/get-started',               label: 'Get Started',           Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
   ]
   const toolsActive = TOOL_ITEMS.some((i) => i.href === pathname)
 
@@ -198,25 +233,40 @@ export function SiteNav({ variant = 'light' }) {
             {pillarsOpen && (
               <div
                 role="menu"
-                className="absolute left-1/2 top-full z-50 mt-2 w-[640px] -translate-x-1/2 rounded-xl bg-white p-4 shadow-2xl ring-1 ring-black/10"
+                className="absolute left-1/2 top-full z-50 mt-2 w-[720px] -translate-x-1/2 rounded-xl bg-white p-4 shadow-2xl ring-1 ring-black/10"
               >
                 <div className="grid grid-cols-3 gap-1">
-                  {PILLARS.map(({ key, name, Icon, description, route }) => (
-                    <a
-                      key={key}
-                      href={route || `/search?pillar=${encodeURIComponent(name)}`}
-                      onClick={() => setPillarsOpen(false)}
-                      className="group flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg"
-                    >
-                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ss-teal/10 text-ss-teal group-hover:bg-ss-teal group-hover:text-white">
-                        <Icon size={16} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold text-ss-teal">{name}</span>
-                        <span className="mt-0.5 block truncate text-[11px] text-ss-muted">{description}</span>
-                      </span>
-                    </a>
-                  ))}
+                  {PILLARS.map(({ key, name, Icon, description, route }) => {
+                    // Section 5: show a small variant count when a genome
+                    // is loaded and this pillar has any recognised variants.
+                    const count = genomeLoaded ? pillarCounts[name] || 0 : 0
+                    return (
+                      <a
+                        key={key}
+                        href={route || `/search?pillar=${encodeURIComponent(name)}`}
+                        onClick={() => setPillarsOpen(false)}
+                        className="group flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg"
+                      >
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ss-teal/10 text-ss-teal group-hover:bg-ss-teal group-hover:text-white">
+                          <Icon size={16} />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-start gap-1.5 text-sm font-bold leading-tight text-ss-teal">
+                            <span className="min-w-0 flex-1 break-words">{name}</span>
+                            {count > 0 && (
+                              <span
+                                className="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-ss-orange/15 px-1.5 py-0.5 text-[10px] font-extrabold text-ss-orange"
+                                title={`${count} variant${count === 1 ? '' : 's'} recognised in your genome`}
+                              >
+                                {count}
+                              </span>
+                            )}
+                          </span>
+                          <span className="mt-1 block truncate text-[11px] text-ss-muted">{description}</span>
+                        </span>
+                      </a>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -370,16 +420,16 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/genome/findings"             onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Findings</a>
             <a href="/genome/strengths"            onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Strengths</a>
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Tools</div>
-            <a href="/get-started"                 onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
             <a href="/nutrition"                   onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
-            <a href="/biomarkers"                  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Biomarkers</a>
-            <a href="/tools/training"              onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training Protocol</a>
-            <a href="/tools/supplements"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Supplements</a>
-            <a href="/tools/supplements/brands"    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Brand Leaderboard</a>
             <a href="/drug-check"                  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Drug Check</a>
-            <a href="/population-compare"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Populations</a>
-            <a href="/ancestry"                    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry</a>
+            <a href="/tools/supplements"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Supplement Discovery</a>
+            <a href="/biomarkers"                  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Lab Biomarkers</a>
+            <a href="/tools/training"              onClick={() => setMobileOpen(false)} className="hover:opacity-80">Training Protocol</a>
+            <a href="/population-compare"          onClick={() => setMobileOpen(false)} className="hover:opacity-80">Population Compare</a>
+            <a href="/ancestry"                    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry Report</a>
             <a href="/practitioner-report"         onClick={() => setMobileOpen(false)} className="hover:opacity-80">Practitioner Report</a>
+            <a href="/tools/supplements/brands"    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Brand Leaderboard</a>
+            <a href="/get-started"                 onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
 
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Browse</div>
             <details className="group">

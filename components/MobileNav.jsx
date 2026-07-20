@@ -40,13 +40,10 @@ const NAV_ITEMS = [
 // Same list as the desktop Tools dropdown in site-nav.jsx (kept in sync
 // manually — if you add a tool there, add it here too). Mobile has a bit
 // more vertical real estate so we use slightly longer blurbs.
+// Section 7 spec: Nutrition Hub, Drug Check, Supplement Discovery lead.
+// "Supplements" renamed to "Supplement Discovery" and "Biomarker Panel"
+// to "Lab Biomarkers" for label parity with the practitioner report.
 const TOOL_ITEMS = [
-  {
-    href: '/get-started',
-    label: 'Get Started (Kits)',
-    Icon: Rocket,
-    blurb: 'Which DNA + blood kits work with SelfScience.',
-  },
   {
     href: '/nutrition',
     label: 'Nutrition Hub',
@@ -54,8 +51,20 @@ const TOOL_ITEMS = [
     blurb: 'Scan a barcode, log your day, and see foods matched to your genome.',
   },
   {
+    href: '/drug-check',
+    label: 'Drug Check',
+    Icon: Pill,
+    blurb: 'Pharmacogenomic guidance for common medications and supplements.',
+  },
+  {
+    href: '/tools/supplements',
+    label: 'Supplement Discovery',
+    Icon: Pill,
+    blurb: 'Discover supplements by ingredient form. NIH label data. Brand-direct only.',
+  },
+  {
     href: '/biomarkers',
-    label: 'Biomarker Panel',
+    label: 'Lab Biomarkers',
     Icon: TestTube2,
     blurb: 'Log blood work and see which of your genes match each marker.',
   },
@@ -64,24 +73,6 @@ const TOOL_ITEMS = [
     label: 'Training Protocol',
     Icon: Activity,
     blurb: 'Personalised training zones and sport affinity based on your DNA.',
-  },
-  {
-    href: '/tools/supplements',
-    label: 'Supplements',
-    Icon: Pill,
-    blurb: 'Discover supplements by ingredient FORM. NIH label data. Brand-direct only.',
-  },
-  {
-    href: '/tools/supplements/brands',
-    label: 'Brand Leaderboard',
-    Icon: Award,
-    blurb: 'Every curated supplement brand ranked by transparency score.',
-  },
-  {
-    href: '/drug-check',
-    label: 'Drug Check',
-    Icon: Pill,
-    blurb: 'Pharmacogenomic guidance for common medications and supplements.',
   },
   {
     href: '/population-compare',
@@ -100,6 +91,18 @@ const TOOL_ITEMS = [
     label: 'Practitioner Report',
     Icon: FileText,
     blurb: 'Print-ready summary you can hand to your clinician.',
+  },
+  {
+    href: '/tools/supplements/brands',
+    label: 'Brand Leaderboard',
+    Icon: Award,
+    blurb: 'Every curated supplement brand ranked by transparency score.',
+  },
+  {
+    href: '/get-started',
+    label: 'Get Started (Kits)',
+    Icon: Rocket,
+    blurb: 'Which DNA + blood kits work with SelfScience.',
   },
 ]
 

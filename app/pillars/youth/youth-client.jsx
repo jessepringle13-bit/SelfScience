@@ -110,7 +110,7 @@ function DomainSection({ domain, defaultOpen }) {
               {domain.research.map((q) => (
                 <Link
                   key={q}
-                  href={`/search?q=${encodeURIComponent(q)}&pillar=${encodeURIComponent('Pediatric & Youth Wellness')}`}
+                  href={`/search?q=${encodeURIComponent(q)}&pillar=${encodeURIComponent('Developmental & Lifespan Wellness')}`}
                   className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm bg-white px-3 py-1 text-[12px] font-semibold text-ss-teal hover:bg-ss-bg"
                 >
                   {q} <ArrowRight size={11} />
@@ -296,7 +296,7 @@ export default function YouthClient() {
               Upload a genome <ArrowRight size={14} />
             </Link>
             <Link
-              href={`/search?pillar=${encodeURIComponent('Pediatric & Youth Wellness')}`}
+              href={`/search?pillar=${encodeURIComponent('Developmental & Lifespan Wellness')}`}
               className="inline-flex items-center gap-2 rounded-full border border-ss-teal px-5 py-2.5 text-sm font-semibold text-ss-teal hover:bg-ss-teal/5"
             >
               Explore the research <ExternalLink size={14} />

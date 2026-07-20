@@ -167,7 +167,7 @@ const CATEGORY_PILLS = [
   'Mental Health',
   'Environment',
   'Hormones',
-  'Youth Wellness',
+  'Development',
 ]
 
 // Map pill short-label to full pillar name (for URL param)
@@ -181,7 +181,7 @@ const PILL_TO_PILLAR = {
   'Mental Health': 'Mental Health & Neurochemistry',
   'Environment': 'Environmental Sensitivity',
   'Hormones': 'Hormones & Endocrine Health',
-  'Youth Wellness': 'Pediatric & Youth Wellness',
+  'Development': 'Developmental & Lifespan Wellness',
 }
 
 /* --------------------------------- Page ------------------------------------ */
