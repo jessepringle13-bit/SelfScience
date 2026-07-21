@@ -3447,6 +3447,39 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+frontend:
+  - task: "Training Protocol Mobile Bottom-Bar Overlap Fix"
+    implemented: true
+    working: true
+    file: "/app/components/training/MobileTabBar.jsx, /app/app/tools/training/training-protocol-client.jsx, /app/app/globals.css"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          ROOT CAUSE: The global site MobileNav (Home/Search/Genome/Tools)
+          and the training-tool page MobileTabBar (Today/Blueprint/History/
+          Supplements/More) were both `fixed inset-x-0 bottom-0 z-40`.
+          MobileNav is rendered AFTER children in /app/app/layout.js, so it
+          painted on top of the page-scoped MobileTabBar. Result: mobile
+          users on /tools/training saw ZERO of the 12 training tabs.
+
+          FIX:
+          1) MobileTabBar toggles `body.ss-page-tabbar-active` while mounted.
+          2) globals.css hides `.ss-mobile-nav` under `body.ss-page-tabbar-active`
+             at max-width 767px, so only one bottom bar is ever visible.
+          3) MobileTabBar bumped to `z-50` (defence in depth).
+          4) Conditional Beginner / Youth tabs are now passed via
+             `extraTabs` prop so mobile parity matches desktop TabNav.
+
+          Verified at 375px viewport via screenshot tool: training tabbar
+          visible with all 5 primary tabs + More sheet listing all 12
+          desktop tabs. Action bar (Save/Regenerate/Print) fully visible,
+          wraps cleanly. Desktop (1280px) unaffected.
+
+
 agent_communication:
     -agent: "main"
       message: |

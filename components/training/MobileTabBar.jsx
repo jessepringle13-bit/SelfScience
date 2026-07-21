@@ -11,6 +11,7 @@ import { useEffect } from 'react'
 import {
   Dumbbell, Calendar, History, Pill, MoreHorizontal,
   Target, Home, Wind, Coffee, Wrench, LineChart, X, Share2, Dna,
+  BookOpen, Baby,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -38,8 +39,18 @@ const ALL_TABS = [
   { key: 'coach',       label: 'Coach Share',     Icon: Share2,    hint: 'Printable brief for your coach' },
 ]
 
-export default function MobileTabBar({ active, onChange, hide = false }) {
+export default function MobileTabBar({ active, onChange, hide = false, extraTabs = [] }) {
   const [moreOpen, setMoreOpen] = useState(false)
+
+  // While this page-scoped bottom bar is mounted, hide the global site
+  // MobileNav so the two bars don't stack / overlap (both are
+  // `fixed bottom-0`). Global MobileNav respects the `.ss-page-tabbar-active`
+  // body class defined in globals.css.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.body.classList.add('ss-page-tabbar-active')
+    return () => document.body.classList.remove('ss-page-tabbar-active')
+  }, [])
 
   // Close More sheet on Escape
   useEffect(() => {
@@ -58,7 +69,7 @@ export default function MobileTabBar({ active, onChange, hide = false }) {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ss-teal-ink/95 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-ss-teal-ink/95 backdrop-blur md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         aria-label="Training tabs"
       >
@@ -142,7 +153,7 @@ export default function MobileTabBar({ active, onChange, hide = false }) {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {ALL_TABS.map(({ key, label, Icon, hint }) => {
+              {[...ALL_TABS, ...(extraTabs || [])].map(({ key, label, Icon, hint }) => {
                 const isActive = active === key
                 return (
                   <button

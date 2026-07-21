@@ -150,6 +150,10 @@ html.ss-print-mode .ss-tab-hidden { display: block !important; }
   body {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
+  /* When a page-scoped bottom bar (e.g. Training tool) is active, hide the
+   * global MobileNav so the two bars don't stack / overlap. The page bar
+   * fully replaces the global bar while it's mounted. */
+  body.ss-page-tabbar-active .ss-mobile-nav { display: none !important; }
   /* Hide the bottom bar on print. */
   @media print {
     .ss-mobile-nav { display: none !important; }

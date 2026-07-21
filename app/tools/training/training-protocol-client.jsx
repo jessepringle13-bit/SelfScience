@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Sparkles, RefreshCw, Save, Printer, Dna, ClipboardList,
-  ArrowLeft, Activity, Info,
+  ArrowLeft, Activity, Info, BookOpen, Baby,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 
@@ -401,7 +401,16 @@ function TrainingProtocolInner() {
       {/* Mobile bottom tab bar — replaces the horizontal tab scroller on
           <768px. Adds bottom padding to the outer wrapper so content isn't
           hidden under the fixed nav. */}
-      {protocol && <MobileTabBar active={tab} onChange={setTab} />}
+      {protocol && (
+        <MobileTabBar
+          active={tab}
+          onChange={setTab}
+          extraTabs={[
+            ...(protocol.beginner ? [{ key: 'beginner', label: 'Beginner', Icon: BookOpen, hint: 'Starter guide + form basics' }] : []),
+            ...(protocol.youth    ? [{ key: 'youth',    label: 'Youth',    Icon: Baby,     hint: 'Youth-athlete-safe programming' }] : []),
+          ]}
+        />
+      )}
       <div aria-hidden="true" className="h-20 md:hidden" />
     </div>
   )
