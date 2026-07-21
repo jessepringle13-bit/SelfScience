@@ -190,25 +190,28 @@ function TrainingProtocolInner() {
 
         {/* ---------- Protocol output ---------- */}
         {ready && protocol && (
-          <div>
-            {/* Action bar */}
+          <div className="pb-24 md:pb-0">
+            {/* Action bar — mobile-friendly: buttons wrap onto their own
+                row, each with 44px min touch height so nothing clips at
+                375px. Desktop layout is unchanged (flex-wrap already
+                accommodates the original single-row look on md+). */}
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ss-border-warm bg-white p-3 shadow-sm ss-screen-only no-print">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-ss-muted">
+              <div className="flex w-full flex-wrap items-center gap-2 text-[11px] text-ss-muted md:w-auto">
                 <ClipboardList size={12} className="text-ss-teal" />
                 <span>
                   Generated {new Date(protocol.generatedAt).toLocaleDateString()} ·
                   {' '}<span className="font-semibold text-ss-teal">{protocol.profile?.coverage?.covered}/{protocol.profile?.coverage?.total}</span> variants covered · goal: <span className="font-semibold text-ss-teal">{(protocol.intake?.goals || []).join(', ') || '—'}</span>
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
                 <ViewModeToggle />
-                <button onClick={handleSave} className="inline-flex items-center gap-1 rounded-full border border-ss-teal px-3 py-1.5 text-[11px] font-semibold text-ss-teal transition hover:bg-ss-teal/10">
+                <button onClick={handleSave} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-ss-teal px-3 py-1.5 text-[11px] font-semibold text-ss-teal transition hover:bg-ss-teal/10">
                   <Save size={11} /> Save
                 </button>
-                <button onClick={handleRegenerate} className="inline-flex items-center gap-1 rounded-full border border-ss-orange px-3 py-1.5 text-[11px] font-semibold text-ss-orange transition hover:bg-ss-orange/10">
+                <button onClick={handleRegenerate} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-ss-orange px-3 py-1.5 text-[11px] font-semibold text-ss-orange transition hover:bg-ss-orange/10">
                   <RefreshCw size={11} /> Regenerate
                 </button>
-                <button onClick={handlePrint} className="inline-flex items-center gap-1 rounded-full bg-ss-teal px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-110">
+                <button onClick={handlePrint} className="inline-flex min-h-11 items-center gap-1 rounded-full bg-ss-teal px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-110">
                   <Printer size={11} /> Print
                 </button>
               </div>

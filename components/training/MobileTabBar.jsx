@@ -10,7 +10,7 @@
 import { useEffect } from 'react'
 import {
   Dumbbell, Calendar, History, Pill, MoreHorizontal,
-  Target, Home, Wind, Coffee, Wrench, LineChart, X,
+  Target, Home, Wind, Coffee, Wrench, LineChart, X, Share2, Dna,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -24,7 +24,8 @@ const PRIMARY = [
 
 // Full tab set, mirrored from the desktop TabNav so mobile has parity.
 const ALL_TABS = [
-  { key: 'overview',    label: 'Overview',       Icon: Home,      hint: 'Program summary' },
+  { key: 'overview',    label: 'Overview',        Icon: Home,      hint: 'Program summary' },
+  { key: 'profile',     label: 'Genetic Profile', Icon: Dna,       hint: 'How your DNA shapes training' },
   { key: 'workouts',    label: "Today's Workout", Icon: Dumbbell,  hint: 'Active sessions + set trackers' },
   { key: 'blueprint',   label: 'Weekly Blueprint', Icon: Calendar, hint: 'Your 7-day plan' },
   { key: 'history',     label: 'History',         Icon: History,   hint: 'Past sessions + PRs' },
@@ -34,6 +35,7 @@ const ALL_TABS = [
   { key: 'equipment',   label: 'Equipment',       Icon: Wrench,    hint: 'Gear + substitutions' },
   { key: 'metrics',     label: 'Metrics',         Icon: LineChart, hint: 'Body comp + biomarkers' },
   { key: 'goals',       label: 'Goals',           Icon: Target,    hint: 'Milestones + progress' },
+  { key: 'coach',       label: 'Coach Share',     Icon: Share2,    hint: 'Printable brief for your coach' },
 ]
 
 export default function MobileTabBar({ active, onChange, hide = false }) {
