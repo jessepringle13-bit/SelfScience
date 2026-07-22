@@ -370,7 +370,7 @@ export default function Dashboard() {
         </DashSection>
 
         {/* 7. EXPLORE YOUR PILLARS */}
-        <DashSection title="Explore Your Pillars" subtitle="Dive into the research grouped by pillar." toneClass="text-ss-teal">
+        <DashSection title="Explore Your Pillars" subtitle="Tap any pillar to search the research with your matched genes." toneClass="text-ss-teal">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {PILLARS.map((p) => (
               <ExplorePillarCard key={p.key} pillar={p} genes={pillarGenes[p.name] || []} />
