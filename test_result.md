@@ -3447,6 +3447,46 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Dashboard: Merge Pillar Score Overview + Explore Your Pillars; add Associated-With on findings/strengths"
+    implemented: true
+    working: true
+    file: "/app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Two separate pillar sections merged into ONE "Explore Your Pillars":
+          - Deleted the standalone "Pillar Score Overview" section (line 268).
+          - Deleted the standalone "Explore Your Pillars" section (line 373).
+          - Introduced a unified `PillarCard` (formerly `PillarTile` + `ExplorePillarCard`)
+            that renders icon + name + description + colored progress bar
+            (Benefit/Aware/Neutral segments) + count row + user's matched
+            gene chips.
+          - Card is always a <Link href="/search?pillar=X&genes=A,B,C"> so the
+            Search page auto-fires the fan-out on arrival. No in-place filter
+            behaviour on these cards — the horizontal pillar chip bar at the
+            top of the dashboard already handles in-place filtering.
+          - Grid: 1 col mobile / 2 col tablet / 3 col desktop (was 2/3/5).
+
+          Findings / Strengths cards enhanced with an "Associated with" row:
+          - Shows the pillar as a teal chip + the trait (when it differs
+            from the card name) so users can immediately see WHAT each
+            variant is associated with.
+          - Renders in the CardRow component used by both `Your Top
+            Findings` and `Your Strengths` on the dashboard.
+
+          Verified at 375px (mobile) and 1280px (desktop):
+          - Explore Your Pillars sections rendered: 1
+          - Pillar Score Overview sections rendered: 0
+          - Pillar card hrefs correctly include genes for the user's
+            classified pillars (e.g. /search?pillar=Genomics&genes=APOE%2CMTHFR)
+          - Horizontal pillar chip bar still filters the dashboard in-place
+          - Findings/Strengths cards show "Associated with · <Pillar> · <trait>"
+
+
 frontend:
   - task: "Training Protocol Mobile Bottom-Bar Overlap Fix"
     implemented: true

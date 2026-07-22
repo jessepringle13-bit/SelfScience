@@ -263,42 +263,39 @@ export default function Dashboard() {
           </DashSection>
         </div>
 
-        {/* 3. PILLAR SCORE OVERVIEW */}
+        {/* 3. YOUR PILLARS (merged: was "Pillar Score Overview" + "Explore Your Pillars")
+             Every card shows icon + name + description + colored progress bar
+             + Benefit/Aware/Neutral counts + your matched gene chips, and
+             navigates to /search?pillar=X&genes=A,B,C so the search page
+             immediately fans out on arrival. In-page pillar filtering is
+             handled exclusively by the horizontal chip bar above. */}
         <div data-tour-target="pillar-grid">
-          <DashSection title="Pillar Score Overview" subtitle="Distribution of findings across your 10 pillars. Tap any pillar to filter your dashboard by it." toneClass="text-ss-teal">
-          {/* Legend */}
-          <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" /> Benefit
-            </span>
-            <span className="text-ss-border-warm">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-ss-amber" aria-hidden="true" /> Aware
-            </span>
-            <span className="text-ss-border-warm">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-2 w-2 rounded-full bg-ss-border-warm" aria-hidden="true" /> Neutral
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {PILLARS.map((p) => (
-              <PillarTile
-                key={p.key}
-                pillar={p}
-                summary={pillarSummary[p.name]}
-                genes={pillarGenes[p.name] || []}
-                onSelect={() => {
-                  setPillar(p.name)
-                  // Smoothly scroll to Top Findings section so the user
-                  // sees the filter take effect immediately.
-                  requestAnimationFrame(() => {
-                    topFindingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  })
-                }}
-              />
-            ))}
-          </div>
-        </DashSection>
+          <DashSection title="Explore Your Pillars" subtitle="Tap any pillar to search the research with your matched genes." toneClass="text-ss-teal">
+            {/* Legend */}
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" /> Benefit
+              </span>
+              <span className="text-ss-border-warm">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-ss-amber" aria-hidden="true" /> Aware
+              </span>
+              <span className="text-ss-border-warm">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-full bg-ss-border-warm" aria-hidden="true" /> Neutral
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {PILLARS.map((p) => (
+                <PillarCard
+                  key={p.key}
+                  pillar={p}
+                  summary={pillarSummary[p.name]}
+                  genes={pillarGenes[p.name] || []}
+                />
+              ))}
+            </div>
+          </DashSection>
         </div>
 
         {/* 4. RESEARCH MATCHED TO YOU */}
@@ -369,15 +366,6 @@ export default function Dashboard() {
           </div>
         </DashSection>
 
-        {/* 7. EXPLORE YOUR PILLARS */}
-        <DashSection title="Explore Your Pillars" subtitle="Tap any pillar to search the research with your matched genes." toneClass="text-ss-teal">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {PILLARS.map((p) => (
-              <ExplorePillarCard key={p.key} pillar={p} genes={pillarGenes[p.name] || []} />
-            ))}
-          </div>
-        </DashSection>
-
         {/* Educational disclaimer footer */}
         <div className="rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
           <div className="flex items-start gap-3">
@@ -439,6 +427,19 @@ function CardRow({ items, tone }) {
           style={{ borderLeft: `4px solid ${border}` }}
         >
           <div className="text-sm font-bold text-ss-teal">{c.name || c.gene}</div>
+          {/* Associated-with row: shows the pillar (and trait if available) so
+              users immediately see what health area each variant relates to. */}
+          {(c.pillar || c.trait) && (
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-[10.5px] text-ss-muted">
+              <span className="font-semibold uppercase tracking-wider text-ss-teal/70">Associated with</span>
+              {c.pillar && (
+                <span className="rounded-full bg-ss-teal/10 px-2 py-0.5 font-semibold text-ss-teal">{c.pillar}</span>
+              )}
+              {c.trait && c.trait !== (c.name || c.gene) && (
+                <span className="text-ss-muted">· {c.trait}</span>
+              )}
+            </div>
+          )}
           <p className="mt-2 line-clamp-3 text-sm text-ss-text">{c.plain || ''}</p>
           <div className="mt-3 flex flex-wrap gap-1 text-[10px] text-ss-muted">
             {c.gene && <code className="rounded bg-ss-bg px-1.5 py-0.5 font-semibold">{c.gene}</code>}
@@ -451,120 +452,89 @@ function CardRow({ items, tone }) {
   )
 }
 
-function PillarTile({ pillar, summary, genes = [], onSelect }) {
-  const positive = summary?.positive || 0
+// Unified pillar card — merges the former PillarTile (colored progress bar +
+// counts + gene chip preview) and ExplorePillarCard (description + Search
+// navigation) into a single grid card. Click always navigates to
+// /search?pillar=X&genes=A,B,... so the Search page can fan out immediately.
+function PillarCard({ pillar, summary, genes = [] }) {
+  const positive  = summary?.positive  || 0
   const awareness = summary?.awareness || 0
-  const neutral = summary?.neutral || 0
-  const total = positive + awareness + neutral
-
-  // Section 3 spec: high-Aware pillars (\u22653 aware, 0 benefit) get a
-  // reassurance line so users don't over-react to yellow-heavy pillars
-  // like Environmental Sensitivity.
-  const showHighAwareNote = awareness >= 3 && positive === 0
-
-  // Section 3 spec: zero-variant pillars ("no notable variants detected")
-  // \u2014 replace the count row with a favorable-signal line.
+  const neutral   = summary?.neutral   || 0
+  const total     = positive + awareness + neutral
   const isZeroVariant = total === 0
 
-  const tileClass = 'flex w-full flex-col rounded-xl bg-white p-4 text-left ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md'
+  // High-Aware pillars (≥3 aware, 0 benefit) get a reassurance line.
+  const showHighAwareNote = awareness >= 3 && positive === 0
 
-  const inner = (
-    <>
-      <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
-          <pillar.Icon size={16} strokeWidth={1.5} />
+  // Build the /search hand-off URL with the user's classified genes for this
+  // pillar. Capped at 12 to keep URLs reasonable and matches the Search
+  // page's own cap.
+  const params = new URLSearchParams({ pillar: pillar.name })
+  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
+
+  return (
+    <Link
+      href={`/search?${params.toString()}`}
+      className="group flex flex-col rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
+      aria-label={`Search research for ${pillar.name}${genes.length ? ` with ${genes.length} of your genes` : ''}`}
+    >
+      {/* Header row: icon + name + arrow */}
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
+          <pillar.Icon size={20} strokeWidth={1.5} />
         </span>
-        <div className="text-xs font-bold text-ss-teal">{pillar.name}</div>
+        <div className="min-w-0 flex-1">
+          <div className="font-bold text-ss-teal">{pillar.name}</div>
+          <div className="mt-1 text-xs text-ss-muted line-clamp-2">{pillar.description}</div>
+        </div>
+        <ArrowRight size={14} className="mt-2 flex-shrink-0 text-ss-muted transition group-hover:translate-x-0.5 group-hover:text-ss-teal" />
       </div>
-      <div className="mt-3 flex h-1.5 w-full overflow-hidden rounded-full bg-ss-border-warm/40" aria-hidden="true">
+
+      {/* Progress bar */}
+      <div className="mt-4 flex h-1.5 w-full overflow-hidden rounded-full bg-ss-border-warm/40" aria-hidden="true">
         {total === 0 ? (
           <div className="h-full w-full" />
         ) : (
           <>
-            {positive > 0 && <div className="h-full bg-ss-green" style={{ width: `${(positive/total)*100}%` }} />}
-            {awareness > 0 && <div className="h-full bg-ss-amber" style={{ width: `${(awareness/total)*100}%` }} />}
-            {neutral > 0 && <div className="h-full bg-ss-border-warm" style={{ width: `${(neutral/total)*100}%` }} />}
+            {positive  > 0 && <div className="h-full bg-ss-green"       style={{ width: `${(positive  / total) * 100}%` }} />}
+            {awareness > 0 && <div className="h-full bg-ss-amber"       style={{ width: `${(awareness / total) * 100}%` }} />}
+            {neutral   > 0 && <div className="h-full bg-ss-border-warm" style={{ width: `${(neutral   / total) * 100}%` }} />}
           </>
         )}
       </div>
+
+      {/* Count row */}
       {isZeroVariant ? (
         <div className="mt-2 text-[10.5px] italic text-ss-muted">
           No notable variants detected — a favorable signal.
         </div>
       ) : (
-        <div className="mt-2 text-[10px] text-ss-muted">
-          {positive}·Benefit &nbsp;{awareness}·Aware &nbsp;{neutral}·Neutral
+        <div className="mt-2 text-[10.5px] text-ss-muted">
+          <span className="font-semibold text-ss-green">{positive}</span> Benefit
+          <span className="mx-1.5 text-ss-border-warm">·</span>
+          <span className="font-semibold text-ss-amber">{awareness}</span> Aware
+          <span className="mx-1.5 text-ss-border-warm">·</span>
+          <span className="font-semibold text-ss-muted">{neutral}</span> Neutral
         </div>
       )}
-      {/* Compact gene chip preview so users can see WHICH of their genes
-          will fan out when they click this tile. Each chip is now
-          interactive: it shows a clinical-trial status dot + popover
-          with recruiting counts and top trial titles. */}
+
+      {/* Gene chips — the actual genes that will be passed to Search */}
       {genes.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {genes.slice(0, 4).map((g) => (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {genes.slice(0, 6).map((g) => (
             <GeneChip key={g} gene={g} size="sm" />
           ))}
-          {genes.length > 4 && (
-            <span className="text-[9px] font-semibold text-ss-muted">+{genes.length - 4}</span>
+          {genes.length > 6 && (
+            <span className="self-center text-[10px] font-semibold text-ss-muted">+{genes.length - 6}</span>
           )}
         </div>
       )}
+
       {showHighAwareNote && (
-        <div className="mt-2 border-t border-ss-border-warm/60 pt-2 text-[10.5px] leading-snug text-ss-muted">
+        <div className="mt-3 border-t border-ss-border-warm/60 pt-2 text-[10.5px] leading-snug text-ss-muted">
           These findings relate to manageable exposures — not deterministic health outcomes.
         </div>
       )}
-    </>
-  )
-
-  // If an onSelect handler is passed (dashboard usage), render as a
-  // button that filters in place rather than a Link that navigates away.
-  if (typeof onSelect === 'function') {
-    return (
-      <button type="button" onClick={onSelect} className={tileClass}>
-        {inner}
-      </button>
-    )
-  }
-  // Fallback: legacy Link behavior for any callers not passing onSelect.
-  const params = new URLSearchParams({ pillar: pillar.name })
-  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
-  return (
-    <Link href={`/search?${params.toString()}`} className={tileClass}>
-      {inner}
-    </Link>
-  )
-}
-
-function ExplorePillarCard({ pillar, genes = [] }) {
-  // Attach the user's genes for this pillar as a URL param so the search
-  // page can fan out to per-gene queries and highlight matches.
-  const params = new URLSearchParams({ pillar: pillar.name })
-  if (genes.length) params.set('genes', genes.slice(0, 12).join(','))
-  return (
-    <Link
-      href={`/search?${params.toString()}`}
-      className="flex items-start gap-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
-    >
-      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
-        <pillar.Icon size={20} strokeWidth={1.5} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="font-bold text-ss-teal">{pillar.name}</div>
-        <div className="mt-1 text-xs text-ss-muted line-clamp-2">{pillar.description}</div>
-        {genes.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {genes.slice(0, 6).map((g) => (
-              <GeneChip key={g} gene={g} size="md" />
-            ))}
-            {genes.length > 6 && (
-              <span className="text-[10px] text-ss-muted">+{genes.length - 6}</span>
-            )}
-          </div>
-        )}
-      </div>
-      <ArrowRight size={14} className="mt-2 flex-shrink-0 text-ss-muted" />
     </Link>
   )
 }
