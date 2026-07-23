@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import EmptyStatePrompt from '@/components/EmptyStatePrompt'
 import {
   Apple,
   Utensils,
@@ -132,14 +133,16 @@ export default function NutritionClient() {
           </p>
         </div>
 
-        {/* No-genome prompt */}
+        {/* No-genome prompt (unified empty-state pattern — Phase B · Part 6) */}
         {ready && !report && (
-          <div className="mt-6 rounded-2xl border border-dashed border-ss-border-warm bg-white/60 p-6 text-center">
-            <p className="text-sm font-semibold text-ss-teal">Upload your genome to get personalized nutrition analysis</p>
-            <p className="mt-1 text-xs text-ss-muted">All three tools still work without genome data — they will show population-average guidance instead of personalized.</p>
-            <Link href="/genome" className="mt-4 inline-flex items-center gap-2 rounded-full bg-ss-teal px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110">
-              Upload genome <ArrowRight size={13} />
-            </Link>
+          <div className="mt-8">
+            <EmptyStatePrompt
+              emoji="🥦"
+              headline="Upload your genome file to see which foods work best for your genes."
+              ctaLabel="Upload Your File →"
+              ctaHref="/genome"
+              reassurance="Already uploaded? Your nutrition results are on the way — the population-average tabs below still work in the meantime."
+            />
           </div>
         )}
 

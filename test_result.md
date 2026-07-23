@@ -3447,6 +3447,83 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Wayfinding Phase B — Persistent JourneyGuide + Reusable EmptyStatePrompt"
+    implemented: true
+    working: true
+    file: |
+      /app/app/layout.js,
+      /app/app/nutrition/nutrition-client.jsx,
+      /app/app/drug-check/drug-check-client.jsx,
+      /app/components/EmptyStatePrompt.jsx (NEW),
+      /app/components/JourneyGuide.jsx (NEW)
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Shipped Phase B of the wayfinding backlog:
+
+          PART 3 — /app/components/JourneyGuide.jsx is a persistent
+          wayfinding element that mounts globally via layout.js and only
+          renders AFTER a genome upload (hasGenomeResults()). It shows
+          the SelfScience journey as a 5-step checklist:
+            1. Upload your genome file (auto-marked complete)
+            2. Review your top 3 findings
+            3. Check your nutrition matches
+            4. See your supplement suggestions
+            5. Explore your full health profile
+          Completed steps get a green checkmark + muted styling. The
+          current/next step gets a green left border and green icon ring.
+          Clicking any step both navigates and marks the step complete.
+
+          Desktop (md+): floating panel bottom-right, 300px wide when
+          expanded, collapses to a compact header pill via chevron.
+          Mobile (<md): floating green FAB (bottom-right, above the
+          global MobileNav via env(safe-area-inset-bottom) + 72px offset)
+          with a live "N/5" progress badge. Tapping the FAB opens a
+          bottom sheet.
+
+          Auto-collapses after 3 days (ss_guide_first_seen ISO timestamp,
+          checked against AUTO_COLLAPSE_AFTER_MS). Manual dismiss via
+          "Hide Guide" link → ss_guide_dismissed = '1' (hidden forever).
+          Excludes /genome, /practitioner-report, /admin, /get-started,
+          /start so it doesn't collide with the upload flow or print
+          docs.
+
+          PART 6 — /app/components/EmptyStatePrompt.jsx is a reusable
+          empty-state card. Every tool page that gates on genome upload
+          now uses the same pattern:
+            [Icon/emoji]
+            [Why it's empty — 1 sentence]
+            [Action button — bg-ss-green]
+            [Reassurance — one short line]
+
+          Applied to:
+          - /app/app/nutrition/nutrition-client.jsx  (🥦, "Upload your
+            genome file to see which foods work best for your genes.")
+          - /app/app/drug-check/drug-check-client.jsx (💊, "See how
+            your genes affect common medications.")
+
+          Biomarkers already has its own on-brand EmptyStateOnboarding
+          (specific to biomarker input, not a genome gate) — kept as-is.
+          Supplements' inline hint sits under a "Pick a goal" prompt
+          which is contextually different (tool works without genome)
+          — kept as-is.
+
+          Verified via screenshots at 375px + 1280px:
+          - Desktop guide renders bottom-right with steps + progress
+          - "Upload your genome file — DONE" step ticked on mount
+            when a report is present
+          - "Review your top 3 findings — VIEW →" is highlighted next
+          - Mobile FAB renders above MobileNav with a "1/5" progress
+            badge; bottom sheet lists all 5 steps
+          - Nutrition empty state: 🥦 + green CTA + reassurance
+          - Drug-check empty state: 💊 + green CTA + reassurance
+          - Guide does NOT render before genome upload or on /genome
+
+
   - task: "Wayfinding Phase A — Homepage CTA + Welcome Modal + Post-Upload Orientation"
     implemented: true
     working: true

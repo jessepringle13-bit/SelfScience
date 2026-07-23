@@ -23,6 +23,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import EmptyStatePrompt from '@/components/EmptyStatePrompt'
 import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare, Printer } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
@@ -149,13 +150,16 @@ export default function DrugCheckClient() {
           </p>
         </div>
 
-        {/* No-genome empty state */}
+        {/* No-genome empty state (unified — Phase B · Part 6) */}
         {ready && !report && (
-          <div className="mt-8 rounded-2xl border border-dashed border-ss-border-warm bg-white/40 p-8 text-center">
-            <p className="text-sm text-ss-muted">Upload your genome to unlock personalized drug guidance.</p>
-            <Link href="/genome" className="mt-4 inline-flex items-center gap-2 rounded-full bg-ss-teal px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110">
-              Upload genome <ArrowRight size={13} />
-            </Link>
+          <div className="mt-8">
+            <EmptyStatePrompt
+              emoji="💊"
+              headline="See how your genes affect common medications."
+              ctaLabel="Upload Your File →"
+              ctaHref="/genome"
+              reassurance="We read your file locally and never store your raw DNA."
+            />
           </div>
         )}
 
