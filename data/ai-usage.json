@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-22T01:03:01.206Z",
+  "lastUpdated": "2026-07-22T01:17:07.889Z",
   "totals": {
-    "calls": 2234,
-    "inTokens": 1569865,
-    "outTokens": 355223,
-    "usd": 0.06893869000000007
+    "calls": 2246,
+    "inTokens": 1578895,
+    "outTokens": 356574,
+    "usd": 0.06915982000000007
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -63,13 +63,13 @@
       "last": "2026-07-11T00:59:33.873Z"
     },
     "openrouter|meta-llama/llama-3.1-8b-instruct|reliability": {
-      "calls": 534,
-      "inTokens": 834795,
-      "outTokens": 70497,
-      "usd": 0.01881081,
+      "calls": 537,
+      "inTokens": 839692,
+      "outTokens": 70838,
+      "usd": 0.018918980000000002,
       "unknownPrice": false,
       "first": "2026-07-11T00:58:31.809Z",
-      "last": "2026-07-22T01:02:24.659Z"
+      "last": "2026-07-22T01:16:39.367Z"
     },
     "openrouter|meta-llama/llama-3.1-70b-instruct:free|plain-language": {
       "calls": 1,
@@ -81,31 +81,31 @@
       "last": "2026-07-11T00:58:31.879Z"
     },
     "openrouter|meta-llama/llama-3.1-8b-instruct|plain-language": {
-      "calls": 535,
-      "inTokens": 680612,
-      "outTokens": 223393,
-      "usd": 0.020314030000000014,
+      "calls": 538,
+      "inTokens": 684745,
+      "outTokens": 224403,
+      "usd": 0.020426990000000016,
       "unknownPrice": false,
       "first": "2026-07-11T00:59:02.106Z",
-      "last": "2026-07-22T01:02:42.201Z"
+      "last": "2026-07-22T01:17:06.129Z"
     },
     "openrouter|meta-llama/llama-3.3-70b-instruct:free|reliability": {
-      "calls": 515,
+      "calls": 518,
       "inTokens": 0,
       "outTokens": 0,
       "usd": 0,
       "unknownPrice": false,
       "first": "2026-07-11T01:00:25.430Z",
-      "last": "2026-07-22T01:02:12.529Z"
+      "last": "2026-07-22T01:16:38.010Z"
     },
     "openrouter|meta-llama/llama-3.3-70b-instruct:free|plain-language": {
-      "calls": 530,
+      "calls": 533,
       "inTokens": 0,
       "outTokens": 0,
       "usd": 0,
       "unknownPrice": false,
       "first": "2026-07-11T02:24:07.762Z",
-      "last": "2026-07-22T01:02:12.504Z"
+      "last": "2026-07-22T01:16:37.934Z"
     },
     "openrouter|meta-llama/llama-3.3-70b-instruct:free|semantic-expand": {
       "calls": 21,
@@ -188,157 +188,13 @@
       "usd": 0.003295920000000001
     },
     "2026-07-22": {
-      "calls": 32,
-      "inTokens": 23866,
-      "outTokens": 4215,
-      "usd": 0.0006037699999999999
+      "calls": 44,
+      "inTokens": 32896,
+      "outTokens": 5566,
+      "usd": 0.0008248999999999998
     }
   },
   "ring": [
-    {
-      "ts": "2026-07-20T01:27:05.364Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "plain-language",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 59
-    },
-    {
-      "ts": "2026-07-20T01:27:11.259Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "reliability",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1556,
-      "outTokens": 111,
-      "usd": 0.00003445,
-      "latencyMs": 7712
-    },
-    {
-      "ts": "2026-07-20T01:27:16.887Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "reliability",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1683,
-      "outTokens": 193,
-      "usd": 0.00003945,
-      "latencyMs": 11570
-    },
-    {
-      "ts": "2026-07-20T01:27:19.625Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "plain-language",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1332,
-      "outTokens": 421,
-      "usd": 0.00003927,
-      "latencyMs": 16137
-    },
-    {
-      "ts": "2026-07-20T01:27:19.831Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "plain-language",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 21
-    },
-    {
-      "ts": "2026-07-20T01:27:19.896Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "reliability",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 80
-    },
-    {
-      "ts": "2026-07-20T01:27:27.116Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "plain-language",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1197,
-      "outTokens": 539,
-      "usd": 0.000040109999999999994,
-      "latencyMs": 33637
-    },
-    {
-      "ts": "2026-07-20T01:27:27.411Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "reliability",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 34
-    },
-    {
-      "ts": "2026-07-20T01:27:27.478Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "plain-language",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 93
-    },
-    {
-      "ts": "2026-07-20T01:27:27.589Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "plain-language",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1458,
-      "outTokens": 567,
-      "usd": 0.00004617,
-      "latencyMs": 22226
-    },
-    {
-      "ts": "2026-07-20T01:27:27.797Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "reliability",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 33
-    },
-    {
-      "ts": "2026-07-20T01:27:27.845Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "plain-language",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 60
-    },
     {
       "ts": "2026-07-20T01:27:28.153Z",
       "provider": "openrouter",
@@ -2594,6 +2450,150 @@
       "outTokens": 394,
       "usd": 0.000040419999999999996,
       "latencyMs": 30270
+    },
+    {
+      "ts": "2026-07-22T01:16:37.888Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "task": "plain-language",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 142
+    },
+    {
+      "ts": "2026-07-22T01:16:37.896Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "task": "reliability",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 121
+    },
+    {
+      "ts": "2026-07-22T01:16:37.901Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "task": "reliability",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 158
+    },
+    {
+      "ts": "2026-07-22T01:16:37.909Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "task": "plain-language",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 164
+    },
+    {
+      "ts": "2026-07-22T01:16:37.934Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "task": "plain-language",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 157
+    },
+    {
+      "ts": "2026-07-22T01:16:38.010Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "task": "reliability",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 265
+    },
+    {
+      "ts": "2026-07-22T01:16:38.229Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "reliability",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1540,
+      "outTokens": 118,
+      "usd": 0.00003433999999999999,
+      "latencyMs": 329
+    },
+    {
+      "ts": "2026-07-22T01:16:39.103Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "reliability",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1589,
+      "outTokens": 111,
+      "usd": 0.000035109999999999994,
+      "latencyMs": 1207
+    },
+    {
+      "ts": "2026-07-22T01:16:39.367Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "reliability",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1768,
+      "outTokens": 112,
+      "usd": 0.00003872,
+      "latencyMs": 1357
+    },
+    {
+      "ts": "2026-07-22T01:16:40.521Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "plain-language",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1533,
+      "outTokens": 314,
+      "usd": 0.00004008,
+      "latencyMs": 2588
+    },
+    {
+      "ts": "2026-07-22T01:16:53.085Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "plain-language",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1338,
+      "outTokens": 320,
+      "usd": 0.000036360000000000004,
+      "latencyMs": 15198
+    },
+    {
+      "ts": "2026-07-22T01:17:06.129Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "plain-language",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 1262,
+      "outTokens": 376,
+      "usd": 0.00003652,
+      "latencyMs": 28221
     }
   ]
 }

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import StartHereBanner from '@/components/StartHereBanner'
+import HomeStepsExplainer from '@/components/HomeStepsExplainer'
 import { ResultCard } from '@/components/result-card'
 import { EditorialFeatured } from '@/components/editorial-featured'
 import { trackEvent, EVENTS } from '@/lib/analytics'
@@ -348,51 +349,49 @@ function DiscoverHome() {
 
         <div className="container relative z-10 flex flex-col items-center pt-24 text-center">
           <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl">
-            Search the science.<br className="hidden sm:block" /> Understand your biology.
+            Your DNA.<br className="hidden sm:block" /> Finally explained in plain English.
           </h1>
-          <p className="mt-4 max-w-2xl text-lg text-white/80">
-            AI-scored research across ten health pillars. Personalized by your own genome, if you choose.
+          <p className="mt-4 max-w-2xl text-lg text-white/85">
+            Upload your 23andMe or AncestryDNA file and discover what your genes actually mean for your health.
           </p>
 
-          {/* Search bar */}
-          <form onSubmit={handleSubmit} className="mt-10 w-full max-w-3xl">
-            <div className="flex items-center overflow-hidden rounded-full bg-white text-ss-text shadow-lg ring-1 ring-black/5">
-              <Search className="ml-5 shrink-0 text-ss-muted" size={20} />
+          {/* Primary CTA — one dominant action. Full-width on mobile, auto on desktop. */}
+          <div className="mt-10 flex w-full max-w-md flex-col items-center gap-3 md:max-w-none md:flex-row md:justify-center md:gap-4">
+            <a
+              href="/genome"
+              aria-label="Start Here — Upload Your File"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ss-green px-8 py-4 text-base font-semibold text-white shadow-lg transition hover:bg-ss-green/90 md:w-auto"
+            >
+              <Upload size={18} /> Start Here — Upload Your File
+            </a>
+          </div>
+          <a
+            href="#genome-upload"
+            className="mt-4 text-sm text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white"
+          >
+            Don&apos;t have a file yet? See which test to get →
+          </a>
+
+          {/* Secondary — small search link for returning visitors. Visually
+              de-emphasized so it doesn't compete with the primary CTA. */}
+          <form onSubmit={handleSubmit} className="mt-14 hidden w-full max-w-2xl md:block">
+            <div className="flex items-center overflow-hidden rounded-full bg-white/10 text-white ring-1 ring-white/20 backdrop-blur">
+              <Search className="ml-4 shrink-0 text-white/70" size={16} />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search a topic, gene, molecule, or study…  e.g. MTHFR, zone 2 training, rapamycin"
-                className="w-full bg-transparent px-4 py-4 text-base placeholder:text-ss-muted focus:outline-none md:py-5 md:text-lg"
+                placeholder="Already know what you're looking for? Search the research…"
+                className="w-full bg-transparent px-3 py-3 text-sm placeholder:text-white/60 focus:outline-none"
               />
               <button
                 type="submit"
-                className="m-1.5 rounded-full bg-ss-orange px-6 py-3 text-sm font-semibold text-white transition hover:bg-ss-orange-dark"
+                className="m-1 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/25"
               >
                 Search
               </button>
             </div>
-            <p className="mt-3 text-xs text-white/60">
-              Sources: PubMed · Semantic Scholar · OpenAlex · Crossref · SelfScience Editorial. Every result gets an AI reliability score.
-            </p>
           </form>
-
-          {/* 9 category pills */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-            {CATEGORY_PILLS.map((p) => (
-              <button
-                key={p}
-                onClick={() => handlePill(p)}
-                className={`rounded-full border px-4 py-1.5 text-sm font-medium transition ${
-                  activePill === p
-                    ? 'border-ss-orange bg-ss-orange text-white'
-                    : 'border-white/25 bg-white/5 text-white/90 hover:bg-white/10'
-                }`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="container relative z-10 mt-16 flex justify-center pb-10">
@@ -404,6 +403,10 @@ function DiscoverHome() {
           </a>
         </div>
       </section>
+
+      {/* 3-step explainer strip (Phase A · Part 1) — placed directly under
+          the hero so first-time visitors see WHY / WHAT / HOW immediately. */}
+      <HomeStepsExplainer />
 
       {/* Start Here banner — placed directly under the hero (below the
           "Explore ↓" prompt) so returning visitors see the full hero first,

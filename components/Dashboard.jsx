@@ -25,6 +25,7 @@ import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
 import StackQualityWidget from '@/components/supplements/StackQualityWidget'
 import OnboardingTour from '@/components/dashboard/OnboardingTour'
+import PostUploadOrientation from '@/components/PostUploadOrientation'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -32,8 +33,19 @@ const LS_LAST_VISIT = 'ss_last_visit'
 
 export default function Dashboard() {
   const [report, setReport] = useState(null)
+  const [orientationDone, setOrientationDone] = useState(false)
   const { pillar: activePillar, setPillar, clear: clearPillar, isFiltering } = usePillarFilter()
   const topFindingsRef = useRef(null)
+
+  // Consult the same LS key the orientation component uses so we don't
+  // even mount the interstitial after it's been dismissed.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const seen = window.localStorage.getItem('ss_orientation_seen')
+      if (seen) setOrientationDone(true)
+    } catch {}
+  }, [])
 
   // \u2014 Persist pillar chip to ss_dashboard_pillar_filter and read it back on
   //   first mount if the URL didn't already carry a ?pillar=. The URL is
@@ -198,6 +210,19 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#DCEDED] via-[#EAF5F5] to-[#F5FAFA] pb-20">
       <SiteNav />
+      {/* Post-upload orientation screen (Phase A · Part 4) — shown once
+          per genome upload BEFORE the full dashboard. If already dismissed
+          this returns null and we render the dashboard normally. */}
+      {!orientationDone && report && (
+        <PostUploadOrientation
+          report={report}
+          onDismiss={() => setOrientationDone(true)}
+        />
+      )}
+      {/* Only render the rest of the dashboard once the orientation has
+          been dismissed (or was already seen for this report). */}
+      {(orientationDone || !report) && (
+      <>
       {/* Header — pt-24 clears the absolute-positioned SiteNav (~64px) + a
           gap for the fixed dashboard/discover toggle beneath it. */}
       <div className="container pt-24 md:pt-28">
@@ -377,9 +402,11 @@ export default function Dashboard() {
         </div>
       </div>
       {/* Slice 4A: first-time tooltip tour. Only renders when the
-          ss_onboarding_complete flag is falsy. Safe to mount always \u2014
+          ss_onboarding_complete flag is falsy. Safe to mount always —
           the component short-circuits internally. */}
       <OnboardingTour />
+      </>
+      )}
     </div>
   )
 }

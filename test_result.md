@@ -3447,6 +3447,86 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Wayfinding Phase A — Homepage CTA + Welcome Modal + Post-Upload Orientation"
+    implemented: true
+    working: true
+    file: |
+      /app/app/layout.js,
+      /app/app/page.js,
+      /app/components/Dashboard.jsx,
+      /app/components/FirstTimeWelcome.jsx (NEW),
+      /app/components/HomeStepsExplainer.jsx (NEW),
+      /app/components/PostUploadOrientation.jsx (NEW),
+      /app/components/dashboard/PillarChipBar.jsx,
+      /app/lib/interests.js (NEW)
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Shipped Phase A of the wayfinding backlog:
+
+          PART 1 — Homepage hero simplified to a single dominant CTA:
+          "Start Here — Upload Your File" (bg-ss-green) with a
+          "Don't have a file yet?" secondary link scrolling to the
+          genome upload card. The 9 category pills were removed from
+          the hero. Search bar is now visually de-emphasized (desktop
+          only, hidden on mobile) to remove competing focus.
+
+          PART 1b — /app/components/HomeStepsExplainer.jsx renders
+          under the hero: horizontal 3-col grid on desktop, vertical
+          stack with a subtle connecting line on mobile (Dna → Search
+          → Lightbulb icons).
+
+          PART 2 — /app/components/FirstTimeWelcome.jsx is a
+          full-screen welcome modal shown once (guarded by ss_onboarded
+          in localStorage). 7 interest checkboxes + "I'm not sure yet
+          — show me everything" sentinel that selects ALL. Selecting
+          "everything" clears others; selecting others clears
+          "everything". Skippable via X or "Skip for now". On confirm,
+          writes ss_interests + ss_onboarded and fires
+          'selfscience:interests-changed'.
+
+          PART 2b — PillarChipBar re-orders chips based on the user's
+          interests (preferred pillars sorted to the front with a
+          small ★ marker). Filter behaviour unchanged. Listens to the
+          'selfscience:interests-changed' event so the ordering updates
+          the moment the modal closes.
+
+          PART 4 — /app/components/PostUploadOrientation.jsx is a
+          full-screen interstitial rendered by Dashboard.jsx BEFORE
+          the main dashboard content. Pulls REAL data (never
+          placeholders):
+            • Green  = report.overview.strengths[0]
+            • Yellow = report.overview.areasToExplore[1]
+            • Orange = report.overview.areasToExplore[0]  (most-impactful awareness)
+          If the report is present but no findings are ready, shows a
+          Loader2 spinner with "Analyzing your file..." — never dummy
+          content. Dismiss via "Show me all my results" persists to
+          ss_orientation_seen (scoped by report.session_id so a NEW
+          genome upload will re-show the screen). Inline "What do
+          these colors mean?" opens a small modal explaining
+          Positive / Awareness / Action.
+
+          Verified via screenshots at 375px and 1280px:
+          - Welcome modal renders with all 8 options, checkbox toggling,
+            "everything" exclusivity all work
+          - ss_interests + ss_onboarded persist correctly; second visit
+            never re-shows the modal
+          - 3-step explainer renders horizontal on desktop, vertical
+            with connecting line on mobile
+          - Orientation screen pulls the correct green/yellow/orange
+            findings from real report.overview data
+          - "Show me all my results" dismisses and reveals the full
+            dashboard normally
+          - Pillar chip bar order after interests ['fitness','heart']:
+            All Pillars, ★Performance, ★Longevity, Genomics, Nutrition,
+            Wellness, Pharmacogenomics, ... (preferred first, ★ marker
+            on non-active chips)
+
+
   - task: "Dashboard: Merge Pillar Score Overview + Explore Your Pillars; add Associated-With on findings/strengths"
     implemented: true
     working: true
