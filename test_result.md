@@ -7812,9 +7812,54 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "2.7"
-  test_sequence: 17
+  version: "2.8"
+  test_sequence: 18
   run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase O3 shipped: Community aggregate finding frequencies
+        (Section C on /community).
+
+        Schema addendum:
+          - community_members.finding_labels text[] not null default '{}'
+            added via idempotent alter (rerun of
+            /app/scripts/community-schema.sql picks it up).
+
+        lib/community.js additions:
+          - collectAnonymousFindingLabels(): pulls plain-English card
+            names only from the local genome. Deduplicates. Hard cap 100.
+            No rsID or genotype ever leaves the device.
+          - createMember / updateMember now include finding_labels when
+            share_settings.finding_counts === true; empty array otherwise.
+          - syncFindingLabels(displayName): re-uploads current labels.
+          - useAutoSyncFindingLabels(): hook mounted on /community that
+            re-syncs whenever the genome changes or community state
+            toggles \u2014 keeps aggregates fresh across all three timings
+            (join, share-settings toggle, genome upload).
+          - fetchFindingFrequencies(labels, minSample=50): reads every
+            active member's finding_labels array, counts label matches,
+            returns {totalMembers, minSample, rows[]} where each row is
+            {label, count, percent, ok}. ok=true only when totalMembers
+            >= 50 (privacy rule 5).
+
+        community-client.jsx:
+          - New FindingFrequencyPanel component. Uses getTopPriorities
+            from blueprint.js to get the user's top-5 findings, calls
+            fetchFindingFrequencies, renders one card per finding with
+            name + big % + mini-bar. Auto-refreshes on
+            selfscience:genome-changed.
+          - Below-50 state shows accurate "aggregates will appear once
+            at least 50 members have joined (X so far)".
+          - No-genome state shows "Upload your genome to see how common
+            your findings are across the community."
+          - The non-opted-in blur + Join CTA overlay is preserved.
+
+        Verified via screenshot tool: Section C now shows the accurate
+        dynamic below-threshold message with real-time member count
+        (0 so far, because the community_members table returns empty
+        until the SQL migration is applied).
 
 agent_communication:
     - agent: "main"

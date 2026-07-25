@@ -14,6 +14,12 @@ create table if not exists public.community_members (
   is_active boolean not null default true
 );
 
+-- Anonymized finding labels (plain-English names only, e.g. "MTHFR C677T").
+-- Never includes rsID or genotype. Populated only when the user has
+-- share_settings.finding_counts = true. Powers Section C aggregate stats.
+alter table public.community_members
+  add column if not exists finding_labels text[] not null default '{}';
+
 create table if not exists public.community_posts (
   id uuid primary key default gen_random_uuid(),
   display_name text not null references public.community_members(display_name) on delete cascade,

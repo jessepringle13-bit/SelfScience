@@ -14,7 +14,10 @@ import {
   isOptedIn, getDisplayName, useCommunityState,
   fetchMemberCount, fetchPillarPopularity, fetchFeed,
   toggleReaction, reportPost, roundToNearest50,
+  fetchFindingFrequencies, useAutoSyncFindingLabels,
 } from '@/lib/community'
+import { getGenomeResults } from '@/lib/genomeSession'
+import { getTopPriorities } from '@/lib/blueprint'
 import CommunityOptInModal from '@/components/community/CommunityOptInModal'
 
 const REPORT_REASONS = [
@@ -26,6 +29,7 @@ const REPORT_REASONS = [
 
 export default function CommunityClient() {
   const { optedIn, name } = useCommunityState()
+  useAutoSyncFindingLabels()
   const [modalOpen, setModalOpen] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
   const [pillarStats, setPillarStats] = useState({ total: 0, buckets: {} })
@@ -230,9 +234,7 @@ export default function CommunityClient() {
           </div>
           <div className={optedIn ? '' : 'relative'}>
             <div className={optedIn ? '' : 'pointer-events-none select-none blur-sm'}>
-              <p className="rounded-lg border border-dashed border-ss-border-warm bg-white/60 p-4 text-sm text-ss-muted">
-                Not enough data yet to display finding-level statistics. Aggregates will appear once at least 50 members have joined.
-              </p>
+              <FindingFrequencyPanel optedIn={optedIn} />
               <p className="mt-3 text-[0.82rem] italic text-ss-muted">
                 These statistics are calculated from anonymous aggregate data. No individual’s findings are ever identified or shared.
               </p>
@@ -383,4 +385,77 @@ function timeAgo(iso) {
     const d = Math.floor(h / 24); if (d < 30) return `${d} day${d===1?'':'s'} ago`
     return new Date(iso).toLocaleDateString()
   } catch { return '' }
+}
+
+/* ------------------ Section C: Finding Frequency ------------------- */
+// Reads the user's top-5 findings from their local genome report and
+// asks Supabase what percentage of opted-in members share each label.
+// Renders numeric percentages only when totalMembers >= 50 (privacy
+// rule 5). Below the threshold, keeps the "not enough data yet" copy.
+function FindingFrequencyPanel({ optedIn }) {
+  const [state, setState] = useState({ loading: true, rows: [], totalMembers: 0, minSample: 50, hasLabels: true })
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      const report = getGenomeResults()
+      if (!report) {
+        if (alive) setState({ loading: false, rows: [], totalMembers: 0, minSample: 50, hasLabels: false })
+        return
+      }
+      const priorities = getTopPriorities(report, 5)
+      const labels = priorities.map((p) => p.name || p.gene).filter(Boolean)
+      if (!labels.length) {
+        if (alive) setState({ loading: false, rows: [], totalMembers: 0, minSample: 50, hasLabels: false })
+        return
+      }
+      const r = await fetchFindingFrequencies(labels, 50)
+      if (!alive) return
+      setState({ loading: false, ...r, hasLabels: true })
+    }
+    load()
+    const onGenome = () => load()
+    window.addEventListener('selfscience:genome-changed', onGenome)
+    return () => { alive = false; window.removeEventListener('selfscience:genome-changed', onGenome) }
+  }, [])
+
+  if (state.loading) {
+    return <div className="h-24 animate-pulse rounded-2xl bg-white ring-1 ring-ss-border-warm/60" />
+  }
+  if (!state.hasLabels) {
+    return (
+      <p className="rounded-lg border border-dashed border-ss-border-warm bg-white/60 p-4 text-sm text-ss-muted">
+        Upload your genome to see how common your findings are across the community.
+      </p>
+    )
+  }
+  const belowThreshold = state.totalMembers < state.minSample
+  if (belowThreshold) {
+    return (
+      <p className="rounded-lg border border-dashed border-ss-border-warm bg-white/60 p-4 text-sm text-ss-muted">
+        Not enough data yet — aggregates will appear once at least {state.minSample} members have joined ({state.totalMembers} so far).
+      </p>
+    )
+  }
+  return (
+    <ul className="space-y-3">
+      {state.rows.map((row) => (
+        <li key={row.label} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-ss-border-warm/60">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <span className="min-w-0 flex-1 text-sm font-semibold text-ss-text">{row.label}</span>
+            <span className="text-[1.8rem] font-extrabold leading-none text-ss-teal">{row.percent}%</span>
+            <span
+              className="font-mono text-[10px] text-ss-muted"
+              style={{ letterSpacing: '0.02em' }}
+            >
+              of members
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-ss-border-warm/40">
+            <div className="h-full rounded-full bg-ss-teal" style={{ width: `${Math.min(100, row.percent)}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
 }
