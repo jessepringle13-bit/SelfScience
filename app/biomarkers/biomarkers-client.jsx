@@ -39,6 +39,7 @@ import { ContextPanel } from '@/components/biomarkers/ContextPanel'
 import { TrendControls } from '@/components/biomarkers/TrendControls'
 import { loadContext, saveContext } from '@/lib/biomarkers/context'
 import DashboardBackLink from '@/components/DashboardBackLink'
+import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
 
 const SEX_STORAGE_KEY = 'selfscience_biomarker_sex'
 
@@ -71,7 +72,17 @@ export default function BiomarkersClient() {
 
   useEffect(() => {
     if (!ready) return
-    const t = setTimeout(() => saveBiomarkerValues(values), 250)
+    const t = setTimeout(() => {
+      saveBiomarkerValues(values)
+      // Journey Guide Tier 2 — fire the "saved a biomarker" signal
+      // once the user has entered at least one real value.
+      const anyValue = values && Object.values(values).some(
+        (v) => v !== '' && v !== null && v !== undefined && !Number.isNaN(v),
+      )
+      if (anyValue) {
+        try { fireGuideAction(GUIDE_ACTIONS.BIOMARKERS) } catch {}
+      }
+    }, 250)
     return () => clearTimeout(t)
   }, [values, ready])
 

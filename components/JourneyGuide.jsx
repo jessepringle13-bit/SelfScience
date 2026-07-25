@@ -53,14 +53,21 @@ const TIER1_STEPS = [
   { key: 'profile',     Icon: LayoutGrid, label: 'Explore your full health profile',   href: '/' },
 ]
 
-// Tier 2 — Go Deeper (new). `matchPath` decides if a route visit counts.
+// Tier 2 — Go Deeper (new). Each step now completes on a REAL action
+// (search submitted, barcode scanned, medication checked, biomarker
+// saved, practitioner report generated, article opened) — dispatched via
+// /app/lib/guideActions.js. `matchPath` is retained only as a soft
+// fallback for the /articles slug pages where landing on the page IS
+// the action (reading an article).
 const TIER2_STEPS = [
-  { key: 'search',       Icon: Search,     label: 'Search the research for one of your genes',   hint: 'Tap a gene chip on the Search page and read a study',      href: '/search',              matchPath: (p) => p.startsWith('/search') },
-  { key: 'scanner',      Icon: ScanLine,   label: 'Scan a food product with your camera',        hint: 'Open Nutrition Hub → Scanner tab → point at any barcode', href: '/nutrition?tab=scanner', matchPath: (p) => p === '/nutrition' },
-  { key: 'drugcheck',    Icon: Pill,       label: 'Check a medication against your genome',      hint: 'See how your genes affect common medications',             href: '/drug-check',          matchPath: (p) => p.startsWith('/drug-check') },
-  { key: 'biomarkers',   Icon: TestTube2,  label: 'Build your biomarker picture',                 hint: 'Log one blood result — HDL, Vitamin D, or HbA1c',          href: '/biomarkers',          matchPath: (p) => p.startsWith('/biomarkers') },
-  { key: 'report',       Icon: FileText,   label: 'Generate your Practitioner Report',            hint: 'Create a print-ready sheet to share with your doctor',     href: '/practitioner-report', matchPath: (p) => p.startsWith('/practitioner-report') },
-  { key: 'articles',     Icon: BookOpen,   label: 'Read an article in your top pillar',           hint: 'Browse staff-written explainers matched to your biology',  href: '/articles',            matchPath: (p) => p.startsWith('/articles') },
+  { key: 'search',       Icon: Search,     label: 'Search the research for one of your genes',   hint: 'Tap a gene chip on the Search page and read a study',      href: '/search',                matchPath: () => false },
+  { key: 'scanner',      Icon: ScanLine,   label: 'Scan a food product with your camera',        hint: 'Open Nutrition Hub → Scanner tab → point at any barcode', href: '/nutrition?tab=scanner', matchPath: () => false },
+  { key: 'drugcheck',    Icon: Pill,       label: 'Check a medication against your genome',      hint: 'Look up how your genes affect a specific drug',            href: '/drug-check',            matchPath: () => false },
+  { key: 'biomarkers',   Icon: TestTube2,  label: 'Build your biomarker picture',                 hint: 'Log one blood result — HDL, Vitamin D, or HbA1c',          href: '/biomarkers',            matchPath: () => false },
+  { key: 'report',       Icon: FileText,   label: 'Generate your Practitioner Report',            hint: 'Create a print-ready sheet to share with your doctor',     href: '/practitioner-report',   matchPath: () => false },
+  // Landing on an actual article slug (not the /articles index) IS the
+  // real action — cheap to detect via pathname, no need for extra wiring.
+  { key: 'articles',     Icon: BookOpen,   label: 'Read an article in your top pillar',           hint: 'Browse staff-written explainers matched to your biology',  href: '/articles',              matchPath: (p) => /^\/articles\/[^/]+/.test(p) },
 ]
 
 function readSet(key) {
@@ -146,7 +153,11 @@ export default function JourneyGuide() {
     }
   }, [])
 
-  // Auto-mark Tier 2 steps on route visit (minimum-viable completion).
+  // Auto-mark Tier 2 steps. Two paths:
+  //   1) A real action was dispatched via /app/lib/guideActions.js
+  //      (fireGuideAction('search'), etc.) — this is the primary path.
+  //   2) Route match fallback (currently only "articles" — landing on an
+  //      article slug page counts as "read an article").
   useEffect(() => {
     if (!mounted || !tier2Unlocked || explorer) return
     const match = TIER2_STEPS.find((s) => s.matchPath(pathname))
@@ -157,6 +168,28 @@ export default function JourneyGuide() {
     writeSet(LS_TIER2, next)
     setTier2Done(next)
   }, [pathname, mounted, tier2Unlocked, explorer, tier2Done])
+
+  // Real-action listener — the source of truth for the other 5 Tier 2
+  // steps. Callers dispatch via /app/lib/guideActions.js.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!mounted || !tier2Unlocked || explorer) return
+    const onAction = (e) => {
+      const key = e?.detail?.key
+      if (!key) return
+      const step = TIER2_STEPS.find((s) => s.key === key)
+      if (!step) return
+      setTier2Done((prev) => {
+        if (prev.has(key)) return prev
+        const next = new Set(prev)
+        next.add(key)
+        writeSet(LS_TIER2, next)
+        return next
+      })
+    }
+    window.addEventListener('selfscience:guide-action', onAction)
+    return () => window.removeEventListener('selfscience:guide-action', onAction)
+  }, [mounted, tier2Unlocked, explorer])
 
   // Detect Tier 1 completion → trigger transition → unlock Tier 2.
   useEffect(() => {

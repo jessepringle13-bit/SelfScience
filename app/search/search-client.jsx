@@ -21,6 +21,7 @@ import { trackEvent, EVENTS } from '@/lib/analytics'
 import { getPillarQuery, isYouthQuery, normalizePillarName } from '@/lib/pillars'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
+import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
 
 const SOURCE_TYPE_OPTIONS = [
   { key: 'all',       label: 'All' },
@@ -437,6 +438,8 @@ export default function SearchClient() {
       setData(null)
       return
     }
+    // Journey Guide Tier 2 — a real search was fired.
+    try { fireGuideAction(GUIDE_ACTIONS.SEARCH) } catch {}
     setLoading(true)
     setError(null)
     setAnalyses({})

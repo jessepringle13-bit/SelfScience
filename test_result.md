@@ -3447,6 +3447,64 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Journey Guide — real-action detection for Tier 2 steps"
+    implemented: true
+    working: true
+    file: |
+      /app/lib/guideActions.js (NEW),
+      /app/components/JourneyGuide.jsx,
+      /app/app/search/search-client.jsx,
+      /app/app/drug-check/drug-check-client.jsx,
+      /app/app/biomarkers/biomarkers-client.jsx,
+      /app/app/practitioner-report/practitioner-report-client.jsx,
+      /app/app/nutrition/nutrition-client.jsx
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Replaced the "visit = complete" rule for 5 of 6 Tier 2 steps
+          with a real-action detector.
+
+          NEW /app/lib/guideActions.js — tiny fire-and-forget dispatcher:
+            fireGuideAction(GUIDE_ACTIONS.SEARCH)   // etc.
+          Dispatches a `selfscience:guide-action` CustomEvent that the
+          JourneyGuide listens for.
+
+          UPDATED JourneyGuide.jsx:
+          - TIER2_STEPS matchPath now returns false for search /
+            scanner / drugcheck / biomarkers / report — visit alone
+            never marks them.
+          - "articles" keeps a soft matchPath (/^/articles/[^/]+/)
+            because landing on an article slug page IS the action.
+          - New useEffect subscribes to the guide-action event and
+            marks the matching step complete via writeSet(LS_TIER2).
+
+          WIRED action dispatchers:
+          - Search  → search-client.jsx  fires from inside runSearch(),
+                     so it counts a REAL query, not just navigation.
+          - Scanner → nutrition-client.jsx handleBarcode() +
+                     Products-tab BarcodeScanner onScan, so a live
+                     barcode read fires it (even on network error).
+          - Drug   → drug-check-client.jsx pickDrug() fires when a
+                     specific medication is selected.
+          - Biomark → biomarkers-client.jsx auto-save effect fires
+                     only when at least one biomarker value is non-empty.
+          - Report → practitioner-report-client.jsx firePrint() fires
+                     right before window.print() (so both Gate-Modal
+                     paths and direct-print paths count).
+
+          Verified end-to-end via Playwright:
+          - Bare /search visit → ss_guide_tier2 = []   (visit-only disabled)
+          - Running an MTHFR search → ss_guide_tier2 = ["search"]
+          - Dispatching all 6 action events → tier2 completes fully
+          - ss_guide_explorer auto-flips to '1'
+          - After reload, Explorer chip visible in header, full guide
+            hidden
+
+
   - task: "Two-tier JourneyGuide + permanent Explorer chip"
     implemented: true
     working: true

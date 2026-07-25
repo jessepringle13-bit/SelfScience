@@ -48,6 +48,7 @@ import DashboardBackLink from '@/components/DashboardBackLink'
 import PrintGateModal, { shouldPromptGate } from '@/components/practitioner/PrintGateModal'
 import ExecutiveSummary from '@/components/practitioner/ExecutiveSummary'
 import { reportFooterLine } from '@/lib/reportVersion'
+import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
 
 export default function PractitionerReportClient() {
   const [report, setReport] = useState(null)
@@ -134,6 +135,8 @@ export default function PractitionerReportClient() {
     firePrint()
   }
   const firePrint = () => {
+    // Journey Guide Tier 2 — the report is being generated / printed.
+    try { fireGuideAction(GUIDE_ACTIONS.REPORT) } catch {}
     // Small delay so React finishes any pending state flushes before print.
     setTimeout(() => window.print(), 60)
   }

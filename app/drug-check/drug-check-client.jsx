@@ -24,6 +24,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import EmptyStatePrompt from '@/components/EmptyStatePrompt'
+import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
 import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare, Printer } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
@@ -110,6 +111,8 @@ export default function DrugCheckClient() {
   const pickDrug = (d) => {
     setSelected(d)
     setQuery(d.generic)
+    // Journey Guide Tier 2 — a real medication was picked / checked.
+    try { fireGuideAction(GUIDE_ACTIONS.DRUG_CHECK) } catch {}
   }
 
   return (

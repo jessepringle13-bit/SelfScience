@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import EmptyStatePrompt from '@/components/EmptyStatePrompt'
+import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
 import {
   Apple,
   Utensils,
@@ -489,6 +490,10 @@ function FoodJournalTab({ activeRules, hasGenome }) {
   const handleBarcode = async (code) => {
     setShowScanner(false)
     setSearchingProduct(true)
+    // Journey Guide Tier 2 — a barcode was actually scanned. Fire the
+    // signal here (not inside the fetch) so it counts even on network
+    // errors — the user did the real action.
+    try { fireGuideAction(GUIDE_ACTIONS.SCANNER) } catch {}
     try {
       const res = await fetch(`/api/nutrition/product?barcode=${encodeURIComponent(code)}`)
       if (res.ok) {
@@ -1345,7 +1350,7 @@ function ScannerTab({ activeRules, hasGenome }) {
       </aside>
 
       {showScanner && (
-        <BarcodeScanner onScan={(code) => { setShowScanner(false); runSearch({ barcode: code }) }} onClose={() => setShowScanner(false)} />
+        <BarcodeScanner onScan={(code) => { setShowScanner(false); try { fireGuideAction(GUIDE_ACTIONS.SCANNER) } catch {}; runSearch({ barcode: code }) }} onClose={() => setShowScanner(false)} />
       )}
       {openIngredient && (
         <IngredientDrawer name={openIngredient} onClose={() => setOpenIngredient(null)} />
