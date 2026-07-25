@@ -31,6 +31,7 @@ import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
 import StackQualityWidget from '@/components/supplements/StackQualityWidget'
 import OnboardingTour from '@/components/dashboard/OnboardingTour'
 import PostUploadOrientation from '@/components/PostUploadOrientation'
+import VariantInterpretation from '@/components/genome/VariantInterpretation'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -460,15 +461,22 @@ function EmptyRow({ copy }) {
 
 function CardRow({ items, tone }) {
   const border = tone === 'strength' ? '#2E7D32' : tone === 'aware' ? '#964219' : '#7A7974'
+  // Map row tone → the same classification bucket the interpretation
+  // library understands, so dashboard cards get properly framed
+  // "meaning/actions" without the caller having to know internals.
+  const classificationForTone = tone === 'strength' ? 'positive' : tone === 'aware' ? 'awareness' : 'neutral'
   const showTech = useShowTechnicalTerms()
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {items.map((c, i) => {
         const explainer = explainGene(c.gene, c.rsid)
+        // Enhance the card with a classification so the interpretation
+        // engine can pick the right tone. Non-mutating — spread copy.
+        const enhancedCard = { ...c, classification: c.classification || classificationForTone }
         return (
         <div
           key={c.rsid || i}
-          className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5"
+          className="overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5"
           style={{ borderLeft: `4px solid ${border}` }}
         >
           <div className="text-sm font-bold text-ss-teal">{c.name || c.gene}</div>
@@ -508,6 +516,10 @@ function CardRow({ items, tone }) {
               </div>
             )
           )}
+          {/* Expandable plain-English interpretation (Phase E).
+              Curated for the 11 priority rsIDs, dynamic fallback for
+              the rest. Local component state (not localStorage). */}
+          <VariantInterpretation card={enhancedCard} />
         </div>
       )})}
     </div>

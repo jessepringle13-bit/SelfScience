@@ -6794,3 +6794,69 @@ working and ready for production.
         4. Add better error boundaries to Dashboard to prevent full page crashes
         5. Once Dashboard is fixed, re-run Discover tests to verify all 6 sections
 
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Expandable Plain-English Interpretation Layer
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "Expandable 'What does this mean for me?' interpretation layer on every variant card"
+    implemented: true
+    working: true
+    file: "/app/components/genome/VariantInterpretation.jsx, /app/lib/variantInterpretations.js, /app/components/genome/GenomeSlicePage.jsx, /app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Implemented additive expandable interpretation layer on every finding
+            card (Dashboard CardRow + GenomeSlicePage VariantCard). Two-tier logic:
+
+            1. CURATED — 11 prioritized rsIDs get hand-written content:
+               rs1801133 (MTHFR C677T), rs1801131 (MTHFR A1298C),
+               rs8192678 (PPARGC1A), rs12722 (COL5A1), rs10830963 (MTNR1B),
+               rs4253778 (PPARA), rs1799750 (MMP1), rs9420907 (CLU),
+               rs12778366 (KLOTHO), rs1360780 (FKBP5), rs174547 (FADS1).
+
+            2. DYNAMIC FALLBACK — every other variant assembles a coherent
+               interpretation from the card's own description +
+               geneExplanations one-liner + classification bucket + pillar tag.
+               Adds an italic "(interpretation generated from your report)"
+               transparency note.
+
+            UI spec verified via screenshot tool at 1280px and 375px:
+              - Trigger: font-mono 11px, ss-teal, dashed border-top, min-h-11
+              - Expanded panel: rgba(14, 122, 110, 0.04) bg, rounded-lg, p-3
+              - 3 sections: What it means, What you can do about it (bullet list),
+                Research confidence pill (High=green, Moderate=amber, Emerging=muted)
+              - Component-local React state (not localStorage) per product spec
+              - No horizontal overflow at 375px (scrollWidth === innerWidth verified)
+              - Break-words + overflow-hidden guards against long tokens
+
+            Coverage: appears on Dashboard "Top Findings" + "Strengths" cards
+            AND on /genome/overview + /genome/findings + /genome/strengths cards
+            (all four share GenomeSlicePage's VariantCard).
+
+metadata:
+  created_by: "main_agent"
+  version: "1.5"
+  test_sequence: 5
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Expandable interpretation layer visual QA on real genome upload"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase E shipped: Expandable plain-English interpretation layer added to
+        every variant card across Dashboard + GenomeSlice (overview / findings /
+        strengths). 11 curated rsIDs with hardcoded rich content; dynamic
+        fallback for the rest. Verified at 1280px and 375px with no horizontal
+        overflow. Component-local React state per user spec.

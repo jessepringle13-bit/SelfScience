@@ -30,6 +30,7 @@ import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import ResetGenomeButton from '@/components/ResetGenomeButton'
+import VariantInterpretation from '@/components/genome/VariantInterpretation'
 import {
   addToPractitionerReport,
   isInPractitionerReport,
@@ -171,7 +172,7 @@ function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
   const doSupplements = () => router.push(`/tools/supplements?gene=${encodeURIComponent(geneLabel)}`)
 
   return (
-    <article className={`rounded-2xl border border-ss-border-warm border-l-4 ${borderClass} bg-white p-4 shadow-sm ring-1 ring-black/5 md:p-5`}>
+    <article className={`overflow-hidden rounded-2xl border border-ss-border-warm border-l-4 ${borderClass} bg-white p-4 shadow-sm ring-1 ring-black/5 md:p-5`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -244,6 +245,10 @@ function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
           </Link>
         )}
       </div>
+      {/* Expandable plain-English interpretation layer (Phase E).
+          Collapsed by default. Every card gets one — curated for the
+          11 priority rsIDs, dynamically generated for the rest. */}
+      <VariantInterpretation card={card} />
     </article>
   )
 }
