@@ -36,6 +36,7 @@ import PostUploadOrientation from '@/components/PostUploadOrientation'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
 import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
 import JournalWidget from '@/components/dashboard/JournalWidget'
+import TrackerWidget from '@/components/dashboard/TrackerWidget'
 import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
 import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
@@ -378,6 +379,13 @@ export default function Dashboard() {
              not affect any other dashboard section. */}
         <div data-tour-target="journal-widget">
           <JournalWidget />
+        </div>
+
+        {/* Habit & Lifestyle Tracker widget — appears directly below
+             the Journal widget per product spec. Additive; hidden
+             gracefully by its own empty state. */}
+        <div data-tour-target="tracker-widget">
+          <TrackerWidget />
         </div>
 
         {/* 3. YOUR PILLARS (merged: was "Pillar Score Overview" + "Explore Your Pillars")

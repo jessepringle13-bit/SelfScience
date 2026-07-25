@@ -26,6 +26,7 @@ import {
   Rocket,
   Award,
   BookOpen as BookOpenIcon,
+  CheckCircle2 as CheckCircleIcon,
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import PrefsMenu from '@/components/PrefsMenu'
@@ -180,6 +181,7 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/ancestry',                  label: 'Ancestry Report',       Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
     { href: '/practitioner-report',       label: 'Practitioner Report',   Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
     { href: '/journal',                    label: 'Health Journal',        Icon: BookOpenIcon, blurb: 'Private, on-device journal & progress timeline.' },
+    { href: '/tracker',                    label: 'Habit Tracker',         Icon: CheckCircleIcon, blurb: 'Genome-informed habits with streaks, heatmaps, and insights.' },
     { href: '/tools/supplements/brands',  label: 'Brand Leaderboard',     Icon: Award,     blurb: 'Every curated supplement brand ranked by transparency score.' },
     { href: '/get-started',               label: 'Get Started',           Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
   ]
@@ -448,6 +450,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/ancestry"                    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Ancestry Report</a>
             <a href="/practitioner-report"         onClick={() => setMobileOpen(false)} className="hover:opacity-80">Practitioner Report</a>
             <a href="/journal"                     onClick={() => setMobileOpen(false)} className="hover:opacity-80">Health Journal</a>
+            <a href="/tracker"                     onClick={() => setMobileOpen(false)} className="hover:opacity-80">Habit Tracker</a>
             <a href="/tools/supplements/brands"    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Brand Leaderboard</a>
             <a href="/get-started"                 onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
 

@@ -7812,9 +7812,73 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "2.8"
-  test_sequence: 18
+  version: "2.9"
+  test_sequence: 19
   run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase P shipped: Habit & Lifestyle Tracker at /tracker.
+
+        Files added:
+          - lib/habits.js (CRUD, streaks, completion math, suggestions,
+            insights, CSV export)
+          - components/tracker/HabitEditorModal.jsx
+          - components/dashboard/TrackerWidget.jsx
+          - app/tracker/page.js + tracker-client.jsx
+
+        Wired:
+          - Dashboard.jsx: TrackerWidget mounted directly below the
+            JournalWidget (data-tour-target='tracker-widget').
+          - site-nav.jsx: 'Habit Tracker' added to Tools dropdown +
+            mobile drawer (with CheckCircle2 icon).
+
+        Feature scope covered end-to-end:
+          Part 1 — Suggestions: 8 variant-gated + SIRT1+FOXO3 pair +
+            general 'mood/energy' habit for all users. Rendered as
+            color-coded cards; add-with-one-click adds to ss_habits;
+            'Customize first' opens editor pre-populated. Skip All
+            marks ss_habit_suggestions_shown=true.
+          Part 2 — Editor: category chips (Nutrition/Supplements/
+            Training/Wellness/Custom w/ color coding), frequency chips
+            + Custom text, why (200-char cap), linked-variant dropdown
+            populated from genome, 8-swatch color picker. 20-habit cap
+            enforced with amber toast.
+          Part 3 — Daily check-in: row cards with border-left in habit
+            color, check circle toggles, why expand, note editor (120
+            char cap keyed by date), streak indicator (fire >=3d,
+            amber @7d, green pulsing @30d), date navigation (<Today>),
+            30-day edit lock.
+          Part 4 — Progress view: 3-column summary stats (Most
+            consistent / Longest streak / This month), per-habit 90-
+            day heatmap (13 weeks x 7 days), completion % + best
+            streak per row.
+          Part 5 — Dashboard widget: 5-row compact check-in with
+            circles, streak indicators, progress bar, empty state
+            with 'Set up habits' CTA; check-ins sync between widget
+            and /tracker instantly via CHANGE_EVENT.
+          Part 6 — Insights: best-day-of-week, struggling-habit
+            (<50% only), streak-celebration (>=7d with hardcoded
+            benchmark table 60/75/85/92/97%). Max 3 shown.
+          Part 7 — CSV export (Habit Name, Category, Variant Source,
+            Date, Completed, Note, Streak-at-Date). Only shows when
+            at least one check-in exists.
+
+        Verified via screenshot tool with fake genome seeded
+        (MTHFR TT, MTNR1B GG, COL5A1 TT, FADS1 TT, PPARA GG):
+          - First-visit suggestions grid shows 6 correctly-matched
+            variant + general cards with all metadata.
+          - Category chips render color-coded (Nutrition=amber,
+            Supplements=green, Training=editorial-blue, Wellness=teal).
+          - Variant chips in ss-green, frequency labels in mono grey.
+          - Add / Customize buttons + Skip All link work.
+          - Progress ring, view toggle, and date nav visible.
+          - No existing dashboard/journal/community functionality
+            touched.
+
+        All state in ss_habits (localStorage). Zero server calls for
+        habit data. CSV export uses Blob + a.click (no libs).
 
 agent_communication:
     - agent: "main"
