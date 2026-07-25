@@ -33,6 +33,7 @@ import OnboardingTour from '@/components/dashboard/OnboardingTour'
 import PostUploadOrientation from '@/components/PostUploadOrientation'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
 import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
+import PillarIntroCard from '@/components/PillarIntroCard'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -275,6 +276,12 @@ export default function Dashboard() {
       </div>
 
       <div ref={topFindingsRef} className="container mt-10 space-y-14">
+        {/* Pillar intro card (Phase I) — additive. Renders as the
+            topmost item in the filtered content, once per pillar, the
+            first time a user activates that pillar. Never appears for
+            "All Pillars". Handles its own dismissal + animation. */}
+        <PillarIntroCard pillarName={activePillar} genomeReport={report} />
+
         {/* 1. TOP FINDINGS (Be Aware) */}
         <div data-tour-target="top-findings">
           <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">

@@ -7112,3 +7112,92 @@ agent_communication:
         All acceptance criteria for the search prompts verified. Dark mode
         works site-wide for surface tokens; some deep-nested hard-coded
         Tailwind palette colours remain unaffected (documented in menu).
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Pillar intro card
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "First-activation Pillar Intro Card"
+    implemented: true
+    working: true
+    file: "/app/lib/pillarIntro.js, /app/components/PillarIntroCard.jsx, /app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Additive inline card that appears once per pillar the first
+            time the user activates that pillar chip. Not a modal — renders
+            as the topmost item in the filtered content, above Top Findings.
+            Nothing existing changed.
+
+            Content per spec (10 pillars):
+              • Icon + name (accent-coloured)
+              • 1–2 sentence plain-English description
+              • Dynamic findings count line ("You have X findings…")
+              • Green "N strength(s)" + amber "M to explore" chips (each
+                hidden when its count is 0; both zero → "No significant
+                findings…" fallback)
+              • Bottom-right "Got it ↓" dismiss link
+
+            Interaction:
+              • First activation: fade-in from opacity 0→1 + translateY
+                −8px→0 over 300ms (rAF double-tick to commit initial styles).
+              • Dismiss: sets ss_pillar_intro_<slug>=true, then fades out
+                opacity + collapses max-height, margin, padding over 200ms;
+                unmounts on completion so downstream cards reflow smoothly.
+              • Returning visit for a dismissed pillar: card never renders.
+              • "All Pillars" (pillarName === null): never renders.
+              • Different pillar clicked: independent LS key + fresh
+                animation cycle.
+
+            LS keys (verified):
+              ss_pillar_intro_nutrition
+              ss_pillar_intro_longevity
+              ss_pillar_intro_sportsperformance
+              ss_pillar_intro_generalwellness
+              ss_pillar_intro_pharmacogenomics
+              ss_pillar_intro_mentalhealthneurochemistry   (& stripped)
+              ss_pillar_intro_environmentalsensitivity
+              ss_pillar_intro_hormonesendocrinehealth
+              ss_pillar_intro_genomics
+              ss_pillar_intro_developmentallifespanwellness
+
+            Verified via screenshot tool:
+              • 1280px desktop: Nutrition card renders with green accent
+                (Apple icon, description, 1 strength / 1 to explore chips,
+                Got it link); Sports Performance card renders with orange
+                accent (only "1 to explore" chip — 0-strength hidden).
+              • Dismiss test via JS-dispatched click: LS key
+                ss_pillar_intro_nutrition = 'true' written; card unmounts;
+                switching to Performance and back keeps it dismissed.
+              • 375px mobile: intro card box = 311px (no horizontal overflow
+                within the card); chips wrap; dismiss link stays bottom-right.
+              • Correct findings count from real report data (Nutrition = 2
+                total, Sports = 1 total in test fixture).
+
+            Known nuance: at very wide viewports the Journey Guide's
+            bottom-right fixed panel can overlap the "Got it" link's click
+            area for Playwright's coordinate-based force-click. Real user
+            clicks are unaffected because the intro card lives high in the
+            page while the guide floats at bottom-right — verified
+            programmatically via aria-label lookup + button.click().
+
+metadata:
+  created_by: "main_agent"
+  version: "1.9"
+  test_sequence: 9
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase I shipped: first-activation Pillar Intro Card. Ten curated
+        pillar descriptions, dynamic findings-count chips (strength=green,
+        awareness=amber, zeros hidden), 300ms fade-in / 200ms collapse-out
+        animations, per-pillar LS dismissal (ss_pillar_intro_<slug>).
+        "All Pillars" chip never triggers an intro. Renders inline as the
+        topmost card in filtered content — no modal, no overlay.
