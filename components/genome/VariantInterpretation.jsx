@@ -24,6 +24,7 @@ import {
 } from '@/lib/variantInterpretations'
 import ExplainToDoctorButton from '@/components/genome/ExplainToDoctorModal'
 import { emitVariantExpanded } from '@/lib/learningPath'
+import SaveButton from '@/components/SaveButton'
 
 export default function VariantInterpretation({ card, className = '' }) {
   const [open, setOpen] = useState(false)
@@ -120,8 +121,21 @@ export default function VariantInterpretation({ card, className = '' }) {
               state per product spec. Opens a modal with a formatted
               clinical conversation summary + copy-to-clipboard and
               add-to-practitioner-report actions. */}
-          <div className="pt-1">
+          <div className="flex items-center justify-between gap-2 pt-1">
             <ExplainToDoctorButton card={card} />
+            {/* Save button — records this finding in ss_reading_list so
+                the user can revisit it from the Saved Reading List. */}
+            <SaveButton
+              item={{
+                id: `finding:${card?.rsid || card?.gene}:${card?.genotype || ''}`,
+                type: 'finding',
+                title: `${card?.gene || 'Finding'}${card?.trait ? ' · ' + card.trait : ''}`,
+                source: card?.rsid ? String(card.rsid).toUpperCase() : '',
+                url: null,
+                pillar: card?.pillar || null,
+                variantTag: card?.gene || null,
+              }}
+            />
           </div>
         </div>
       )}

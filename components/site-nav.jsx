@@ -29,6 +29,7 @@ import {
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import PrefsMenu from '@/components/PrefsMenu'
 import ExplorerChip from '@/components/ExplorerChip'
+import { useSavedCount } from '@/lib/readingList'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -274,7 +275,7 @@ export function SiteNav({ variant = 'light' }) {
             )}
           </div>
 
-          <a href="/reading-list" className={linkClass('/reading-list')}>Reading List</a>
+          <ReadingListNavLink linkClass={linkClass('/reading-list')} />
 
           {/* Tools dropdown — consolidates Biomarkers / Training / Drug Check /
               Populations / Ancestry so the desktop nav doesn't get crowded. */}
@@ -473,6 +474,25 @@ export function SiteNav({ variant = 'light' }) {
 }
 
 export default SiteNav
+
+/** Reading List link with a small ss-green badge showing saved-item count. */
+function ReadingListNavLink({ linkClass }) {
+  const count = useSavedCount()
+  return (
+    <a href="/reading-list" className={`relative ${linkClass}`}>
+      <span>Reading List</span>
+      {count > 0 && (
+        <span
+          className="absolute -top-1.5 -right-3 inline-flex min-w-[18px] items-center justify-center rounded-full bg-ss-green px-1 font-mono text-[9px] font-bold text-white"
+          style={{ height: 18 }}
+          aria-label={`${count} saved items`}
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </a>
+  )
+}
 
 /**
  * "Support" pill for the desktop nav — filled orange to match the site brand.

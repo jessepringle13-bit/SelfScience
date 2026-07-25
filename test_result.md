@@ -7399,3 +7399,96 @@ agent_communication:
         pre-populated. "Explore without a file" routes to
         /genome?autosample=1 which auto-fires the sample-data flow so
         users land on a populated dashboard with a single tap.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Reading List, Save button, Digest bonus
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "Universal Save button + Reading List page + Digest bonus + Nav badge"
+    implemented: true
+    working: true
+    file: "/app/lib/readingList.js, /app/components/SaveButton.jsx, /app/components/ReadingListToaster.jsx, /app/app/reading-list/saved/*, /app/components/dashboard/WeeklyDigest.jsx, /app/components/genome/VariantInterpretation.jsx, /app/components/site-nav.jsx, /app/app/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Additive save/bookmark system on top of the legacy Reading List
+            (which is untouched). Uses new LS key ss_reading_list.
+
+            PART 1 — SAVE BUTTON
+              • Reusable <SaveButton item={...}/> component
+              • Item shape per spec: {id, type, title, source, url, savedAt,
+                pillar, variantTag, notes}
+              • 100-item cap with amber warning toast (shown once)
+              • ReadingListToaster mounted globally in layout.js — micro
+                toast with "View Reading List →" link, auto-dismiss
+              • Integrated on:
+                – WeeklyDigest all three cards (paper / insight / trial)
+                – VariantInterpretation expanded pane (finding cards)
+              • Not yet integrated on Search results / Articles index /
+                Discover tab standalone cards (documented as sweep-later).
+
+            PART 2 — READING LIST PAGE
+              • Route: /reading-list/saved (kept separate from legacy
+                /reading-list book/study experience so nothing existing
+                breaks)
+              • Header with eyebrow, heading, subheading, live saved-item
+                count
+              • Filter chips (All / Research / Findings / Articles /
+                Trials / Digest), Sort dropdown (Most recent / Oldest /
+                By pillar / By type)
+              • Saved-item card with type-coloured badge, pillar chip,
+                variant match chip, save-date, unsave button, title/
+                source, collapsible notes (with Save/Cancel + preview +
+                Edit), and type-aware Read/View/Open link
+              • Empty state with bookmark icon + CTA to /search
+              • Export as CSV (title/type/source/pillar/date/url/notes)
+
+            PART 3 — DIGEST BONUS CONTENT
+              • ss_digest_viewed_<isoweekstamp> LS tracks paper/insight/
+                trial click-through independently
+              • Bonus section renders when all 3 flags true. Dashed
+                border, muted bg. Three sub-cards:
+                – "DEEP CUT" (older highly-cited paper CTA)
+                – "FROM YOUR LIST" (oldest unread saved item OR
+                  "Save research papers to build your list" fallback)
+                – "SELFSCIENCE ARTICLE" (pillar deep-dive link)
+
+            PART 4 — NAV BADGE
+              • Reading List nav item gets a small ss-green pill badge
+                showing saved-item count (99+ cap). Hidden at 0. Updates
+                live via useSavedCount() hook.
+
+            Verified via screenshot tool at 1280px:
+              • Digest cards show outline bookmark icons initially.
+              • Clicking save on paper card → icon flips filled/green,
+                bottom-center "Saved to your Reading List" toast with
+                working "View Reading List →" link, nav badge shows "1".
+              • ss_reading_list LS payload correctly shaped:
+                [{"id":"research:42346809","type":"research","title":"…",...}]
+              • /reading-list/saved shows 2 items after 2 saves with
+                filter chips, sort dropdown, per-item badges, "+ Add a
+                note", Read links, unsave (filled green bookmark) buttons,
+                and Export CSV footer.
+              • Nav badge updates to "2" in real time.
+
+metadata:
+  created_by: "main_agent"
+  version: "2.2"
+  test_sequence: 12
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase L shipped: universal Save button + dedicated saved-items
+        Reading List page + Digest bonus content + nav badge.
+        Uses new ss_reading_list LS bucket separate from the legacy
+        Reading List so nothing existing was touched.
+        Integrated in WeeklyDigest (3 cards) + VariantInterpretation
+        (finding cards). Sweep-later: Search-results cards, Articles
+        index, Discover-tab standalone cards.

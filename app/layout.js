@@ -9,6 +9,7 @@ import FirstTimeWelcome from '@/components/FirstTimeWelcome'
 import HealthStoryQuiz from '@/components/HealthStoryQuiz'
 import JourneyGuide from '@/components/JourneyGuide'
 import Toast from '@/components/Toast'
+import ReadingListToaster from '@/components/ReadingListToaster'
 import FeaturesTracker from '@/components/FeaturesTracker'
 import { NO_FLASH_SCRIPT } from '@/lib/theme'
 
@@ -105,6 +106,7 @@ export default function RootLayout({ children }) {
         <HealthStoryQuiz />
         <JourneyGuide />
         <Toast />
+        <ReadingListToaster />
         <FeaturesTracker />
         <Analytics />
         <ChunkReloader />

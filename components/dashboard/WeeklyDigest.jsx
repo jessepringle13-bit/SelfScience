@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  BookOpen, Sparkles, FlaskConical, ArrowUpRight, Loader2,
+  BookOpen, Sparkles, FlaskConical, ArrowUpRight, Loader2, Layers,
 } from 'lucide-react'
 import {
   pickTopDigestVariants,
@@ -30,6 +30,10 @@ import {
   VARIANT_QUERY_MAP,
 } from '@/lib/weeklyDigest'
 import { flattenReportCards } from '@/lib/supplementProtocol'
+import SaveButton from '@/components/SaveButton'
+import {
+  markDigestCardViewed, useDigestViewed, useReadingList,
+} from '@/lib/readingList'
 
 /* ============================== Section ============================== */
 
@@ -151,7 +155,96 @@ export default function WeeklyDigest({ report }) {
       >
         Updated weekly · Matched to your top variants · Powered by PubMed and ClinicalTrials.gov
       </div>
+
+      {/* Bonus section — appears when the user has clicked into all three
+          main digest cards this week. Provides between-refresh
+          engagement. */}
+      <BonusSection topVariants={topVariants} />
     </section>
+  )
+}
+
+/* ============================ Bonus =================================== */
+
+function BonusSection({ topVariants }) {
+  const viewed = useDigestViewed()
+  const list = useReadingList()
+  const allViewed = viewed.paper && viewed.insight && viewed.trial
+  if (!allViewed) return null
+
+  const primaryVariant = topVariants?.[0]
+  const primaryPillar  = primaryVariant?.card?.pillar || 'Genomics'
+  const primaryLabel   = primaryVariant?.gene || 'your top variant'
+  const oldestSaved    = [...list].sort((a, b) => (a.savedAt || '').localeCompare(b.savedAt || ''))[0]
+  const savedDays      = oldestSaved ? Math.max(1, Math.round((Date.now() - Date.parse(oldestSaved.savedAt || 0)) / 86400000)) : 0
+
+  return (
+    <div className="mt-6 rounded-2xl border border-dashed border-ss-border-warm/80 bg-ss-bg/60 p-4 md:p-5">
+      <div
+        className="mb-1 font-mono text-[9px] font-bold uppercase text-ss-muted"
+        style={{ letterSpacing: '0.14em' }}
+      >
+        Bonus content
+      </div>
+      <div className="font-mono text-[11px] font-bold uppercase text-ss-green">
+        You have read this week&apos;s digest
+      </div>
+      <p className="mt-1 text-[0.9rem] text-ss-muted">
+        Here is a little more while you wait for next week&apos;s update.
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {/* Bonus 1 — Deep Cut */}
+        <BonusCard tone="amber" label="Deep cut">
+          <div className="text-[13px] font-semibold text-ss-text">A highly-cited paper on {primaryLabel}</div>
+          <div className="mt-1 font-mono text-[10px] text-ss-muted">Older but influential</div>
+          <Link href={`/search?q=${encodeURIComponent(primaryLabel + ' review')}`} className="mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold text-ss-teal hover:underline">
+            Read <ArrowUpRight size={11} />
+          </Link>
+        </BonusCard>
+
+        {/* Bonus 2 — From Your Reading List (or CTA) */}
+        <BonusCard tone="teal" label="From your list">
+          {oldestSaved ? (
+            <>
+              <div className="line-clamp-2 text-[13px] font-semibold text-ss-text">{oldestSaved.title}</div>
+              <div className="mt-1 font-mono text-[10px] text-ss-muted">You saved this {savedDays} day{savedDays === 1 ? '' : 's'} ago — ready to read it?</div>
+              <a href={oldestSaved.url || '/reading-list/saved'} target={oldestSaved.url ? '_blank' : undefined} rel="noopener noreferrer" className="mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold text-ss-teal hover:underline">
+                Read now <ArrowUpRight size={11} />
+              </a>
+            </>
+          ) : (
+            <>
+              <div className="text-[13px] font-semibold text-ss-text">Save research papers to build your reading list.</div>
+              <Link href="/search" className="mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold text-ss-teal hover:underline">
+                Start saving <ArrowUpRight size={11} />
+              </Link>
+            </>
+          )}
+        </BonusCard>
+
+        {/* Bonus 3 — Related SelfScience article */}
+        <BonusCard tone="green" label="SelfScience article">
+          <div className="text-[13px] font-semibold text-ss-text">Deep dive: {primaryPillar}</div>
+          <div className="mt-1 font-mono text-[10px] text-ss-muted">{primaryPillar} · ~6 min read</div>
+          <Link href={`/search?pillar=${encodeURIComponent(primaryPillar)}`} className="mt-auto inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold text-ss-teal hover:underline">
+            Read article <ArrowUpRight size={11} />
+          </Link>
+        </BonusCard>
+      </div>
+    </div>
+  )
+}
+
+function BonusCard({ label, tone, children }) {
+  const color = tone === 'amber' ? 'text-ss-amber' : tone === 'green' ? 'text-ss-green' : 'text-ss-teal'
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-ss-border-warm/80 bg-white/70 px-3.5 py-3">
+      <div className={`font-mono text-[9px] font-bold uppercase ${color}`} style={{ letterSpacing: '0.14em' }}>
+        {label}
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -212,11 +305,22 @@ function ActionLink({ href, children, external = true }) {
 function NewResearchCard({ paper, loading }) {
   if (loading && !paper) return <SkeletonCard />
   const yr = paper?.year || (paper?.pubDate ? new Date(paper.pubDate).getFullYear() : '')
+  const saveEntry = paper && paper.url ? {
+    id: `research:${paper.pmid || paper.url}`,
+    type: 'research',
+    title: paper.title,
+    source: [paper.journal, yr].filter(Boolean).join(' · '),
+    url: paper.url || paper.pubmedUrl || null,
+    variantTag: paper.matchedGene || null,
+  } : null
   return (
     <CardShell>
-      <div className="flex items-center gap-2">
-        <BookOpen size={14} className="text-ss-green" aria-hidden="true" />
-        <CardLabel tone="green">New Research</CardLabel>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <BookOpen size={14} className="text-ss-green" aria-hidden="true" />
+          <CardLabel tone="green">New Research</CardLabel>
+        </div>
+        {saveEntry && <SaveButton item={saveEntry} />}
       </div>
       {paper ? (
         <>
@@ -228,7 +332,10 @@ function NewResearchCard({ paper, loading }) {
             {yr && <span>· {yr}</span>}
           </div>
           {paper.matchedGene && <MatchedChip label={paper.matchedGene} tone="green" />}
-          <ActionLink href={paper.url || paper.pubmedUrl}>Read study</ActionLink>
+          <a href={paper.url || paper.pubmedUrl} target="_blank" rel="noopener noreferrer" onClick={() => markDigestCardViewed('paper')}
+             className="mt-auto inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-ss-teal hover:underline">
+            Read study <ArrowUpRight size={12} aria-hidden="true" />
+          </a>
         </>
       ) : (
         <>
@@ -249,11 +356,22 @@ function NewResearchCard({ paper, loading }) {
 
 /* ---------- Card 2: Did You Know ---------- */
 function DidYouKnowCard({ snippet }) {
+  const saveEntry = snippet ? {
+    id: `digest:insight:${snippet.rsid || snippet.variantLabel}`,
+    type: 'digest',
+    title: snippet.text.slice(0, 120) + (snippet.text.length > 120 ? '…' : ''),
+    source: 'SelfScience Weekly Insight',
+    url: `/search?q=${encodeURIComponent(snippet.query || snippet.variantLabel || '')}`,
+    variantTag: snippet.variantLabel || null,
+  } : null
   return (
     <CardShell>
-      <div className="flex items-center gap-2">
-        <Sparkles size={14} className="text-ss-amber" aria-hidden="true" />
-        <CardLabel tone="amber">Did You Know</CardLabel>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles size={14} className="text-ss-amber" aria-hidden="true" />
+          <CardLabel tone="amber">Did You Know</CardLabel>
+        </div>
+        {saveEntry && <SaveButton item={saveEntry} />}
       </div>
       {snippet ? (
         <>
@@ -261,12 +379,10 @@ function DidYouKnowCard({ snippet }) {
             {snippet.text}
           </p>
           {snippet.variantLabel && <MatchedChip label={snippet.variantLabel} tone="green" />}
-          <ActionLink
-            href={`/search?q=${encodeURIComponent(snippet.query || snippet.variantLabel)}`}
-            external={false}
-          >
-            Learn more
-          </ActionLink>
+          <Link href={`/search?q=${encodeURIComponent(snippet.query || snippet.variantLabel)}`} onClick={() => markDigestCardViewed('insight')}
+                className="mt-auto inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-ss-teal hover:underline">
+            Learn more <ArrowUpRight size={12} aria-hidden="true" />
+          </Link>
         </>
       ) : (
         <p className="text-[12.5px] text-ss-muted">
@@ -280,11 +396,22 @@ function DidYouKnowCard({ snippet }) {
 /* ---------- Card 3: Clinical Trial ---------- */
 function ClinicalTrialCard({ trial, loading }) {
   if (loading && !trial) return <SkeletonCard />
+  const saveEntry = trial ? {
+    id: `trial:${trial.nctId}`,
+    type: 'trial',
+    title: trial.title,
+    source: summarizeTrialLocation(trial.locations) + (trial.nctId ? ` · ${trial.nctId}` : ''),
+    url: trial.url || (trial.nctId ? `https://clinicaltrials.gov/study/${trial.nctId}` : null),
+    variantTag: trial.gene || null,
+  } : null
   return (
     <CardShell>
-      <div className="flex items-center gap-2">
-        <FlaskConical size={14} className="text-ss-teal" aria-hidden="true" />
-        <CardLabel tone="blue">Clinical Trial</CardLabel>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FlaskConical size={14} className="text-ss-teal" aria-hidden="true" />
+          <CardLabel tone="blue">Clinical Trial</CardLabel>
+        </div>
+        {saveEntry && <SaveButton item={saveEntry} />}
       </div>
       {trial ? (
         <>
@@ -306,9 +433,10 @@ function ClinicalTrialCard({ trial, loading }) {
             {trial.nctId && <span>· {trial.nctId}</span>}
           </div>
           {trial.gene && <MatchedChip label={trial.gene} tone="blue" />}
-          <ActionLink href={trial.url || `https://clinicaltrials.gov/study/${trial.nctId}`}>
-            See details
-          </ActionLink>
+          <a href={trial.url || `https://clinicaltrials.gov/study/${trial.nctId}`} target="_blank" rel="noopener noreferrer" onClick={() => markDigestCardViewed('trial')}
+             className="mt-auto inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-ss-teal hover:underline">
+            See details <ArrowUpRight size={12} aria-hidden="true" />
+          </a>
         </>
       ) : (
         <>
