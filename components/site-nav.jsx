@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import PrefsMenu from '@/components/PrefsMenu'
+import ExplorerChip from '@/components/ExplorerChip'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -356,6 +357,10 @@ export function SiteNav({ variant = 'light' }) {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Explorer chip — permanent header pill that replaces the
+              Journey Guide once the user completes both Tier 1 and
+              Tier 2. Renders null otherwise. */}
+          <ExplorerChip isDark={isDark} />
           {/* Display prefs (Phase C) — small gear menu with the
               "Show technical terms" toggle. Kept adjacent to the
               other end-of-nav controls so it's discoverable but not

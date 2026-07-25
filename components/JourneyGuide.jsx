@@ -1,59 +1,66 @@
 'use client'
 
 // /app/components/JourneyGuide.jsx
-// Phase B · Part 3 — persistent "Your Guide" wayfinding component. It maps
-// the SelfScience journey as a 5-step checklist so users always know what
-// to look at next after uploading their genome.
+// Two-tier wayfinding guide.
+//   Tier 1 — "Getting Started" — the original 5 steps.
+//   Tier 2 — "Go Deeper" — unlocks automatically when all Tier 1 steps
+//            are complete. Six deeper-use tasks that teach the user how
+//            to actually USE the platform, not just visit pages.
 //
-// Behaviour:
-//   • Mounts globally via layout.js.
-//   • Only visible AFTER genome upload (hasGenomeResults()).
-//   • Never shown on /genome itself (that's the upload page) or on any
-//     admin/print route.
-//   • Desktop (md+): floating rounded panel pinned to bottom-right, 300px
-//     wide when expanded, collapses to a compact "Guide" pill when
-//     collapsed.
-//   • Mobile (<md): a floating "Guide" button (bottom-right, above the
-//     site MobileNav) that opens a bottom sheet.
-//   • Auto-collapses (not dismisses) after 3 days from first mount.
-//   • Manual dismiss via the "Hide Guide" link → hidden forever
-//     (ss_guide_dismissed = '1').
+// After Tier 2 finishes the full guide is replaced by a small "Explorer"
+// chip in the header (rendered by /app/components/ExplorerChip.jsx).
+// The 3-day auto-collapse rule still applies to the full guide; the
+// Explorer chip is permanent.
 //
-// LocalStorage keys (ss_ namespaced):
-//   ss_guide_progress   → JSON.stringify(string[]) of completed step keys
-//   ss_guide_first_seen → ISO date of first mount
-//   ss_guide_collapsed  → '1' if the user manually collapsed
-//   ss_guide_dismissed  → '1' if the user hit "Hide Guide"
+// LocalStorage contract (all ss_ namespaced):
+//   ss_guide_progress         — Tier 1 completed keys (string[])
+//   ss_guide_tier2            — Tier 2 completed keys (string[])
+//   ss_guide_tier2_unlocked   — '1' once every Tier 1 step is done
+//   ss_guide_explorer         — '1' once every Tier 2 step is done
+//   ss_guide_first_seen       — ISO timestamp (auto-collapse anchor)
+//   ss_guide_collapsed        — '1' if the user manually collapsed
+//   ss_guide_dismissed        — '1' if the user hit "Hide Guide"
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Compass, Check, ChevronDown, ChevronUp, X,
-  Upload, Star, Apple, Pill, LayoutGrid,
+  Upload, Star, Apple, Pill, LayoutGrid, Search, ScanLine,
+  TestTube2, FileText, BookOpen, Rocket,
 } from 'lucide-react'
 import { hasGenomeResults } from '@/lib/genomeSession'
 
-const LS_PROGRESS   = 'ss_guide_progress'
-const LS_FIRST_SEEN = 'ss_guide_first_seen'
-const LS_COLLAPSED  = 'ss_guide_collapsed'
-const LS_DISMISSED  = 'ss_guide_dismissed'
-const AUTO_COLLAPSE_AFTER_MS = 3 * 24 * 60 * 60 * 1000  // 3 days
+const LS_PROGRESS         = 'ss_guide_progress'
+const LS_TIER2            = 'ss_guide_tier2'
+const LS_TIER2_UNLOCKED   = 'ss_guide_tier2_unlocked'
+const LS_EXPLORER         = 'ss_guide_explorer'
+const LS_FIRST_SEEN       = 'ss_guide_first_seen'
+const LS_COLLAPSED        = 'ss_guide_collapsed'
+const LS_DISMISSED        = 'ss_guide_dismissed'
+const AUTO_COLLAPSE_AFTER_MS = 3 * 24 * 60 * 60 * 1000
 
 const EXCLUDED_PATH_PREFIXES = [
-  '/genome',              // upload page itself
-  '/practitioner-report', // print-optimized doc
-  '/admin',
-  '/get-started',
-  '/start',
+  '/genome', '/practitioner-report', '/admin', '/get-started', '/start',
 ]
 
-const STEPS = [
-  { key: 'upload',      Icon: Upload,     label: 'Upload your genome file',       href: '/genome' },
-  { key: 'findings',    Icon: Star,       label: 'Review your top 3 findings',    href: '/genome/findings' },
-  { key: 'nutrition',   Icon: Apple,      label: 'Check your nutrition matches',  href: '/nutrition' },
-  { key: 'supplements', Icon: Pill,       label: 'See your supplement suggestions', href: '/tools/supplements' },
-  { key: 'profile',     Icon: LayoutGrid, label: 'Explore your full health profile', href: '/' },
+// Tier 1 — Getting Started (unchanged from the previous version)
+const TIER1_STEPS = [
+  { key: 'upload',      Icon: Upload,     label: 'Upload your genome file',            href: '/genome' },
+  { key: 'findings',    Icon: Star,       label: 'Review your top 3 findings',         href: '/genome/findings' },
+  { key: 'nutrition',   Icon: Apple,      label: 'Check your nutrition matches',       href: '/nutrition' },
+  { key: 'supplements', Icon: Pill,       label: 'See your supplement suggestions',    href: '/tools/supplements' },
+  { key: 'profile',     Icon: LayoutGrid, label: 'Explore your full health profile',   href: '/' },
+]
+
+// Tier 2 — Go Deeper (new). `matchPath` decides if a route visit counts.
+const TIER2_STEPS = [
+  { key: 'search',       Icon: Search,     label: 'Search the research for one of your genes',   hint: 'Tap a gene chip on the Search page and read a study',      href: '/search',              matchPath: (p) => p.startsWith('/search') },
+  { key: 'scanner',      Icon: ScanLine,   label: 'Scan a food product with your camera',        hint: 'Open Nutrition Hub → Scanner tab → point at any barcode', href: '/nutrition?tab=scanner', matchPath: (p) => p === '/nutrition' },
+  { key: 'drugcheck',    Icon: Pill,       label: 'Check a medication against your genome',      hint: 'See how your genes affect common medications',             href: '/drug-check',          matchPath: (p) => p.startsWith('/drug-check') },
+  { key: 'biomarkers',   Icon: TestTube2,  label: 'Build your biomarker picture',                 hint: 'Log one blood result — HDL, Vitamin D, or HbA1c',          href: '/biomarkers',          matchPath: (p) => p.startsWith('/biomarkers') },
+  { key: 'report',       Icon: FileText,   label: 'Generate your Practitioner Report',            hint: 'Create a print-ready sheet to share with your doctor',     href: '/practitioner-report', matchPath: (p) => p.startsWith('/practitioner-report') },
+  { key: 'articles',     Icon: BookOpen,   label: 'Read an article in your top pillar',           hint: 'Browse staff-written explainers matched to your biology',  href: '/articles',            matchPath: (p) => p.startsWith('/articles') },
 ]
 
 function readSet(key) {
@@ -68,23 +75,38 @@ function writeSet(key, set) {
   if (typeof window === 'undefined') return
   try { window.localStorage.setItem(key, JSON.stringify(Array.from(set))) } catch {}
 }
+function writeFlag(key, value) {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.setItem(key, value ? '1' : '0') } catch {}
+}
+function readFlag(key) {
+  if (typeof window === 'undefined') return false
+  try { return window.localStorage.getItem(key) === '1' } catch { return false }
+}
 
 export default function JourneyGuide() {
   const pathname = usePathname() || ''
-  const [mounted, setMounted]         = useState(false)
-  const [hasGenome, setHasGenome]     = useState(false)
-  const [dismissed, setDismissed]     = useState(false)
-  const [collapsed, setCollapsed]     = useState(false)     // desktop panel state
-  const [sheetOpen, setSheetOpen]     = useState(false)     // mobile bottom sheet
-  const [done, setDone]               = useState(new Set()) // completed step keys
+  const [mounted, setMounted]       = useState(false)
+  const [hasGenome, setHasGenome]   = useState(false)
+  const [dismissed, setDismissed]   = useState(false)
+  const [collapsed, setCollapsed]   = useState(false)
+  const [sheetOpen, setSheetOpen]   = useState(false)
+  const [tier1Done, setTier1Done]   = useState(() => new Set())
+  const [tier2Done, setTier2Done]   = useState(() => new Set())
+  const [tier2Unlocked, setTier2Unlocked] = useState(false)
+  const [explorer, setExplorer]     = useState(false)
+  // The transition banner sits between Tier 1 completing and Tier 2
+  // revealing — displayed for exactly 2s per spec.
+  const [transitioning, setTransitioning] = useState(false)
 
-  // Client-side mount only (avoid SSR flicker / hydration mismatch).
+  // Client-side hydration
   useEffect(() => {
     setMounted(true)
     setHasGenome(hasGenomeResults())
-    setDismissed(typeof window !== 'undefined' && window.localStorage.getItem(LS_DISMISSED) === '1')
+    setDismissed(readFlag(LS_DISMISSED))
+    setExplorer(readFlag(LS_EXPLORER))
 
-    // Auto-collapse after 3 days.
+    // Auto-collapse anchor.
     if (typeof window !== 'undefined') {
       const first = window.localStorage.getItem(LS_FIRST_SEEN)
       if (!first) {
@@ -93,27 +115,30 @@ export default function JourneyGuide() {
       } else {
         try {
           const ms = Date.now() - new Date(first).getTime()
-          const manual = window.localStorage.getItem(LS_COLLAPSED) === '1'
+          const manual = readFlag(LS_COLLAPSED)
           setCollapsed(manual || ms > AUTO_COLLAPSE_AFTER_MS)
         } catch {
-          setCollapsed(window.localStorage.getItem(LS_COLLAPSED) === '1')
+          setCollapsed(readFlag(LS_COLLAPSED))
         }
       }
     }
 
-    // Merge stored progress with derived "upload complete" state.
-    const stored = readSet(LS_PROGRESS)
-    if (hasGenomeResults()) stored.add('upload')
-    setDone(stored)
+    // Load Tier 1 progress (auto-complete "upload" when genome present).
+    const t1 = readSet(LS_PROGRESS)
+    if (hasGenomeResults()) t1.add('upload')
+    setTier1Done(t1)
+    // Load Tier 2 progress + unlock state.
+    setTier2Done(readSet(LS_TIER2))
+    setTier2Unlocked(readFlag(LS_TIER2_UNLOCKED))
 
-    // Listen for genome changes so we re-detect after fresh upload.
+    // Genome-changed listener re-derives "upload" completion.
     const onGenomeChanged = () => {
       const has = hasGenomeResults()
       setHasGenome(has)
       const s = readSet(LS_PROGRESS)
       if (has) s.add('upload')
       writeSet(LS_PROGRESS, s)
-      setDone(s)
+      setTier1Done(s)
     }
     if (typeof window !== 'undefined') {
       window.addEventListener('selfscience:genome-changed', onGenomeChanged)
@@ -121,37 +146,81 @@ export default function JourneyGuide() {
     }
   }, [])
 
-  // Compute the current "next" step so we can highlight it.
-  const nextKey = useMemo(() => STEPS.find((s) => !done.has(s.key))?.key, [done])
+  // Auto-mark Tier 2 steps on route visit (minimum-viable completion).
+  useEffect(() => {
+    if (!mounted || !tier2Unlocked || explorer) return
+    const match = TIER2_STEPS.find((s) => s.matchPath(pathname))
+    if (!match) return
+    if (tier2Done.has(match.key)) return
+    const next = new Set(tier2Done)
+    next.add(match.key)
+    writeSet(LS_TIER2, next)
+    setTier2Done(next)
+  }, [pathname, mounted, tier2Unlocked, explorer, tier2Done])
+
+  // Detect Tier 1 completion → trigger transition → unlock Tier 2.
+  useEffect(() => {
+    if (!mounted || tier2Unlocked || explorer) return
+    const allDone = TIER1_STEPS.every((s) => tier1Done.has(s.key))
+    if (!allDone) return
+    // 2-second transition banner, then reveal Tier 2.
+    setTransitioning(true)
+    const t = setTimeout(() => {
+      writeFlag(LS_TIER2_UNLOCKED, true)
+      setTier2Unlocked(true)
+      setTransitioning(false)
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [tier1Done, mounted, tier2Unlocked, explorer])
+
+  // Detect Tier 2 completion → promote to Explorer state.
+  useEffect(() => {
+    if (!mounted || !tier2Unlocked || explorer) return
+    const allDone = TIER2_STEPS.every((s) => tier2Done.has(s.key))
+    if (!allDone) return
+    writeFlag(LS_EXPLORER, true)
+    setExplorer(true)
+  }, [tier2Done, mounted, tier2Unlocked, explorer])
+
+  // "Next step" pointer (Tier 1 first, then Tier 2 once unlocked).
+  const nextKey = useMemo(() => {
+    if (!tier2Unlocked) return TIER1_STEPS.find((s) => !tier1Done.has(s.key))?.key
+    return TIER2_STEPS.find((s) => !tier2Done.has(s.key))?.key
+  }, [tier1Done, tier2Done, tier2Unlocked])
 
   const excluded = EXCLUDED_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
 
-  if (!mounted || !hasGenome || dismissed || excluded) return null
+  // Once Explorer state is reached the full guide is replaced by the
+  // header chip (see ExplorerChip.jsx). Return null here.
+  if (!mounted || !hasGenome || dismissed || explorer || excluded) return null
 
-  const markStep = (key) => {
-    const s = new Set(done); s.add(key); writeSet(LS_PROGRESS, s); setDone(s)
+  const markT1 = (key) => {
+    const s = new Set(tier1Done); s.add(key); writeSet(LS_PROGRESS, s); setTier1Done(s)
+  }
+  const markT2 = (key) => {
+    const s = new Set(tier2Done); s.add(key); writeSet(LS_TIER2, s); setTier2Done(s)
   }
   const hideForever = () => {
-    if (typeof window !== 'undefined') window.localStorage.setItem(LS_DISMISSED, '1')
+    writeFlag(LS_DISMISSED, true)
     setDismissed(true); setSheetOpen(false)
   }
   const toggleCollapse = () => {
     const next = !collapsed
     setCollapsed(next)
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(LS_COLLAPSED, next ? '1' : '0')
-    }
+    writeFlag(LS_COLLAPSED, next)
   }
 
-  const progress = done.size
-  const total    = STEPS.length
+  const t1Progress = tier1Done.size
+  const t2Progress = tier2Done.size
+  const totalProgress  = t1Progress + (tier2Unlocked ? t2Progress : 0)
+  const totalPossible  = TIER1_STEPS.length + (tier2Unlocked ? TIER2_STEPS.length : 0)
 
   // ---------------- Desktop panel ----------------
   const desktopPanel = (
     <div
       role="complementary"
       aria-label="Your SelfScience journey"
-      className="pointer-events-auto fixed bottom-6 right-6 z-40 hidden w-[300px] rounded-2xl border border-ss-border-warm bg-white shadow-xl md:block"
+      className="pointer-events-auto fixed bottom-6 right-6 z-40 hidden w-[320px] rounded-2xl border border-ss-border-warm bg-white shadow-xl md:block"
     >
       <button
         type="button"
@@ -166,7 +235,7 @@ export default function JourneyGuide() {
         <div className="flex-1">
           <div className="text-sm font-extrabold text-ss-teal">Your Guide</div>
           <div className="text-[10.5px] text-ss-muted">
-            {progress} of {total} steps complete
+            {totalProgress} of {totalPossible} steps complete
           </div>
         </div>
         {collapsed
@@ -175,8 +244,30 @@ export default function JourneyGuide() {
       </button>
 
       {!collapsed && (
-        <div id="ss-guide-body" className="border-t border-ss-border-warm/60 p-4">
-          <StepList steps={STEPS} done={done} nextKey={nextKey} onClickStep={markStep} />
+        <div id="ss-guide-body" className="max-h-[70vh] overflow-y-auto border-t border-ss-border-warm/60 p-4">
+          <TierBanner tier={1} progress={t1Progress} total={TIER1_STEPS.length} />
+          <StepList
+            steps={TIER1_STEPS}
+            done={tier1Done}
+            nextKey={!tier2Unlocked ? nextKey : null}
+            onClickStep={markT1}
+          />
+
+          {transitioning && <TransitionBanner />}
+
+          {tier2Unlocked && (
+            <>
+              <TierBanner tier={2} progress={t2Progress} total={TIER2_STEPS.length} />
+              <StepList
+                steps={TIER2_STEPS}
+                done={tier2Done}
+                nextKey={tier2Unlocked ? nextKey : null}
+                onClickStep={markT2}
+                withHint
+              />
+            </>
+          )}
+
           <div className="mt-4 flex items-center justify-between text-[10.5px]">
             <button
               type="button"
@@ -197,19 +288,17 @@ export default function JourneyGuide() {
     <button
       type="button"
       onClick={() => setSheetOpen(true)}
-      aria-label={`Open your guide — ${progress} of ${total} steps complete`}
-      // Anchored ABOVE the site MobileNav (~64px + safe-area). Do NOT sit
-      // below it or the tap target will be blocked.
+      aria-label={`Open your guide — ${totalProgress} of ${totalPossible} steps complete`}
       className="fixed right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-ss-green text-white shadow-lg md:hidden"
       style={{ bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }}
     >
       <Compass size={20} />
-      {progress > 0 && (
+      {totalProgress > 0 && (
         <span
           aria-hidden="true"
           className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-ss-orange px-1 text-[10px] font-bold text-white ring-2 ring-white"
         >
-          {progress}/{total}
+          {totalProgress}/{totalPossible}
         </span>
       )}
     </button>
@@ -224,7 +313,7 @@ export default function JourneyGuide() {
       onClick={() => setSheetOpen(false)}
     >
       <div
-        className="w-full rounded-t-3xl bg-white p-5 shadow-2xl"
+        className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl"
         style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -236,7 +325,7 @@ export default function JourneyGuide() {
           <div className="flex-1">
             <h3 id="ss-guide-sheet-title" className="text-base font-extrabold text-ss-teal">Your Guide</h3>
             <div className="text-[11px] text-ss-muted">
-              {progress} of {total} steps complete
+              {totalProgress} of {totalPossible} steps complete
             </div>
           </div>
           <button
@@ -250,7 +339,27 @@ export default function JourneyGuide() {
         </div>
 
         <div className="mt-5">
-          <StepList steps={STEPS} done={done} nextKey={nextKey} onClickStep={(key) => { markStep(key); setSheetOpen(false) }} />
+          <TierBanner tier={1} progress={t1Progress} total={TIER1_STEPS.length} />
+          <StepList
+            steps={TIER1_STEPS}
+            done={tier1Done}
+            nextKey={!tier2Unlocked ? nextKey : null}
+            onClickStep={(k) => { markT1(k); setSheetOpen(false) }}
+          />
+          {transitioning && <TransitionBanner />}
+          {tier2Unlocked && (
+            <>
+              <div className="my-4 border-t border-dashed border-ss-border-warm" aria-hidden="true" />
+              <TierBanner tier={2} progress={t2Progress} total={TIER2_STEPS.length} />
+              <StepList
+                steps={TIER2_STEPS}
+                done={tier2Done}
+                nextKey={tier2Unlocked ? nextKey : null}
+                onClickStep={(k) => { markT2(k); setSheetOpen(false) }}
+                withHint
+              />
+            </>
+          )}
         </div>
 
         <div className="mt-6 flex items-center justify-between text-[11px]">
@@ -272,10 +381,34 @@ export default function JourneyGuide() {
   )
 }
 
-function StepList({ steps, done, nextKey, onClickStep }) {
+// ─── Sub-components ────────────────────────────────────────────────────
+
+function TierBanner({ tier, progress, total }) {
+  const label = tier === 1 ? 'Getting Started' : 'Go Deeper'
+  const bg    = tier === 1 ? 'bg-ss-teal'  : 'bg-ss-green'
+  return (
+    <div className={`${bg} mb-3 flex items-center justify-between rounded-lg px-3 py-2 text-white`}>
+      <div className="flex items-center gap-2">
+        {tier === 1 ? <Star size={12} /> : <Rocket size={12} />}
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{label}</span>
+      </div>
+      <span className="text-[10.5px] font-semibold">{progress}/{total}</span>
+    </div>
+  )
+}
+
+function TransitionBanner() {
+  return (
+    <div className="my-3 rounded-lg border border-ss-green/40 bg-ss-green/8 px-3 py-3 text-center text-xs font-semibold text-ss-teal">
+      🎉 Nice work — you&apos;ve got the basics. Ready to go deeper?
+    </div>
+  )
+}
+
+function StepList({ steps, done, nextKey, onClickStep, withHint = false }) {
   return (
     <ol className="space-y-2">
-      {steps.map(({ key, Icon, label, href }) => {
+      {steps.map(({ key, Icon, label, href, hint }) => {
         const isDone = done.has(key)
         const isNext = key === nextKey
         return (
@@ -283,27 +416,34 @@ function StepList({ steps, done, nextKey, onClickStep }) {
             <Link
               href={href}
               onClick={() => onClickStep(key)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+              className={`flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
                 isDone
-                  ? 'bg-ss-green/5 text-ss-muted'
+                  ? 'bg-ss-green/5 text-ss-muted line-through'
                   : isNext
-                    ? 'border-l-4 border-ss-green bg-ss-green/8 pl-2 font-semibold text-ss-teal'
+                    ? 'border-l-[3px] border-ss-green bg-ss-green/8 pl-2 font-semibold text-ss-teal'
                     : 'text-ss-teal hover:bg-ss-bg'
               }`}
             >
               <span
                 aria-hidden="true"
-                className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
+                className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
                   isDone ? 'bg-ss-green text-white' : isNext ? 'bg-white ring-1 ring-ss-green text-ss-green' : 'bg-white ring-1 ring-ss-border-warm text-ss-muted'
                 }`}
               >
                 {isDone ? <Check size={12} strokeWidth={3} /> : <Icon size={12} />}
               </span>
-              <span className="min-w-0 flex-1">{label}</span>
-              <span className={`text-[10.5px] font-semibold uppercase tracking-wider ${
+              <span className="min-w-0 flex-1">
+                <span className="block">{label}</span>
+                {withHint && hint && !isDone && (
+                  <span className="mt-0.5 block text-[10.5px] font-normal leading-snug text-ss-muted no-underline">
+                    {hint}
+                  </span>
+                )}
+              </span>
+              <span className={`self-center text-[10.5px] font-semibold uppercase tracking-wider ${
                 isDone ? 'text-ss-green' : isNext ? 'text-ss-green' : 'text-ss-muted'
               }`}>
-                {isDone ? 'Done' : isNext ? 'View →' : 'View →'}
+                {isDone ? 'Done' : 'View →'}
               </span>
             </Link>
           </li>
@@ -312,3 +452,7 @@ function StepList({ steps, done, nextKey, onClickStep }) {
     </ol>
   )
 }
+
+// Export the step arrays so ExplorerChip can render the same list in its
+// summary modal without duplicating the source of truth.
+export { TIER1_STEPS, TIER2_STEPS, LS_EXPLORER, LS_PROGRESS, LS_TIER2 }

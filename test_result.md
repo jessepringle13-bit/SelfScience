@@ -3447,6 +3447,65 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Two-tier JourneyGuide + permanent Explorer chip"
+    implemented: true
+    working: true
+    file: |
+      /app/components/JourneyGuide.jsx (REWRITTEN),
+      /app/components/ExplorerChip.jsx (NEW),
+      /app/components/site-nav.jsx
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Expanded the Journey Guide from 5 → 11 steps in a two-tier
+          system. Everything is additive — Tier 1 stays exactly as it
+          was.
+
+          Tier 1 — Getting Started (unchanged): upload, findings,
+          nutrition, supplements, profile. Teal banner "GETTING
+          STARTED · N/5".
+
+          Tier 2 — Go Deeper (new): search, scanner, drugcheck,
+          biomarkers, report, articles. Green banner "GO DEEPER · N/6".
+          Each step has both a title and a plain-language hint. Steps
+          auto-mark complete on page visit via usePathname +
+          matchPath predicates. Tier 2 is stored in
+          ss_guide_tier2 (string[]) and gated by ss_guide_tier2_unlocked
+          ('1').
+
+          Transition: when the 5th Tier 1 step lands, a 2-second
+          "🎉 Nice work — you've got the basics. Ready to go deeper?"
+          banner renders inline, then Tier 2 reveals automatically
+          (no refresh required).
+
+          After every Tier 2 step is done, ss_guide_explorer = '1' and
+          the entire guide (desktop panel + mobile FAB + sheet)
+          suppresses itself. A permanent compact "EXPLORER" chip
+          appears in the header (new /app/components/ExplorerChip.jsx),
+          rendered by site-nav.jsx. Clicking it opens a summary modal
+          that lists every completed step with green checkmarks —
+          split into "Getting Started" and "Go Deeper" sections.
+
+          The 3-day auto-collapse rule still applies to the full guide
+          (ss_guide_first_seen + AUTO_COLLAPSE_AFTER_MS). The Explorer
+          chip is permanent and unaffected.
+
+          Verified via screenshots at 1280px + 375px with the exact
+          spec flows:
+          - Seeded Tier 1 complete → transition banner rendered, then
+            Tier 2 unlocked automatically after 2 seconds.
+          - ss_guide_tier2_unlocked flipped to '1'.
+          - Visited /search once → ss_guide_tier2 stored ["search"].
+          - Seeded Explorer state → full guide hidden (count = 0),
+            Explorer chip visible in header (count = 1), modal renders
+            all 11 completed steps.
+          - Mobile FAB progress badge shows "6/11" (5 T1 + 1 T2).
+
+
   - task: "Discover tab research fix — plain-language PubMed queries + Retry empty state"
     implemented: true
     working: true
