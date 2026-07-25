@@ -27,9 +27,10 @@ import { usePathname } from 'next/navigation'
 import {
   Compass, Check, ChevronDown, ChevronUp, X,
   Upload, Star, Apple, Pill, LayoutGrid, Search, ScanLine,
-  TestTube2, FileText, BookOpen, Rocket,
+  TestTube2, FileText, BookOpen, Rocket, RefreshCw,
 } from 'lucide-react'
 import { hasGenomeResults } from '@/lib/genomeSession'
+import { resetGuideOnly, fireToast } from '@/lib/journeyReset'
 
 const LS_PROGRESS         = 'ss_guide_progress'
 const LS_TIER2            = 'ss_guide_tier2'
@@ -149,7 +150,23 @@ export default function JourneyGuide() {
     }
     if (typeof window !== 'undefined') {
       window.addEventListener('selfscience:genome-changed', onGenomeChanged)
-      return () => window.removeEventListener('selfscience:genome-changed', onGenomeChanged)
+      const onGuideChanged = () => {
+        // Re-read every guide flag when journeyReset fires. Ensures the
+        // guide un-hides + restarts without a page refresh.
+        setDismissed(readFlag(LS_DISMISSED))
+        setExplorer(readFlag(LS_EXPLORER))
+        setCollapsed(readFlag(LS_COLLAPSED))
+        setTier2Unlocked(readFlag(LS_TIER2_UNLOCKED))
+        const t1r = readSet(LS_PROGRESS)
+        if (hasGenomeResults()) t1r.add('upload')
+        setTier1Done(t1r)
+        setTier2Done(readSet(LS_TIER2))
+      }
+      window.addEventListener('selfscience:guide-changed', onGuideChanged)
+      return () => {
+        window.removeEventListener('selfscience:genome-changed', onGenomeChanged)
+        window.removeEventListener('selfscience:guide-changed', onGuideChanged)
+      }
     }
   }, [])
 
@@ -242,6 +259,13 @@ export default function JourneyGuide() {
     setCollapsed(next)
     writeFlag(LS_COLLAPSED, next)
   }
+  const restartGuide = () => {
+    // Reset only guide-related keys (Part 2). Toast the user and let the
+    // 'selfscience:guide-changed' event re-hydrate our state in-place.
+    resetGuideOnly()
+    setSheetOpen(false)
+    fireToast('Guide restarted — follow the steps to explore your results')
+  }
 
   const t1Progress = tier1Done.size
   const t2Progress = tier2Done.size
@@ -311,6 +335,14 @@ export default function JourneyGuide() {
             </button>
             <span className="text-ss-muted">Auto-hides after 3 days</span>
           </div>
+          {/* Restart link (Phase D · Part 2) */}
+          <button
+            type="button"
+            onClick={() => { restartGuide() }}
+            className="mt-3 flex w-full items-center justify-center gap-1 font-mono text-[11px] text-ss-muted transition hover:text-ss-teal hover:underline"
+          >
+            <RefreshCw size={11} /> Restart guide from beginning
+          </button>
         </div>
       )}
     </div>
@@ -401,6 +433,13 @@ export default function JourneyGuide() {
           </button>
           <span className="text-ss-muted">Auto-hides after 3 days</span>
         </div>
+        <button
+          type="button"
+          onClick={restartGuide}
+          className="mt-3 flex w-full items-center justify-center gap-1 font-mono text-[11px] text-ss-muted transition hover:text-ss-teal hover:underline"
+        >
+          <RefreshCw size={11} /> Restart guide from beginning
+        </button>
       </div>
     </div>
   )

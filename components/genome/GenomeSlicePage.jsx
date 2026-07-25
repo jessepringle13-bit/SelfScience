@@ -29,6 +29,7 @@ import { getPopulationFrequency } from '@/lib/populationFrequencies'
 import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import DashboardBackLink from '@/components/DashboardBackLink'
+import ResetGenomeButton from '@/components/ResetGenomeButton'
 import {
   addToPractitionerReport,
   isInPractitionerReport,
@@ -345,6 +346,13 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
         <Link href="/" className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-ss-muted hover:text-ss-teal">
           <ArrowLeft size={14} /> Back to Dashboard
         </Link>
+        {/* Phase D · Part 1: monospaced "Upload a different file" link
+            — opens the shared reset confirmation modal. Placed at the
+            very top of results so it's discoverable but visually
+            secondary. */}
+        <div className="mb-4 flex justify-end">
+          <ResetGenomeButton variant="link" />
+        </div>
 
         {/* Snapshot header (overview only) */}
         {mode === 'overview' && (

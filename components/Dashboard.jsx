@@ -22,6 +22,7 @@ import { usePillarFilter } from '@/components/PillarFilter'
 import PillarChipBar from '@/components/dashboard/PillarChipBar'
 import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
+import ResetGenomeButton from '@/components/ResetGenomeButton'
 import TimeAwareBanner from '@/components/dashboard/TimeAwareBanner'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
@@ -243,12 +244,15 @@ export default function Dashboard() {
                 matching variant is present). */}
             <TimeAwareBanner report={report} />
           </div>
-          <Link
-            href="/genome/overview"
-            className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
-          >
-            See your full genome report <ArrowRight size={14} />
-          </Link>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <ResetGenomeButton variant="button" />
+            <Link
+              href="/genome/overview"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
+            >
+              See your full genome report <ArrowRight size={14} />
+            </Link>
+          </div>
         </div>
 
         {/* Horizontal, scrollable pillar chip bar. Replaces the older

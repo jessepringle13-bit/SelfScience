@@ -3447,6 +3447,64 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Phase D · Parts 1-3 — Genome reset, Guide restart, Show Guide again"
+    implemented: true
+    working: true
+    file: |
+      /app/lib/journeyReset.js (NEW),
+      /app/components/Toast.jsx (NEW),
+      /app/components/ResetGenomeButton.jsx (NEW),
+      /app/components/PrefsMenu.jsx,
+      /app/components/FirstTimeWelcome.jsx,
+      /app/components/JourneyGuide.jsx,
+      /app/components/EmptyStatePrompt.jsx,
+      /app/components/Dashboard.jsx,
+      /app/components/genome/GenomeSlicePage.jsx,
+      /app/app/layout.js
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          PART 1 — Clear & Reset:
+          - Dashboard header pill (Trash icon, transparent → red hover).
+          - Genome results monospace link "Upload a different file".
+          - Both open a shared confirmation modal (spec copy verbatim,
+            role="dialog", red confirm + secondary cancel). Renders as
+            bottom sheet on <md via items-end + rounded-t-3xl.
+          - Confirm calls resetGenomeAndGuide() → wipes genome +
+            GUIDE_KEYS + FULL_RESET_EXTRA_KEYS → router.push('/')
+            → router.refresh(). FirstTimeWelcome now listens for
+            'selfscience:interests-changed' so it re-opens without a
+            hard reload.
+
+          PART 2 — Restart Guide:
+          - Inside guide panel (desktop + mobile sheet) small monospace
+            "Restart guide from beginning" link at the bottom.
+          - PrefsMenu item "Replay getting started guide".
+          - Both call resetGuideOnly() (leaves genome + onboarding
+            intact) + fireToast() → Toast renders bottom-center green
+            pill + auto-dismisses after 3 s.
+          - JourneyGuide subscribes to 'selfscience:guide-changed' so
+            it re-hydrates in-place — no refresh needed.
+
+          PART 3 — Show Guide Again:
+          - PrefsMenu item "Show getting started guide" → showGuideAgain().
+          - EmptyStatePrompt renders "Need help getting started? Reopen
+            the guide →" only when ss_guide_dismissed === '1'.
+
+          Verified end-to-end via Playwright at 1280px:
+          - Clear & Reset button visible on dashboard.
+          - Confirmation modal renders + cancels cleanly.
+          - PrefsMenu shows all 3 items (Show / Replay / Clear).
+          - Replay clears ss_guide_progress and guide re-hydrates to
+            Tier 1 · Step 1 in place; toast appears.
+          - Full reset wipes genome + onboarded; navigates to homepage.
+          - Bottom-sheet modal renders at <md.
+
+
   - task: "First-visit contextual banners on 6 feature pages"
     implemented: true
     working: true

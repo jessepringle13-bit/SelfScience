@@ -23,7 +23,9 @@
 // alreadyUploaded="…" for the small greyed line ABOVE the emoji.
 
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowRight, Compass } from 'lucide-react'
+import { showGuideAgain, fireToast } from '@/lib/journeyReset'
 
 export default function EmptyStatePrompt({
   emoji,
@@ -65,6 +67,33 @@ export default function EmptyStatePrompt({
       <p className="mt-4 text-xs text-ss-muted">
         {reassurance}
       </p>
+      {/* Phase D · Part 3 · Location B — surfaces the Guide only when
+          the user has explicitly hidden it. Silent otherwise so we
+          don't clutter the empty state. */}
+      <ReopenGuideLink />
     </section>
+  )
+}
+
+function ReopenGuideLink() {
+  const [hidden, setHidden] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const check = () => {
+      try { setHidden(window.localStorage.getItem('ss_guide_dismissed') === '1') } catch {}
+    }
+    check()
+    window.addEventListener('selfscience:guide-changed', check)
+    return () => window.removeEventListener('selfscience:guide-changed', check)
+  }, [])
+  if (!hidden) return null
+  return (
+    <button
+      type="button"
+      onClick={() => { showGuideAgain(); fireToast('Guide reopened') }}
+      className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-ss-teal hover:underline"
+    >
+      <Compass size={12} /> Need help getting started? Reopen the guide →
+    </button>
   )
 }

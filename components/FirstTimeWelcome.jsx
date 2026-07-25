@@ -18,6 +18,14 @@ export default function FirstTimeWelcome() {
   useEffect(() => {
     // Only run in the browser after mount to avoid SSR flashes.
     if (needsOnboarding()) setOpen(true)
+    if (typeof window !== 'undefined') {
+      // Full "Clear & Reset" fires 'selfscience:interests-changed' after
+      // wiping ss_onboarded — re-check so we re-open immediately without
+      // waiting for a full page reload.
+      const onChange = () => { if (needsOnboarding()) setOpen(true) }
+      window.addEventListener('selfscience:interests-changed', onChange)
+      return () => window.removeEventListener('selfscience:interests-changed', onChange)
+    }
   }, [])
 
   if (!open) return null
