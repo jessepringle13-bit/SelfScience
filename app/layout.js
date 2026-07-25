@@ -10,6 +10,7 @@ import HealthStoryQuiz from '@/components/HealthStoryQuiz'
 import JourneyGuide from '@/components/JourneyGuide'
 import Toast from '@/components/Toast'
 import ReadingListToaster from '@/components/ReadingListToaster'
+import AchievementToaster from '@/components/AchievementToaster'
 import FeaturesTracker from '@/components/FeaturesTracker'
 import { NO_FLASH_SCRIPT } from '@/lib/theme'
 
@@ -107,6 +108,7 @@ export default function RootLayout({ children }) {
         <JourneyGuide />
         <Toast />
         <ReadingListToaster />
+        <AchievementToaster />
         <FeaturesTracker />
         <Analytics />
         <ChunkReloader />

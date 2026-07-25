@@ -20,6 +20,7 @@ import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 import { usePillarFilter } from '@/components/PillarFilter'
 import { shouldApplyGoalPillar, markGoalPillarApplied } from '@/lib/userProfile'
+import { markPillarClicked } from '@/lib/achievements'
 import PillarChipBar from '@/components/dashboard/PillarChipBar'
 import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
@@ -71,6 +72,12 @@ export default function Dashboard() {
     // Intentionally only on mount — subsequent pillar changes are user-driven.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Feed the achievements engine every time the active pillar changes.
+  // Additive: does not affect any filter behaviour.
+  useEffect(() => {
+    if (activePillar) markPillarClicked(activePillar)
+  }, [activePillar])
 
   // \u2014 Persist pillar chip to ss_dashboard_pillar_filter and read it back on
   //   first mount if the URL didn't already carry a ?pillar=. The URL is

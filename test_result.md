@@ -7492,3 +7492,106 @@ agent_communication:
         Integrated in WeeklyDigest (3 cards) + VariantInterpretation
         (finding cards). Sweep-later: Search-results cards, Articles
         index, Discover-tab standalone cards.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Achievements + Milestones system
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "20-achievement milestone system with celebration toast + /achievements page"
+    implemented: true
+    working: true
+    file: "/app/lib/achievements.js, /app/components/AchievementToaster.jsx, /app/app/achievements/page.js, /app/app/achievements/achievements-client.jsx, /app/app/layout.js, /app/components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Fully additive achievement/milestone engine. Nothing existing
+            removed.
+
+            PART 1 — 20 achievement defs across 4 tiers
+              T1 First Steps (5): first_upload, first_finding, first_search,
+                first_save, first_pillar
+              T2 Going Deeper (7): five_findings, first_doctor_summary,
+                first_nutrition_scan, first_biomarker, first_drug_check,
+                learning_path_step, first_practitioner_report
+              T3 Committed Explorer (6): all_pillars, ten_findings,
+                three_learning_paths, digest_streak, reading_list_ten,
+                quiz_complete
+              T4 Mastery (2): all_tools, first_note
+              Each has id, name, description, tier, icon (lucide), and a
+              science-context line explaining WHY the action matters.
+
+            PART 2 — storage
+              ss_achievements JSON array of {id, unlockedAt, seen} written
+              by checkAll(). Supporting counters: ss_findings_expanded,
+              ss_first_search, ss_first_doctor_modal, ss_pillars_clicked.
+              Triggers read the app's existing LS keys — no new state
+              plumbing required for most (ss_reading_list,
+              ss_learning_step*_<pillar>, ss_learning_complete_<pillar>,
+              ss_user_profile, ss_features_explored, ss_digest_viewed_*).
+
+            PART 3 — unlock moment
+              <AchievementToaster/> mounted globally in layout.js:
+              • On mount + on ambient app events (variant-expanded,
+                learning-changed, reading-list-changed, profile-changed,
+                digest-viewed-changed, pillar-intro-changed) + window
+                focus → calls checkAll().
+              • checkAll() emits UNLOCK_EVENT per new unlock; toaster
+                queues them, plays a 600ms delay + 350ms slide-in +
+                6s auto-dismiss + 320ms slide-out per card.
+              • prefers-reduced-motion is respected — opacity-only fade,
+                no confetti.
+              • Tier 3 + Tier 4 unlocks trigger a CSS-only confetti
+                burst (12 rects, 4 brand colours, 1.2s animation).
+              • Card structure per spec: eyebrow "ACHIEVEMENT UNLOCKED"
+                (mono 9px ss-green tracking 0.14em) + name + description
+                + dashed-top science-context + View-all link.
+
+            PART 4 — /achievements page
+              Route: /achievements. Grouped by tier with tier-header
+              eyebrow ("X of Y unlocked") + display heading. 4-col grid
+              desktop, 2-col tablet, 1-col mobile. Unlocked cards show
+              green icon + date + science context. Locked T3/T4 show
+              "???" as name; T1/T2 show real name as hint. "NEW" badge
+              on any unlocked-but-not-seen entry. Visiting the page runs
+              markAllSeen().
+
+            Dashboard integration
+              markPillarClicked() fires whenever activePillar changes,
+              earning first_pillar / all_pillars organically.
+
+            Verified via screenshot tool:
+              • Seeded 5 fresh triggers (upload, save, pillar, learning
+                step, quiz) → LS ss_achievements has all 5, IDs match:
+                first_upload, first_save, first_pillar,
+                learning_path_step, quiz_complete.
+              • /achievements renders 20-card grid, progress "5 of 20",
+                First Steps tier "3 of 5 unlocked" with 5 cards
+                (unlocked show DNA/Bookmark/Compass icons + dates +
+                science context; locked show muted icon + "Keep
+                exploring…"), Going Deeper section shows "1 of 7".
+              • markAllSeen() runs on mount — every unlocked record
+                becomes seen: true after page visit (verified).
+              • Dashboard's Nutrition pillar auto-select still works
+                and does not conflict with achievement tracking.
+
+metadata:
+  created_by: "main_agent"
+  version: "2.3"
+  test_sequence: 13
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase M shipped: 20-achievement milestone system. Fully event-
+        driven via existing LS state — no new state plumbing needed for
+        most triggers. Celebration toaster is a single global mount
+        that queues unlocks, respects prefers-reduced-motion, and
+        confetti-bursts for T3/T4. Achievements page groups by 4 tiers
+        with correct unlocked/locked visual states and "???" hiding for
+        higher-tier locked achievements.
