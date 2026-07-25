@@ -31,6 +31,7 @@ import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import ResetGenomeButton from '@/components/ResetGenomeButton'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
+import PopulationContextWidget from '@/components/genome/PopulationContextWidget'
 import {
   addToPractitionerReport,
   isInPractitionerReport,
@@ -385,6 +386,9 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
         )}
 
         {/* Pillar tiles (overview only) */}
+        {mode === 'overview' && (
+          <PopulationContextWidget report={report} className="mb-6" />
+        )}
         {mode === 'overview' && (
           <div className="mb-6 grid grid-cols-2 gap-2 md:grid-cols-5">
             {PILLARS.map((p) => {

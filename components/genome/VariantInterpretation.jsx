@@ -24,6 +24,7 @@ import {
 } from '@/lib/variantInterpretations'
 import ExplainToDoctorButton from '@/components/genome/ExplainToDoctorModal'
 import ShareToCommunityButton from '@/components/community/ShareToCommunityButton'
+import VariantFrequency from '@/components/genome/VariantFrequency'
 import { emitVariantExpanded } from '@/lib/learningPath'
 import SaveButton from '@/components/SaveButton'
 
@@ -39,6 +40,10 @@ export default function VariantInterpretation({ card, className = '' }) {
       // narrow screens (the parent card is `overflow-hidden` by design).
       className={`mt-3 min-w-0 border-t border-dashed border-ss-border-warm/70 pt-3 ${className}`}
     >
+      {/* Population Intelligence — 'how common is this' block. Renders
+          only when we have frequency data for this variant; hides
+          gracefully otherwise. Additive above the interpretation. */}
+      <VariantFrequency card={card} className="!mt-0 !border-t-0 !pt-0" />
       <button
         type="button"
         onClick={() => setOpen((v) => {

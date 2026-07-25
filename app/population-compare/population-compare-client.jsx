@@ -29,6 +29,7 @@ import {
 import SiteNav from '@/components/site-nav'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { collectRawGenotypeRows } from '@/lib/genomeCards'
+import PopulationIntelligencePanel from '@/components/genome/PopulationIntelligencePanel'
 import {
   computeGenotypeStats,
   formatPct,
@@ -158,6 +159,13 @@ export default function PopulationCompareClient() {
               nothing to change on your end.
             </p>
           </div>
+        )}
+
+        {/* Population Intelligence — always renders when a genome is
+            loaded, even if the legacy per-population row table above
+            is empty. It uses its own gnomAD priority data + rarity math. */}
+        {ready && report && (
+          <PopulationIntelligencePanel report={report} />
         )}
 
         {ready && report && rows.length > 0 && (

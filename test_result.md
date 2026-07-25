@@ -7812,9 +7812,51 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "2.9"
-  test_sequence: 19
+  version: "3.0"
+  test_sequence: 20
   run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase Q shipped: Population Intelligence.
+        Files added: lib/ancestryFrequencies.js, components/genome/
+        VariantFrequency.jsx, PopulationContextWidget.jsx,
+        PopulationIntelligencePanel.jsx.
+        Wired: VariantInterpretation.jsx (freq block on every card),
+        GenomeSlicePage.jsx (widget above pillar tiles on overview),
+        population-compare-client.jsx (6-section panel appended below
+        existing 3 views — additive, existing highlights/bars/heatmap
+        untouched).
+
+        Verified via screenshot tool w/ 10 seeded variants:
+        • Every card now shows 'HOW COMMON IS THIS' block with global
+          bar, genotype, %, plain-English rarity sentence, gnomAD
+          source note, expandable ancestry breakdown (8 populations).
+        • Genome overview widget shows correct rare/moderate/common
+          counts (1/8/1 for test data) with 'Explore population data'
+          link.
+        • Population-compare page renders all 6 new sections:
+          Section 1 — dot plot (10 colored dots at correct X-positions)
+                     + 3 summary stats + interpretation sentence.
+          Section 2 — variant-by-variant table sorted rarest-first;
+                     sort chips (Rarest / Pillar / A-Z) present.
+          Section 3 — educational explanation + big 1-in-100,000
+                     combination probability estimate.
+          Section 4 — ancestry explorer dropdown; selecting PPARA
+                     renders 8-population horizontal bar chart with
+                     correct percentages (85/70/68/71/74/72/69/70).
+          Section 5 — 3 rarest distinctive cards (MTNR1B 12%, ACTN3
+                     18%, COL5A1 23%) with 'RARER THAN MOST' badge +
+                     Learn more links + share-to-community affordance
+                     (opted-in only).
+          Section 6 — FAQ accordion with 4 questions.
+        • Top disclaimer banner + Print button rendered.
+        • Print CSS scoped: nav/FAB/guide/toasters hidden, FAQ auto-
+          expands, dot plot swapped for text summary.
+        • ZERO existing population-compare functionality removed;
+          Highlights / Bar Chart / Heatmap views still work exactly
+          as before.
 
 agent_communication:
     - agent: "main"
