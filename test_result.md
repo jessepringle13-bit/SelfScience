@@ -3447,6 +3447,79 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Discover tab research fix — plain-language PubMed queries + Retry empty state"
+    implemented: true
+    working: true
+    file: |
+      /app/app/api/pubmed-search/route.js,
+      /app/components/dashboard/DiscoverFeed.jsx (REWRITTEN),
+      /app/lib/variantQueries.js (NEW)
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Root cause of the "3 empty sections" bug: DiscoverFeed called
+          fetchMatchedResearch({ genes: topGenes, limit: 24 }) — but that
+          helper's signature is fetchMatchedResearch(genes, options) and
+          it returns a Map, not an array. The wrapper then ran
+          Array.isArray(Map) === false → set papers=[], so every
+          downstream section rendered blank.
+
+          Fixes applied:
+
+          1) NEW /app/lib/variantQueries.js — curated rsID → plain-
+             English PubMed query map (25+ variants covering MTHFR,
+             ACTN3, PPARGC1A, COL5A1, MTNR1B, PPARA, FKBP5, CYP2D6/
+             CYP2C19, VKORC1, OPRM1, COMT, APOE, FTO, TCF7L2, FADS1
+             etc.) + a per-pillar broad-query map (nutrigenomics,
+             pharmacogenomics, longevity, exercise, neurotransmitter,
+             circadian, etc.). PubMed does not match raw rsIDs; every
+             query is now plain-language.
+
+          2) EXTENDED /app/app/api/pubmed-search/route.js:
+             - Accepts ?q=<plain-language> in addition to ?gene=<symbol>.
+             - Accepts optional ?days=<n> for recency-window queries.
+             - Emits pubDate (ISO) so the client can filter by date.
+             - Emits id + url + source for consistent card rendering.
+
+          3) REWROTE /app/components/dashboard/DiscoverFeed.jsx:
+             - "Trending in your pillars" fans out per-pillar plain-
+               language queries with a 180-day window; falls back to
+               window-less if empty.
+             - "New this month" uses the OR-join of the user's top-5
+               variant plain-language queries with a 90-day window;
+               falls back to window-less sorted by pubDate.
+             - "Based on your <variant>" runs the variantQueryMap
+               entry for the featured awareness variant.
+             - Full-width ResearchLoadingCard + per-section
+               InlineEmptyState both use a FlaskConical icon +
+               explanation + Retry button + "Results pull from PubMed
+               — check your connection" reassurance. Blank cards are
+               gone.
+
+          Verified with a real MTHFR compound-het (rs1801133 AG +
+          rs1801131 GT) + COMT + APOE genome at 1280px and 375px:
+          - Trending: 6 real 2026 papers from Neuroscience &
+            Biobehavioral Reviews, AJMG, Stem Cell Research & Therapy,
+            Molecular Biology Reports, Frontiers in Pharmacology, etc.
+          - New this month (90-day): 3 real APOE / CETP / cardio
+            papers.
+          - Based on your MTHFR: 3 papers ("MTHFR and MTRR
+            Polymorphisms Predict Sex-Dependent Psychotic Symptom
+            Improvements", "Genotype Combinations and Genetic Risk
+            Score Analyses of MTHFR, MTRR, and MTR Polymorphisms in
+            Hypothyroidism", "LINE-1 Methylation Status in Multiple
+            Sclerosis Patients").
+          - Clinical trials: 4 real trials including MTHFR + COMT +
+            OPRM1 trials.
+          - Retry state confirmed via the earlier 6-second wait
+            (surface-tested; buttons render with correct icon +
+            reassurance line).
+
+
   - task: "Wayfinding Phase C — Plain-English gene explainers + tech-terms toggle"
     implemented: true
     working: true
