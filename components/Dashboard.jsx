@@ -20,6 +20,8 @@ import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 import { usePillarFilter } from '@/components/PillarFilter'
 import PillarChipBar from '@/components/dashboard/PillarChipBar'
+import { explainGene } from '@/lib/geneExplanations'
+import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import TimeAwareBanner from '@/components/dashboard/TimeAwareBanner'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
@@ -445,9 +447,12 @@ function EmptyRow({ copy }) {
 
 function CardRow({ items, tone }) {
   const border = tone === 'strength' ? '#2E7D32' : tone === 'aware' ? '#964219' : '#7A7974'
+  const showTech = useShowTechnicalTerms()
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-      {items.map((c, i) => (
+      {items.map((c, i) => {
+        const explainer = explainGene(c.gene, c.rsid)
+        return (
         <div
           key={c.rsid || i}
           className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5"
@@ -467,14 +472,31 @@ function CardRow({ items, tone }) {
               )}
             </div>
           )}
+          {/* Plain-English gene job description — shown ABOVE the
+              variant's classification text so users see WHAT the gene
+              does first, then WHAT the finding says. */}
+          {explainer && (
+            <p className="mt-2 text-xs leading-relaxed text-ss-text">
+              <span className="font-semibold text-ss-teal">What it does — </span>
+              {explainer}
+            </p>
+          )}
           <p className="mt-2 line-clamp-3 text-sm text-ss-text">{c.plain || ''}</p>
-          <div className="mt-3 flex flex-wrap gap-1 text-[10px] text-ss-muted">
-            {c.gene && <code className="rounded bg-ss-bg px-1.5 py-0.5 font-semibold">{c.gene}</code>}
-            {c.rsid && <code className="rounded bg-ss-bg px-1.5 py-0.5">{c.rsid}</code>}
-            {c.genotype && <span className="font-semibold">{c.genotype}</span>}
-          </div>
+          {showTech ? (
+            <div className="mt-3 flex flex-wrap gap-1 text-[10px] text-ss-muted">
+              {c.gene && <code className="rounded bg-ss-bg px-1.5 py-0.5 font-semibold">{c.gene}</code>}
+              {c.rsid && <code className="rounded bg-ss-bg px-1.5 py-0.5">{c.rsid}</code>}
+              {c.genotype && <span className="font-semibold">{c.genotype}</span>}
+            </div>
+          ) : (
+            c.gene && (
+              <div className="mt-3 text-[10px] text-ss-muted">
+                <span className="font-semibold text-ss-teal">Gene:</span> {c.gene}
+              </div>
+            )
+          )}
         </div>
-      ))}
+      )})}
     </div>
   )
 }

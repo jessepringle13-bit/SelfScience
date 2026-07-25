@@ -26,6 +26,8 @@ import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 import { normalizePillarName } from '@/lib/pillars'
 import { getPopulationFrequency } from '@/lib/populationFrequencies'
+import { explainGene } from '@/lib/geneExplanations'
+import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import {
   addToPractitionerReport,
@@ -111,6 +113,7 @@ function narrativeForMode(mode, cards) {
 
 function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
   const router = useRouter()
+  const showTech = useShowTechnicalTerms()
   const [inReport, setInReport] = useState(false)
   useEffect(() => {
     const id = String(card.rsid || card.id || '')
@@ -126,6 +129,33 @@ function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
   const pillar = normalizePillarName(card.pillar || '')
   const geneLabel = (card.gene || card.rsid || 'Variant').split(/[\s(/·+,]/)[0]
   const description = card.classification_text || card.summary || card.description || ''
+  // NEW (Phase C · gene explanations): plain-English "what this gene
+  // is responsible for" one-liner. Only rendered when the card has NO
+  // classification_text of its own — otherwise the card would carry
+  // two overlapping descriptions.
+  const geneExplainer = !description ? explainGene(card.gene, card.rsid) : null
+
+  // Genotype label — friendlier in plain-English mode.
+  //   AA / GG / CC / TT   → "Two copies"
+  //   AG / CT / AC / etc. → "One copy"
+  //   val_val / met_met   → "Two copies (val/met)"
+  //   Falls back to the raw genotype string if we can't classify.
+  const rawGenotype = card.genotype || ''
+  const genotypeLabel = (() => {
+    if (!rawGenotype) return ''
+    if (showTech) return rawGenotype
+    const g = String(rawGenotype).trim()
+    // Simple 2-letter genotype ("AA", "AG", ...).
+    if (/^[ACGT]{2}$/i.test(g)) {
+      return g[0].toUpperCase() === g[1].toUpperCase() ? 'Two copies of this variant' : 'One copy of this variant'
+    }
+    // Compound / functional genotype like "val_val", "ε4/ε4".
+    const parts = g.split(/[_/]/).filter(Boolean)
+    if (parts.length === 2) {
+      return parts[0].toLowerCase() === parts[1].toLowerCase() ? 'Two copies of this variant' : 'One copy of this variant'
+    }
+    return g
+  })()
 
   const borderClass = bucket === 'strength'  ? 'border-l-ss-green'
                     : bucket === 'awareness' ? 'border-l-ss-amber'
@@ -157,11 +187,31 @@ function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
             </span>
           </div>
           <h3 className="mt-2 text-lg font-extrabold leading-snug text-ss-text">{geneLabel}</h3>
+          {/* Gene explainer (Phase C) — plain-English one-liner
+              describing what this gene DOES. Only shown when the card
+              doesn't carry its own classification_text, so we never
+              stack two descriptions. */}
+          {geneExplainer && (
+            <p className="mt-1 text-sm leading-relaxed text-ss-text">
+              <span className="font-semibold text-ss-teal">What it does — </span>
+              {geneExplainer}
+            </p>
+          )}
           {description && <p className="mt-1 text-sm leading-relaxed text-ss-muted">{description}</p>}
           {freq && <p className="mt-2 text-[11px] italic text-ss-muted">{freq}</p>}
-          <p className="mt-1 font-mono text-[10px] text-ss-muted">
-            {card.rsid || '—'}{card.genotype ? ` · ${card.genotype}` : ''}
-          </p>
+          {/* Plain-English genotype line. In "Show technical terms" mode
+              we swap to the raw rsID · genotype string. */}
+          {showTech ? (
+            <p className="mt-1 font-mono text-[10px] text-ss-muted">
+              {card.rsid || '—'}{card.genotype ? ` · ${card.genotype}` : ''}
+            </p>
+          ) : (
+            genotypeLabel && (
+              <p className="mt-2 text-[11px] text-ss-muted">
+                <span className="font-semibold text-ss-teal">Your gene version:</span> {genotypeLabel}
+              </p>
+            )
+          )}
           {otherPillarHasContent && (
             <button
               type="button"

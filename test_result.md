@@ -3447,6 +3447,72 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Wayfinding Phase C — Plain-English gene explainers + tech-terms toggle"
+    implemented: true
+    working: true
+    file: |
+      /app/components/site-nav.jsx,
+      /app/components/Dashboard.jsx,
+      /app/components/genome/GenomeSlicePage.jsx,
+      /app/components/PrefsMenu.jsx (NEW),
+      /app/lib/geneExplanations.js (NEW),
+      /app/lib/uiPrefs.js (NEW)
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Shipped Phase C of the wayfinding backlog plus the emergent
+          "explain what each gene does" request.
+
+          NEW /app/lib/geneExplanations.js — a curated map of ~85
+          genes → plain-English "what it does" one-liners
+          (functional-not-molecular, ≤22 words, verb-first). Also maps
+          40+ common rsIDs → gene so variant cards that only carry an
+          rsID still get their explanation. explainGene(gene, rsid)
+          returns null when nothing is available so the caller hides
+          the row gracefully.
+
+          NEW /app/lib/uiPrefs.js — SSR-safe read/write for the
+          ss_show_tech_terms preference plus useShowTechnicalTerms()
+          React hook that updates cross-component via the
+          'selfscience:prefs-changed' event.
+
+          NEW /app/components/PrefsMenu.jsx — small gear-icon dropdown
+          in the site header with the "Show technical terms" toggle.
+          Click / touch outside / Escape closes. Rendered on both
+          desktop AND mobile (right of the header's other controls).
+
+          UPDATED /app/components/site-nav.jsx — imports PrefsMenu and
+          renders it in the top-right end-of-nav group.
+
+          UPDATED /app/components/genome/GenomeSlicePage.jsx VariantCard:
+          - "What it does — <plain-English gene job>" line now renders
+            when the card has no classification_text of its own.
+          - Genotype line swaps between plain English ("Your gene
+            version: Two copies of this variant") and the raw rsID ·
+            genotype code (rs4680 · val_val) based on the toggle.
+
+          UPDATED /app/components/Dashboard.jsx CardRow (Top Findings +
+          Strengths quick previews):
+          - "What it does — <explainer>" line added.
+          - Gene / rsID / genotype chips only render in technical mode;
+            plain mode just shows "Gene: <name>".
+
+          Verified via screenshots at 375px + 1280px on /genome/strengths:
+          - Each variant card shows a green "What it does — …" line
+            (CYP2D6, COMT, ANK3, BDNF, DRD2, ACTN3, PPARA, etc.)
+          - Plain-English genotype label ("Two copies of this variant")
+            shown by default
+          - Gear icon opens the PrefsMenu; toggling "Show technical
+            terms" switches cards to rs4680 · val_val + monospaced code
+            chips
+          - Mobile header still shows the gear icon; cards remain
+            readable and single-column at 375px
+
+
   - task: "Wayfinding Phase B — Persistent JourneyGuide + Reusable EmptyStatePrompt"
     implemented: true
     working: true

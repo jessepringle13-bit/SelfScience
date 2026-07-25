@@ -27,6 +27,7 @@ import {
   Award,
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
+import PrefsMenu from '@/components/PrefsMenu'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -355,7 +356,13 @@ export function SiteNav({ variant = 'light' }) {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Support pill \u2014 links to /support which lists Buy Me a Coffee +
+          {/* Display prefs (Phase C) — small gear menu with the
+              "Show technical terms" toggle. Kept adjacent to the
+              other end-of-nav controls so it's discoverable but not
+              shouty. Visible on both desktop and mobile so mobile
+              users can toggle without opening the drawer. */}
+          <PrefsMenu isDark={isDark} />
+          {/* Support pill — links to /support which lists Buy Me a Coffee +
               other ways to help. Replaces the standalone Donate button; a
               single call-to-action reduces nav clutter on both desktop
               and mobile. */}
