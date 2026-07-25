@@ -8,18 +8,20 @@
 // Click / touch outside or Escape closes the menu.
 
 import { useEffect, useRef, useState } from 'react'
-import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X } from 'lucide-react'
+import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useShowTechnicalTerms, setShowTechnicalTerms } from '@/lib/uiPrefs'
 import { resetGuideOnly, showGuideAgain, resetGenomeAndGuide, fireToast } from '@/lib/journeyReset'
 import ThemeToggle from '@/components/ThemeToggle'
 import { openHealthStoryQuiz } from '@/lib/userProfile'
+import { useCommunityState } from '@/lib/community'
 
 export default function PrefsMenu({ isDark = false }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const showTech = useShowTechnicalTerms()
+  const { optedIn: communityOptedIn } = useCommunityState()
   const wrapRef = useRef(null)
 
   // Close on outside click / Escape
@@ -114,6 +116,14 @@ export default function PrefsMenu({ isDark = false }) {
 
           {/* Guide actions (Parts 2 + 3) */}
           <div className="border-t border-ss-border-warm/60">
+            {communityOptedIn && (
+              <MenuItem
+                Icon={Users}
+                label="Community Settings"
+                hint="Manage your display name and shares"
+                onClick={() => { setOpen(false); router.push('/community/settings') }}
+              />
+            )}
             <MenuItem
               Icon={Compass}
               label="Show getting started guide"

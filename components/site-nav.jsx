@@ -280,6 +280,8 @@ export function SiteNav({ variant = 'light' }) {
 
           <ReadingListNavLink linkClass={linkClass('/reading-list')} />
 
+          <a href="/community" className={linkClass('/community')}>Community</a>
+
           {/* Tools dropdown — consolidates Biomarkers / Training / Drug Check /
               Populations / Ancestry so the desktop nav doesn't get crowded. */}
           <div className="relative" ref={toolsRef}>
@@ -464,6 +466,7 @@ export function SiteNav({ variant = 'light' }) {
               </div>
             </details>
             <a href="/reading-list" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Reading List</a>
+            <a href="/community" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Community</a>
 
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">About</div>
             <a href="/about"        onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">About</a>

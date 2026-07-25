@@ -38,6 +38,7 @@ import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
 import JournalWidget from '@/components/dashboard/JournalWidget'
 import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
+import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -294,6 +295,9 @@ export default function Dashboard() {
         {/* Phase D · Part 5 — sample-to-real transition banner (auto-
             renders only when the transition is detected). */}
         <RealGenomeBanner />
+
+        {/* Community opt-in banner (gated by First Insight + 3 findings + 2+ sessions). */}
+        <CommunityOptInBanner />
 
         {/* Phase D · Part 4 — journey progress bar. */}
         <FeaturesProgressBar />
