@@ -78,7 +78,7 @@ export async function GET(request) {
     pageSize: '50',
     countTotal: 'true',
     fields:
-      'protocolSection.identificationModule,protocolSection.statusModule,protocolSection.designModule,protocolSection.conditionsModule',
+      'protocolSection.identificationModule,protocolSection.statusModule,protocolSection.designModule,protocolSection.conditionsModule,protocolSection.contactsLocationsModule',
   })
 
   const data = await fetchJson(`${CT_BASE}?${params.toString()}`)
@@ -106,6 +106,18 @@ export async function GET(request) {
     const startDate = p.statusModule?.startDateStruct?.date || null
     const year = startDate ? parseInt(String(startDate).slice(0, 4), 10) || null : null
 
+    // Additive: expose site locations so downstream features (e.g.
+    // the Weekly Digest) can filter by geography. Keep it lightweight
+    // (max 6 sites) to avoid ballooning the payload.
+    const rawLocs = Array.isArray(p?.contactsLocationsModule?.locations)
+      ? p.contactsLocationsModule.locations
+      : []
+    const locations = rawLocs.slice(0, 6).map((l) => ({
+      city: l?.city || '',
+      state: l?.state || '',
+      country: l?.country || '',
+    }))
+
     if (RECRUITING_STATUSES.has(status)) recruiting++
     else if (COMPLETED_STATUSES.has(status)) completed++
     else if (TERMINATED_STATUSES.has(status)) terminated++
@@ -117,6 +129,7 @@ export async function GET(request) {
       status,
       phase,
       year,
+      locations,
       url: nctId
         ? `https://clinicaltrials.gov/study/${nctId}`
         : 'https://clinicaltrials.gov',

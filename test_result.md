@@ -6931,3 +6931,81 @@ agent_communication:
         variant gets pillar-aware dynamic questions. Copy-to-clipboard,
         Add-to-Practitioner-Report, and Close actions all working. Mobile
         bottom sheet verified at 375px with zero horizontal overflow.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): "This Week for Your Genome" weekly digest
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "This Week for Your Genome — weekly-refreshing 3-card dashboard section"
+    implemented: true
+    working: true
+    file: "/app/lib/weeklyDigest.js, /app/components/dashboard/WeeklyDigest.jsx, /app/components/Dashboard.jsx, /app/app/api/clinical-trials/gene/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Added additive dashboard section between "Your Strengths" and
+            "Explore Your Pillars" — nothing existing removed.
+
+            THREE CARDS
+              1. NEW RESEARCH — real PubMed paper for the user's top variants.
+                 Uses the 13-entry VARIANT_QUERY_MAP so PubMed gets plain-English
+                 queries instead of raw rsIDs. Escalation: 7-day window → 30-day
+                 window → no window. Never shows an empty card (fallback CTA).
+              2. DID YOU KNOW — rotating snippet. 8 curated rsIDs (MTHFR, PPARGC1A,
+                 COL5A1, MTNR1B, PPARA, FKBP5, FADS1, SIRT1) get the exact
+                 hand-written copy from spec; every other variant gets a
+                 dynamic fallback built from confidence + classification_text.
+                 Rotation is deterministic per ISO week.
+              3. CLINICAL TRIAL — recruiting-only trial ranked by location
+                 preference: Wisconsin → IL/MN/IA/MI → US → other. Falls back
+                 to a "Coming Soon" panel if nothing recruits. Extended the
+                 existing /api/clinical-trials/gene endpoint to include a
+                 `locations[]` field (additive, non-breaking) so we can rank.
+
+            CACHE + REFRESH
+              • ss_digest_last_refreshed (ISO) — refresh trigger
+              • ss_digest_cache (JSON payload) — stores paper + trial
+              • Fresh (< 7 days): render cached content instantly
+              • Stale or missing: fetch fresh; show skeleton shimmer during fetch
+              • On fetch failure: fall back to cache; if no cache, subtle
+                "Check your connection" note under the cards
+
+            UI
+              • Eyebrow + heading + subheading per spec (mono 11px, 1.6rem
+                display, 0.91rem subheading)
+              • Section wrapper: rgba warm-bg tint, ring-1, rounded-[20px]
+              • Cards: white bg, rounded-2xl, border, flex-col with matched-
+                variant chip + action link pushed to bottom (mt-auto)
+              • Skeleton: 3 shimmer blocks per card using Tailwind animate-pulse
+              • Footer: "Updated weekly · Matched to your top variants ·
+                Powered by PubMed and ClinicalTrials.gov" (mono 10px, centered)
+
+            Verified via screenshot tool:
+              • 1280px desktop: 3-column grid with real MTNR1B PubMed paper
+                (Diabetes Care 2026), curated MTNR1B Did You Know snippet,
+                real RECRUITING Omega-3 trial (Tucson, AZ, Phase 2, NCT07078344)
+              • 375px mobile: single-column stacked layout. Digest section
+                scrollWidth === 311 (no horizontal overflow). Page-level
+                overflow of 50px is the pre-existing PillarChipBar
+                horizontal-scroll strip, not our new section.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.7"
+  test_sequence: 7
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase G shipped: "This Week for Your Genome" weekly digest section
+        added between Top Findings/Strengths and Explore Your Pillars.
+        Real PubMed + real ClinicalTrials.gov data + curated Did You Know
+        bank. Cache-first with 7-day refresh. Skeleton shimmer during
+        fetch. Extended /api/clinical-trials/gene (additive) to expose
+        study locations so we can rank by geography.

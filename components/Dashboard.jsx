@@ -32,6 +32,7 @@ import StackQualityWidget from '@/components/supplements/StackQualityWidget'
 import OnboardingTour from '@/components/dashboard/OnboardingTour'
 import PostUploadOrientation from '@/components/PostUploadOrientation'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
+import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -302,6 +303,15 @@ export default function Dashboard() {
               label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
             />
           </DashSection>
+        </div>
+
+        {/* 2.5 THIS WEEK FOR YOUR GENOME — additive weekly digest with
+             three cards (New Research · Did You Know · Clinical Trial).
+             Renders below Top Findings + Strengths and above the
+             pillar grid, per product spec. Fully client-side; no
+             existing dashboard content is changed. */}
+        <div data-tour-target="weekly-digest">
+          <WeeklyDigest report={report} />
         </div>
 
         {/* 3. YOUR PILLARS (merged: was "Pillar Score Overview" + "Explore Your Pillars")
