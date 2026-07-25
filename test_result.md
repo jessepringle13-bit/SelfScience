@@ -3447,6 +3447,65 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "Phase D · Parts 4-6 — Journey progress, Real-genome banner, Guide tooltips"
+    implemented: true
+    working: true
+    file: |
+      /app/lib/featuresExplored.js (NEW),
+      /app/components/FeaturesTracker.jsx (NEW),
+      /app/components/FeaturesProgressBar.jsx (NEW),
+      /app/components/RealGenomeBanner.jsx (NEW),
+      /app/components/JourneyGuide.jsx,
+      /app/components/Dashboard.jsx,
+      /app/app/layout.js
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          PART 4 — Journey progress bar:
+          - featuresExplored.js: 11-feature registry + LS-backed
+            (ss_features_explored) + useFeaturesExplored() hook + event
+            'selfscience:features-changed'.
+          - FeaturesTracker: mounted in root layout, watches
+            usePathname + ?tab=discover and calls markFeatureExplored()
+            for the matching feature.
+          - FeaturesProgressBar: rendered on Dashboard directly under
+            the welcome header. "N of 11 features explored" mono text,
+            ss-green fill on a rounded track, "Continue exploring →"
+            button that links to the next-unvisited feature. Stacks
+            on mobile via md:flex-row / flex-col.
+
+          PART 5 — Sample-to-real genome banner:
+          - RealGenomeBanner mounted at top of Dashboard. Watches
+            'selfscience:genome-changed'. Recognises a sample report
+            via `sampleData === true` OR `session_id` starting with
+            "sample" and sets ss_seen_sample. When a subsequent
+            NON-sample report loads, sets ss_seen_real_upload and
+            renders once. X dismiss writes
+            ss_real_genome_banner_dismissed = '1' — banner never
+            re-fires.
+
+          PART 6 — [?] tooltips on Guide steps:
+          - TIER1_STEPS + TIER2_STEPS now carry a `tooltip` field
+            (spec copy verbatim for all 11 steps).
+          - StepList renders a small `?` button next to each step
+            that opens a right-aligned bubble ABOVE the icon
+            (bottom-full + mb-2) so it never clips a mobile sheet.
+          - Hover on desktop, tap on mobile. Click-away / tap-away
+            closes via a document-level click listener.
+
+          Verified visually on dashboard at 1280px:
+          - "YOUR SELFSCIENCE JOURNEY" + progress bar + "3 of 11
+            features explored" + "Continue exploring →" all render.
+          - Real-genome banner (green pill with checkmark + X) shows
+            when sample→real transition detected.
+          - Tooltip [?] icons render on every Tier 1 step; hover
+            opens the 220px bubble with correct copy.
+
+
   - task: "Phase D · Parts 1-3 — Genome reset, Guide restart, Show Guide again"
     implemented: true
     working: true

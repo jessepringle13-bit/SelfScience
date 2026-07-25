@@ -8,6 +8,7 @@ import BookmarkToast from '@/components/BookmarkToast'
 import FirstTimeWelcome from '@/components/FirstTimeWelcome'
 import JourneyGuide from '@/components/JourneyGuide'
 import Toast from '@/components/Toast'
+import FeaturesTracker from '@/components/FeaturesTracker'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
 
@@ -93,6 +94,7 @@ export default function RootLayout({ children }) {
         <FirstTimeWelcome />
         <JourneyGuide />
         <Toast />
+        <FeaturesTracker />
         <Analytics />
         <ChunkReloader />
       </body>

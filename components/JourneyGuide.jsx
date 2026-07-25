@@ -47,11 +47,11 @@ const EXCLUDED_PATH_PREFIXES = [
 
 // Tier 1 — Getting Started (unchanged from the previous version)
 const TIER1_STEPS = [
-  { key: 'upload',      Icon: Upload,     label: 'Upload your genome file',            href: '/genome' },
-  { key: 'findings',    Icon: Star,       label: 'Review your top 3 findings',         href: '/genome/findings' },
-  { key: 'nutrition',   Icon: Apple,      label: 'Check your nutrition matches',       href: '/nutrition' },
-  { key: 'supplements', Icon: Pill,       label: 'See your supplement suggestions',    href: '/tools/supplements' },
-  { key: 'profile',     Icon: LayoutGrid, label: 'Explore your full health profile',   href: '/' },
+  { key: 'upload',      Icon: Upload,     label: 'Upload your genome file',            href: '/genome',            tooltip: 'This unlocks personalized results across every tool on the site.' },
+  { key: 'findings',    Icon: Star,       label: 'Review your top 3 findings',         href: '/genome/findings',   tooltip: 'See the variants that matter most for your health right now.' },
+  { key: 'nutrition',   Icon: Apple,      label: 'Check your nutrition matches',       href: '/nutrition',         tooltip: 'Discover which foods work with or against your specific genes.' },
+  { key: 'supplements', Icon: Pill,       label: 'See your supplement suggestions',    href: '/tools/supplements', tooltip: 'Get research-backed supplement ideas matched to your biology.' },
+  { key: 'profile',     Icon: LayoutGrid, label: 'Explore your full health profile',   href: '/',                  tooltip: 'See your complete genetic picture across all 9 health areas.' },
 ]
 
 // Tier 2 — Go Deeper (new). Each step now completes on a REAL action
@@ -61,14 +61,12 @@ const TIER1_STEPS = [
 // fallback for the /articles slug pages where landing on the page IS
 // the action (reading an article).
 const TIER2_STEPS = [
-  { key: 'search',       Icon: Search,     label: 'Search the research for one of your genes',   hint: 'Tap a gene chip on the Search page and read a study',      href: '/search',                matchPath: () => false },
-  { key: 'scanner',      Icon: ScanLine,   label: 'Scan a food product with your camera',        hint: 'Open Nutrition Hub → Scanner tab → point at any barcode', href: '/nutrition?tab=scanner', matchPath: () => false },
-  { key: 'drugcheck',    Icon: Pill,       label: 'Check a medication against your genome',      hint: 'Look up how your genes affect a specific drug',            href: '/drug-check',            matchPath: () => false },
-  { key: 'biomarkers',   Icon: TestTube2,  label: 'Build your biomarker picture',                 hint: 'Log one blood result — HDL, Vitamin D, or HbA1c',          href: '/biomarkers',            matchPath: () => false },
-  { key: 'report',       Icon: FileText,   label: 'Generate your Practitioner Report',            hint: 'Create a print-ready sheet to share with your doctor',     href: '/practitioner-report',   matchPath: () => false },
-  // Landing on an actual article slug (not the /articles index) IS the
-  // real action — cheap to detect via pathname, no need for extra wiring.
-  { key: 'articles',     Icon: BookOpen,   label: 'Read an article in your top pillar',           hint: 'Browse staff-written explainers matched to your biology',  href: '/articles',              matchPath: (p) => /^\/articles\/[^/]+/.test(p) },
+  { key: 'search',       Icon: Search,     label: 'Search the research for one of your genes',   hint: 'Tap a gene chip on the Search page and read a study',      href: '/search',                matchPath: () => false, tooltip: 'Read the actual published studies behind your results.' },
+  { key: 'scanner',      Icon: ScanLine,   label: 'Scan a food product with your camera',        hint: 'Open Nutrition Hub → Scanner tab → point at any barcode', href: '/nutrition?tab=scanner', matchPath: () => false, tooltip: 'Grade any food against your genome in real time.' },
+  { key: 'drugcheck',    Icon: Pill,       label: 'Check a medication against your genome',      hint: 'Look up how your genes affect a specific drug',            href: '/drug-check',            matchPath: () => false, tooltip: 'See if your genes affect how you process common drugs.' },
+  { key: 'biomarkers',   Icon: TestTube2,  label: 'Build your biomarker picture',                 hint: 'Log one blood result — HDL, Vitamin D, or HbA1c',          href: '/biomarkers',            matchPath: () => false, tooltip: 'Connect your blood work to your genetic findings.' },
+  { key: 'report',       Icon: FileText,   label: 'Generate your Practitioner Report',            hint: 'Create a print-ready sheet to share with your doctor',     href: '/practitioner-report',   matchPath: () => false, tooltip: 'Create a document your doctor can actually use.' },
+  { key: 'articles',     Icon: BookOpen,   label: 'Read an article in your top pillar',           hint: 'Browse staff-written explainers matched to your biology',  href: '/articles',              matchPath: (p) => /^\/articles\/[^/]+/.test(p), tooltip: 'Plain-English explainers written for your health areas.' },
 ]
 
 function readSet(key) {
@@ -480,48 +478,90 @@ function TransitionBanner() {
 function StepList({ steps, done, nextKey, onClickStep, withHint = false }) {
   return (
     <ol className="space-y-2">
-      {steps.map(({ key, Icon, label, href, hint }) => {
+      {steps.map(({ key, Icon, label, href, hint, tooltip }) => {
         const isDone = done.has(key)
         const isNext = key === nextKey
         return (
           <li key={key}>
-            <Link
-              href={href}
-              onClick={() => onClickStep(key)}
-              className={`flex items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+            <div
+              className={`group flex items-start gap-3 rounded-lg pr-2 text-sm transition ${
                 isDone
-                  ? 'bg-ss-green/5 text-ss-muted line-through'
+                  ? 'bg-ss-green/5 text-ss-muted'
                   : isNext
                     ? 'border-l-[3px] border-ss-green bg-ss-green/8 pl-2 font-semibold text-ss-teal'
                     : 'text-ss-teal hover:bg-ss-bg'
               }`}
             >
-              <span
-                aria-hidden="true"
-                className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
-                  isDone ? 'bg-ss-green text-white' : isNext ? 'bg-white ring-1 ring-ss-green text-ss-green' : 'bg-white ring-1 ring-ss-border-warm text-ss-muted'
-                }`}
+              <Link
+                href={href}
+                onClick={() => onClickStep(key)}
+                className={`flex min-w-0 flex-1 items-start gap-3 px-3 py-2.5 ${isDone ? 'line-through' : ''}`}
               >
-                {isDone ? <Check size={12} strokeWidth={3} /> : <Icon size={12} />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block">{label}</span>
-                {withHint && hint && !isDone && (
-                  <span className="mt-0.5 block text-[10.5px] font-normal leading-snug text-ss-muted no-underline">
-                    {hint}
-                  </span>
-                )}
-              </span>
-              <span className={`self-center text-[10.5px] font-semibold uppercase tracking-wider ${
+                <span
+                  aria-hidden="true"
+                  className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
+                    isDone ? 'bg-ss-green text-white' : isNext ? 'bg-white ring-1 ring-ss-green text-ss-green' : 'bg-white ring-1 ring-ss-border-warm text-ss-muted'
+                  }`}
+                >
+                  {isDone ? <Check size={12} strokeWidth={3} /> : <Icon size={12} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block">{label}</span>
+                  {withHint && hint && !isDone && (
+                    <span className="mt-0.5 block text-[10.5px] font-normal leading-snug text-ss-muted no-underline">
+                      {hint}
+                    </span>
+                  )}
+                </span>
+              </Link>
+              {tooltip && <StepTooltip content={tooltip} />}
+              <span className={`self-center pl-1 text-[10.5px] font-semibold uppercase tracking-wider ${
                 isDone ? 'text-ss-green' : isNext ? 'text-ss-green' : 'text-ss-muted'
               }`}>
                 {isDone ? 'Done' : 'View →'}
               </span>
-            </Link>
+            </div>
           </li>
         )
       })}
     </ol>
+  )
+}
+
+// Small [?] icon + tooltip bubble. Desktop hover, mobile tap. Positions
+// above the icon so we don't clip off the bottom of a mobile sheet.
+function StepTooltip({ content }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => {
+      // Close on any click / tap outside the tooltip anchor.
+      if (!e.target.closest?.('[data-ss-tooltip]')) setOpen(false)
+    }
+    document.addEventListener('click', onDown)
+    return () => document.removeEventListener('click', onDown)
+  }, [open])
+  return (
+    <span data-ss-tooltip className="relative flex self-center">
+      <button
+        type="button"
+        aria-label={`Why this matters — ${content}`}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v) }}
+        className="flex h-6 w-6 items-center justify-center rounded-full text-[13px] font-bold text-ss-muted transition hover:bg-white hover:text-ss-teal"
+      >
+        ?
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute bottom-full right-0 z-30 mb-2 w-[220px] rounded-lg border border-ss-border-warm bg-white p-2 px-3 text-left text-[0.82rem] font-normal leading-snug text-ss-text shadow-lg"
+        >
+          {content}
+        </span>
+      )}
+    </span>
   )
 }
 

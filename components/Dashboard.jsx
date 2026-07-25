@@ -23,6 +23,8 @@ import PillarChipBar from '@/components/dashboard/PillarChipBar'
 import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import ResetGenomeButton from '@/components/ResetGenomeButton'
+import FeaturesProgressBar from '@/components/FeaturesProgressBar'
+import RealGenomeBanner from '@/components/RealGenomeBanner'
 import TimeAwareBanner from '@/components/dashboard/TimeAwareBanner'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
@@ -254,6 +256,13 @@ export default function Dashboard() {
             </Link>
           </div>
         </div>
+
+        {/* Phase D · Part 5 — sample-to-real transition banner (auto-
+            renders only when the transition is detected). */}
+        <RealGenomeBanner />
+
+        {/* Phase D · Part 4 — journey progress bar. */}
+        <FeaturesProgressBar />
 
         {/* Horizontal, scrollable pillar chip bar. Replaces the older
             dropdown filter per Section 2 spec. Persisted to both the URL
