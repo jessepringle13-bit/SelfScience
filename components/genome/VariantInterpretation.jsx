@@ -23,6 +23,7 @@ import {
   getConfidenceMeta,
 } from '@/lib/variantInterpretations'
 import ExplainToDoctorButton from '@/components/genome/ExplainToDoctorModal'
+import ShareToCommunityButton from '@/components/community/ShareToCommunityButton'
 import { emitVariantExpanded } from '@/lib/learningPath'
 import SaveButton from '@/components/SaveButton'
 
@@ -122,7 +123,17 @@ export default function VariantInterpretation({ card, className = '' }) {
               clinical conversation summary + copy-to-clipboard and
               add-to-practitioner-report actions. */}
           <div className="flex items-center justify-between gap-2 pt-1">
-            <ExplainToDoctorButton card={card} />
+            <div className="flex items-center gap-3">
+              <ExplainToDoctorButton card={card} />
+              {/* Opt-in members can share this finding's plain-English
+                  interpretation to the community feed. Auto-hides when
+                  the user isn't a community member. */}
+              <ShareToCommunityButton
+                initialText={card?.plain || card?.classification_text || ''}
+                pillar={card?.pillar || null}
+                label="Share to community"
+              />
+            </div>
             {/* Save button — records this finding in ss_reading_list so
                 the user can revisit it from the Saved Reading List. */}
             <SaveButton

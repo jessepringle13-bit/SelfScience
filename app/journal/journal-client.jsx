@@ -16,6 +16,7 @@ import {
   groupByDay, moodSeries, topTags, downloadCsv, openPrintablePdf, deleteEntry,
 } from '@/lib/journal'
 import JournalEntryModal from '@/components/JournalEntryModal'
+import ShareToCommunityButton from '@/components/community/ShareToCommunityButton'
 
 const ICONS = { observation: Eye, reflection: MessageCircle, action: CheckCircle2, question: HelpCircle }
 
@@ -353,6 +354,15 @@ function EntryCard({ entry, onEdit, onDelete }) {
               ))}
             </div>
           )}
+          {/* Share-to-community affordance. Auto-hidden if the user is
+              not opted in to the community. */}
+          <div className="mt-3 flex items-center gap-3">
+            <ShareToCommunityButton
+              initialText={entry.text || ''}
+              pillar={null}
+              label="Share this reflection"
+            />
+          </div>
         </div>
       </div>
     </li>

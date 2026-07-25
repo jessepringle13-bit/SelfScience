@@ -7812,18 +7812,67 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "2.5"
-  test_sequence: 15
+  version: "2.7"
+  test_sequence: 17
   run_ui: false
 
 agent_communication:
     - agent: "main"
       message: |
-        Phase O shipped: Personal Health Blueprint at /blueprint. Seven
-        section-based synthesis view (Genetic Identity, Top Priorities,
-        Daily Protocol, Supplements, Nutrition, Research Snapshot,
-        Next Steps) with dynamic rule engine, cache-aware research
-        fetching, live 'Last updated' hook, and print-optimized CSS
-        (window.print()). Dashboard header, Tools dropdown, and
-        Practitioner Report page all link to it. No existing
-        functionality changed.
+        Phase O2 shipped: Share to Community + Community Settings.
+
+        Files added:
+          - components/community/ShareToCommunityModal.jsx
+          - components/community/ShareToCommunityButton.jsx
+          - app/community/settings/page.js + settings-client.jsx
+
+        Wired into:
+          - components/genome/VariantInterpretation.jsx — 'Share to
+            community' next to Explain-to-Doctor in the expanded card
+            footer. Auto-hidden for non-opted-in users. Pre-fills the
+            plain-English interpretation as the initial share text.
+          - app/journal/journal-client.jsx — 'Share this reflection'
+            below tags on each list-view entry. Auto-hidden for
+            non-opted-in users. Pre-fills the entry text.
+
+        Behavior:
+          - ShareToCommunityButton renders nothing when opted-in=false.
+          - ShareToCommunityModal enforces the on-device privacy
+            filter (email / phone / URL / self-name / profanity) on
+            every keystroke; textarea borders turn red + inline
+            reason shown when a rule triggers; Post button disabled.
+          - When the user has reflections=false in their share
+            settings, the modal degrades to a hint that links to
+            Community Settings instead of allowing posting.
+          - Pillar-tag chip selector shows None + all 10 pillars.
+          - Character counter, 280 cap, auto-toast on post, auto-
+            close after 900ms.
+
+        Community Settings (/community/settings):
+          - Display name row with Change flow (availability check via
+            Supabase; only allowed when the user has zero existing
+            posts because display_name is the FK).
+          - Share settings — 4 toggles that persist locally AND round
+            trip to Supabase (community_members.share_settings).
+          - My posts — pulled from Supabase (all non-deleted posts),
+            each with a Delete affordance (soft-delete via
+            is_deleted=true).
+          - Danger zone — Leave community with confirmation. On
+            confirm: deletes member row + cascades posts/reactions/
+            reports, wipes local LS keys, shows confirmation banner,
+            redirects to /.
+          - Hidden entry point: PrefsMenu shows 'Community Settings'
+            only when ss_community_opted_in=true.
+
+        Verified via screenshot tool:
+          - Settings page renders with 4 sections, correct toggle
+            states from LS, red 'Leave community' danger button.
+          - Journal 'Share this reflection' link visible below tags.
+          - Share modal opens with pre-filled text, 10-pillar chip
+            row, character counter, privacy hint.
+          - PII filter catches URL + email in real time.
+          - Valid text unlocks the Post button.
+
+        Reminder to user: still requires the community SQL from
+        /app/scripts/community-schema.sql to be applied in the
+        Supabase Dashboard SQL Editor before any writes succeed.
