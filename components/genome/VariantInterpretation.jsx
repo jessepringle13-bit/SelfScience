@@ -22,6 +22,7 @@ import {
   getVariantInterpretation,
   getConfidenceMeta,
 } from '@/lib/variantInterpretations'
+import ExplainToDoctorButton from '@/components/genome/ExplainToDoctorModal'
 
 export default function VariantInterpretation({ card, className = '' }) {
   const [open, setOpen] = useState(false)
@@ -103,6 +104,14 @@ export default function VariantInterpretation({ card, className = '' }) {
                 (interpretation generated from your report)
               </span>
             )}
+          </div>
+
+          {/* "Explain this to my doctor" — only visible in the expanded
+              state per product spec. Opens a modal with a formatted
+              clinical conversation summary + copy-to-clipboard and
+              add-to-practitioner-report actions. */}
+          <div className="pt-1">
+            <ExplainToDoctorButton card={card} />
           </div>
         </div>
       )}

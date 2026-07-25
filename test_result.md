@@ -6860,3 +6860,74 @@ agent_communication:
         strengths). 11 curated rsIDs with hardcoded rich content; dynamic
         fallback for the rest. Verified at 1280px and 375px with no horizontal
         overflow. Component-local React state per user spec.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): "Explain this to my doctor" button + modal
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "'Explain this to my doctor' clinical-conversation modal on every expanded finding card"
+    implemented: true
+    working: true
+    file: "/app/lib/doctorExplanation.js, /app/components/genome/ExplainToDoctorModal.jsx, /app/components/genome/VariantInterpretation.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Added secondary-style "Explain this to my doctor" button that ONLY
+            renders inside the expanded interpretation panel (spec §2). Clicking
+            it opens a modal with a single-finding clinical conversation summary.
+
+            Modal content:
+              • Eyebrow: "FOR YOUR APPOINTMENT" (mono 11px, ss-teal, tracking 0.14em)
+              • Finding: <Gene · trait> (<rsid>) + Genotype + Source
+              • What it suggests: reuses variantInterpretations.meaning (already
+                framed with "research associates" / "may be relevant to" tone;
+                never uses diagnosis language)
+              • Questions to ask your doctor: 3 items with → bullet arrows
+              • Note to clinician: amber-tinted callout (rgba(207,144,24,0.07),
+                border-left 3px amber, italic)
+
+            Question generation:
+              • CURATED — 7 priority rsIDs (rs1801133, rs1801131, rs10830963,
+                rs12722, rs8192678, rs4149056, rs1360780) use the exact
+                hand-written questions from product spec §"pre-written questions".
+              • DYNAMIC FALLBACK — every other variant gets 3 template-driven
+                questions built from its pillar tag (blood-marker mapping) and
+                gene label.
+
+            Three action buttons:
+              • Copy to clipboard — writes plain-text serialization; shows
+                "Copied!" with check icon for 2s, then reverts. Fallback to
+                execCommand('copy') for older browsers.
+              • Add to Practitioner Report — uses existing addToPractitionerReport
+                (session-storage backed); shows "Added!" for 2s. Idempotent —
+                no duplicates.
+              • Close — dismisses modal, no side effects.
+
+            Verified via screenshot tool at 1280px and 375px:
+              • Desktop: centered card, max-w-560px, rounded-2xl, 32/32 padding
+              • Mobile: full-width bottom sheet, buttons stack vertically,
+                Close X pinned top-right, scrollWidth === innerWidth
+              • ESC key closes modal, backdrop tap closes modal, body scroll
+                locked while modal is open
+              • aria-modal + aria-labelledby set for a11y
+
+metadata:
+  created_by: "main_agent"
+  version: "1.6"
+  test_sequence: 6
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase F shipped: "Explain this to my doctor" button + modal wired into
+        every expanded variant card (Dashboard + all 3 GenomeSlice views).
+        7 priority rsIDs use hand-written clinical questions; every other
+        variant gets pillar-aware dynamic questions. Copy-to-clipboard,
+        Add-to-Practitioner-Report, and Close actions all working. Mobile
+        bottom sheet verified at 375px with zero horizontal overflow.
