@@ -6,6 +6,17 @@
 
 @layer base {
   :root {
+    /* SelfScience surface tokens — light theme defaults. Tailwind's
+       ss-* classes read these via var(--ss-*). See tailwind.config.js. */
+    --ss-canvas: #0F2A2E;
+    --ss-bg: #F7F6F2;
+    --ss-surface: #F9F8F5;
+    --ss-text: #28251D;
+    --ss-muted: #7A7974;
+    --ss-border-warm: #D4D1CA;
+    --ss-row-alt: #EEF7F7;
+    --ss-privacy-tint: #EAF5F5;
+
     --background: 44 27% 96%;
     --foreground: 42 15% 14%;
     --card: 45 25% 97%;
@@ -26,6 +37,39 @@
     --input: 43 15% 80%;
     --ring: 186 47% 20%;
     --radius: 0.5rem;
+  }
+
+  /* DARK THEME — flip surfaces + text, keep brand accents. Applied when
+     <html class="dark"> is set by ThemeToggle / theme init script. */
+  .dark {
+    --ss-canvas: #05141A;
+    --ss-bg: #0F1B22;
+    --ss-surface: #16242C;
+    --ss-text: #E8EDEA;
+    --ss-muted: #9CA5A2;
+    --ss-border-warm: #2A3A42;
+    --ss-row-alt: #17262E;
+    --ss-privacy-tint: #16303A;
+
+    --background: 200 40% 8%;
+    --foreground: 160 8% 92%;
+    --card: 200 30% 12%;
+    --card-foreground: 160 8% 92%;
+    --popover: 200 30% 12%;
+    --popover-foreground: 160 8% 92%;
+    --primary: 176 38% 55%;
+    --primary-foreground: 200 40% 8%;
+    --secondary: 200 20% 20%;
+    --secondary-foreground: 160 8% 92%;
+    --muted: 200 20% 20%;
+    --muted-foreground: 160 5% 65%;
+    --accent: 20 71% 55%;
+    --accent-foreground: 200 40% 8%;
+    --destructive: 322 58% 55%;
+    --destructive-foreground: 160 8% 92%;
+    --border: 200 15% 22%;
+    --input: 200 15% 22%;
+    --ring: 176 38% 55%;
   }
 }
 
@@ -63,6 +107,36 @@
 /* Hide scrollbar for horizontal scroll on featured research */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ==========================================================================
+   Dark-mode surface overrides
+   -------------------------------------------------------------------------- */
+/* The app is heavily light-mode-designed and uses `bg-white` for most card
+   surfaces. Under `.dark` we remap those raw white backgrounds to the
+   ss-surface CSS var so cards look native in dark mode without touching
+   every component. Accents (teal, orange, green, amber) stay intact.
+   Scoped narrowly to avoid clobbering legitimate white-on-teal usage. */
+.dark .bg-white          { background-color: var(--ss-surface) !important; }
+.dark .bg-white\/95      { background-color: color-mix(in srgb, var(--ss-surface) 95%, transparent) !important; }
+.dark .bg-white\/90      { background-color: color-mix(in srgb, var(--ss-surface) 90%, transparent) !important; }
+.dark .bg-white\/80      { background-color: color-mix(in srgb, var(--ss-surface) 80%, transparent) !important; }
+.dark .bg-white\/60      { background-color: color-mix(in srgb, var(--ss-surface) 60%, transparent) !important; }
+.dark .bg-white\/40      { background-color: color-mix(in srgb, var(--ss-surface) 40%, transparent) !important; }
+.dark .bg-slate-50,
+.dark .bg-gray-50,
+.dark .bg-neutral-50     { background-color: var(--ss-surface) !important; }
+/* Prose / body text using neutral dark shades — nudge for legibility. */
+.dark .text-black,
+.dark .text-slate-900,
+.dark .text-gray-900,
+.dark .text-neutral-900  { color: var(--ss-text) !important; }
+/* Native form control background so <input> / <textarea> defaults blend. */
+.dark input:not([type='checkbox']):not([type='radio']),
+.dark textarea,
+.dark select {
+  background-color: var(--ss-surface);
+  color: var(--ss-text);
+}
 
 /* ==========================================================================
    Genome Report — tab visibility + print styles

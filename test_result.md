@@ -7009,3 +7009,106 @@ agent_communication:
         bank. Cache-first with 7-day refresh. Skeleton shimmer during
         fetch. Extended /api/clinical-trials/gene (additive) to expose
         study locations so we can rank by geography.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Search prompts + Dark mode
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "'You might be wondering...' pre-built search prompts"
+    implemented: true
+    working: true
+    file: "/app/lib/searchPrompts.js, /app/components/search/SearchPrompts.jsx, /app/app/search/search-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Additive prompt-chip section rendered below the Search hero and
+            above the sticky gene chip bar. Hides the moment the user
+            types; reappears when the search box is cleared.
+
+            15 CURATED (rs1801133, rs1801131, rs8192678, rs12722, rs10830963,
+            rs4253778, rs1799750, rs9420907, rs12778366, rs1360780, rs174547,
+            rs1815739, rs4680, rs4149056, rs3918290) with hand-written
+            question + query per spec. DYNAMIC fallback for uncurated variants.
+
+            Selection: top 3 awareness → then strengths → then more awareness →
+            then generic fallbacks (nutrigenomics, PGx, classifications,
+            consumer DNA, blood tests). ss_clicked_prompts LS array
+            deprioritizes clicked prompts; auto-resets when everything's
+            been clicked.
+
+            Chip click: prefills search box + sets submittedQ (triggers
+            existing runSearch effect). Verified end-to-end — clicking
+            "Why do I need methylfolate..." fills the box with the exact
+            spec query "MTHFR C677T methylfolate folic acid methylation"
+            and runs the search.
+
+            Verified at 1280px + 375px. No horizontal overflow at 375px;
+            chips wrap naturally.
+
+  - task: "Dark mode toggle (Light · System · Dark)"
+    implemented: true
+    working: true
+    file: "/app/lib/theme.js, /app/components/ThemeToggle.jsx, /app/components/PrefsMenu.jsx, /app/app/globals.css, /app/tailwind.config.js, /app/app/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Three-way theme preference (light | dark | system) surfaced in
+            the existing PrefsMenu. Additive — nothing existing removed.
+
+            Implementation:
+              • ss-* neutral tokens in tailwind.config.js refactored to
+                CSS variables (var(--ss-bg, #F7F6F2) etc). Fallback literals
+                preserve legacy behaviour if the CSS var is absent.
+              • globals.css defines :root + .dark blocks so a single
+                <html class="dark"> flips the entire palette.
+              • .dark scoped overrides remap raw `bg-white`, bg-slate-50,
+                text-black etc. so cards still look native in dark mode
+                without touching every component.
+              • lib/theme.js: getThemePref/setThemePref/resolveTheme/useTheme
+                + NO_FLASH_SCRIPT for pre-hydration paint.
+              • layout.js injects the no-flash script in <head> so users
+                never see a light→dark flash on first paint.
+              • ThemeToggle.jsx = compact segmented control with Sun/
+                Monitor/Moon icons; keyboard + aria-radiogroup accessible.
+              • Persists to ss_theme in localStorage.
+              • Reacts to OS theme changes when pref === 'system'.
+
+            Verified live via screenshot tool: dashboard + search + prefs
+            menu all render coherently in dark mode; brand accents
+            (teal, orange, green, amber) preserved; toggling in the menu
+            flips <html> class immediately and writes ss_theme=dark.
+            Light mode remains identical to pre-change baseline.
+
+            Known limitation (surfaced to user in the menu subtext):
+            components that hardcode Tailwind palette colours (e.g. a
+            specific bg-blue-900) instead of `bg-ss-*` tokens will not
+            flip. Additional polish would require per-component work.
+
+metadata:
+  created_by: "main_agent"
+  version: "1.8"
+  test_sequence: 8
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase H shipped in one drop:
+          • "You might be wondering" search prompts (15 curated rsIDs +
+            dynamic fallback, 5 chips at a time, rotation via
+            ss_clicked_prompts, hides on typing).
+          • Dark mode toggle in PrefsMenu (Light · System · Dark) backed
+            by CSS-variable refactor of ss-* neutrals plus scoped .dark
+            overrides. No-flash inline init script prevents FOUC.
+        All acceptance criteria for the search prompts verified. Dark mode
+        works site-wide for surface tokens; some deep-nested hard-coded
+        Tailwind palette colours remain unaffected (documented in menu).

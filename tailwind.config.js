@@ -23,25 +23,31 @@ module.exports = {
         },
         colors: {
           ss: {
+            // Brand colors — kept fixed across light/dark so identity
+            // stays consistent (accents don't need to flip).
             teal: '#1B474D',
             'teal-dark': '#123539',
             'teal-ink': '#0F2A2E',
-            canvas: '#0F2A2E',
             orange: '#C45820',
             'orange-dark': '#A5471A',
-            bg: '#F7F6F2',
-            surface: '#F9F8F5',
-            text: '#28251D',
-            muted: '#7A7974',
-            'border-warm': '#D4D1CA',
             green: '#2E7D32',
             amber: '#964219',
             red: '#B23A3A',
             critical: '#A12C7B',
-            'row-alt': '#EEF7F7',
             'preprint-yellow': '#B07D00',
             'editorial-blue': '#006494',
-            'privacy-tint': '#EAF5F5',
+            // Surfaces / neutrals — driven by CSS variables so a single
+            // `.dark` class on <html> swaps the entire palette. Fallback
+            // literals are the original light-mode values so pre-CSS-var
+            // usage stays identical.
+            canvas: 'var(--ss-canvas, #0F2A2E)',
+            bg: 'var(--ss-bg, #F7F6F2)',
+            surface: 'var(--ss-surface, #F9F8F5)',
+            text: 'var(--ss-text, #28251D)',
+            muted: 'var(--ss-muted, #7A7974)',
+            'border-warm': 'var(--ss-border-warm, #D4D1CA)',
+            'row-alt': 'var(--ss-row-alt, #EEF7F7)',
+            'privacy-tint': 'var(--ss-privacy-tint, #EAF5F5)',
           },
           border: 'hsl(var(--border))',
           input: 'hsl(var(--input))',

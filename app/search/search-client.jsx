@@ -23,6 +23,7 @@ import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
 import FirstVisitBanner from '@/components/FirstVisitBanner'
+import SearchPrompts from '@/components/search/SearchPrompts'
 
 const SOURCE_TYPE_OPTIONS = [
   { key: 'all',       label: 'All' },
@@ -1013,6 +1014,25 @@ export default function SearchClient() {
               own sticky section below the hero (Section 4 spec) so the
               chips remain visible while the user scrolls through
               results. */}
+        </div>
+      </section>
+
+      {/* "You might be wondering..." pre-built question chips.
+          Only shows when the search box is empty AND no search has
+          been submitted — hides the moment the user types. Additive:
+          nothing below (gene chips, filter pills, results) is
+          touched. */}
+      <section className="border-b border-ss-border-warm bg-ss-surface" aria-label="Suggested questions">
+        <div className="container py-5 md:py-6">
+          <SearchPrompts
+            genomeReport={genomeReport}
+            hasQuery={query.length > 0 || submittedQ.length > 0}
+            onPick={(q) => {
+              setQuery(q)
+              setSubmittedQ(q)
+              setShowSuggestions(false)
+            }}
+          />
         </div>
       </section>
 

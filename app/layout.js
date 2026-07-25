@@ -9,6 +9,7 @@ import FirstTimeWelcome from '@/components/FirstTimeWelcome'
 import JourneyGuide from '@/components/JourneyGuide'
 import Toast from '@/components/Toast'
 import FeaturesTracker from '@/components/FeaturesTracker'
+import { NO_FLASH_SCRIPT } from '@/lib/theme'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
 
@@ -83,6 +84,14 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        {/* No-flash theme init: reads ss_theme from localStorage and
+            sets <html class="dark"> before hydration so users never
+            see a light→dark flash on first paint. */}
+        <script
+          dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }}
+        />
+      </head>
       <body>
         <div className="mx-auto min-h-screen w-full max-w-[1600px] bg-ss-bg text-ss-text 2xl:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
           {children}

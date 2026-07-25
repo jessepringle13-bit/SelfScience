@@ -12,6 +12,7 @@ import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X } from 'lucide-re
 import { useRouter } from 'next/navigation'
 import { useShowTechnicalTerms, setShowTechnicalTerms } from '@/lib/uiPrefs'
 import { resetGuideOnly, showGuideAgain, resetGenomeAndGuide, fireToast } from '@/lib/journeyReset'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function PrefsMenu({ isDark = false }) {
   const router = useRouter()
@@ -57,6 +58,16 @@ export default function PrefsMenu({ isDark = false }) {
         >
           <div className="border-b border-ss-border-warm/60 px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ss-muted">Display preferences</div>
+          </div>
+
+          {/* Colour theme — light / system / dark. Additive: nothing
+              else in the menu changes. */}
+          <div className="border-b border-ss-border-warm/60 px-4 py-3">
+            <div className="mb-2 text-sm font-bold text-ss-teal">Colour theme</div>
+            <ThemeToggle />
+            <div className="mt-1.5 text-[11px] leading-snug text-ss-muted">
+              Dark mode is optimised for the core reading surfaces. Some pages may still render in light shades.
+            </div>
           </div>
 
           <label className="flex cursor-pointer items-start gap-3 px-4 py-3 text-left hover:bg-ss-bg">
