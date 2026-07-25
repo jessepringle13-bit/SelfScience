@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import EmptyStatePrompt from '@/components/EmptyStatePrompt'
 import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
+import FirstVisitBanner from '@/components/FirstVisitBanner'
 import { Search, Pill, ShieldAlert, Info, ArrowRight, X, HeartHandshake, Phone, Beaker, Activity, AlertTriangle, GitCompare, Printer } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
@@ -121,6 +122,18 @@ export default function DrugCheckClient() {
       <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pt-8 pb-24">
+        <FirstVisitBanner
+          storageKey="ss_visited_drugcheck"
+          Icon={Pill}
+          text="Select a medication from the list to see how your genes may affect how your body processes it."
+          buttonText="Browse medications →"
+          onAction={() => {
+            const el = document.getElementById('drug-list') || document.querySelector('[data-role="drug-list"]') || document.querySelector('input[placeholder*="medication" i], input[placeholder*="drug" i]')
+            if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            if (el && typeof el.focus === 'function') el.focus()
+          }}
+          ariaLabel="First visit tip on Drug Check — dismiss"
+        />
         {/* Header */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

@@ -3447,6 +3447,57 @@ test_plan:
          comment: "Ready for QA. Meal Planner tab, PGx PDF export, DSLD supplement scanner, Foods tab nutrient filter chips."
 
 
+  - task: "First-visit contextual banners on 6 feature pages"
+    implemented: true
+    working: true
+    file: |
+      /app/components/FirstVisitBanner.jsx (NEW),
+      /app/app/search/search-client.jsx,
+      /app/app/nutrition/nutrition-client.jsx,
+      /app/app/drug-check/drug-check-client.jsx,
+      /app/app/tools/supplements/supplements-client.jsx,
+      /app/app/biomarkers/biomarkers-client.jsx,
+      /app/app/tools/training/training-protocol-client.jsx
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          NEW /app/components/FirstVisitBanner.jsx — reusable, SSR-safe
+          "First time here?" banner. Reads / writes ss_visited_<page>
+          on mount (writes '1' the moment the page first renders). Hides
+          on X or on action-button click; renders `null` on every
+          subsequent visit. Design tokens match spec: bg
+          `rgba(14,122,110,0.08)` (bg-[…]), 1px teal border, 3px green
+          accent (border-l-[3px] border-l-ss-green), 12px radius,
+          teal icon 20px, ss-green pill button, top-right X. Stacks
+          vertically on <sm and lays out horizontally on ≥sm. All
+          required a11y attributes: role="note",
+          aria-label="First visit tip — dismiss" on the X, and a
+          descriptive aria-label on the action button.
+
+          Wired into 6 pages with the exact spec copy + actions:
+          - Search       → prefills "MTHFR methylation" and runs it via
+                           the existing runSearch pipeline.
+          - Nutrition    → focuses the food search input (scrollIntoView +
+                           focus, best-effort selector match).
+          - Drug Check   → scrolls to / focuses the medication list
+                           search field.
+          - Supplements  → scrolls to the GoalPicker.
+          - Biomarkers   → focuses the first biomarker numeric input.
+          - Training     → scrolls to training zones section (id fallback).
+
+          Verified via Playwright at 1280px + 375px:
+          - Fresh state → all 6 banners render (role="note" count = 1
+            per page), each ss_visited_<key> set to '1' immediately.
+          - Copy + button text match spec verbatim per page.
+          - Clicking the Nutrition action button dismisses (count → 0).
+          - Mobile layout stacks icon + text + full-width button; X
+            remains top-right; no layout shift.
+
+
   - task: "Journey Guide — real-action detection for Tier 2 steps"
     implemented: true
     working: true

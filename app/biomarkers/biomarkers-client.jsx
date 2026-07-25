@@ -17,7 +17,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ShieldAlert, Trash2, ArrowRight, TestTube2, Loader2 } from 'lucide-react'
+import { ShieldAlert, Trash2, ArrowRight, TestTube2, Loader2, LineChart } from 'lucide-react'
+import FirstVisitBanner from '@/components/FirstVisitBanner'
 import SiteNav from '@/components/site-nav'
 import RegenTools from '@/components/RegenTools'
 import { BIOMARKERS_DISCLAIMER } from '@/lib/biomarkers/schema'
@@ -133,6 +134,18 @@ export default function BiomarkersClient() {
       <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
 
       <div className="container pb-24 pt-24 md:pt-28">
+        <FirstVisitBanner
+          storageKey="ss_visited_biomarkers"
+          Icon={LineChart}
+          text="Enter one blood test result to get started. Try Vitamin D or HbA1c if you have recent labs."
+          buttonText="Add a result →"
+          onAction={() => {
+            const el = document.querySelector('input[data-role="biomarker-input"], input[type="number"], input[inputmode="decimal"]')
+            if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            if (el && typeof el.focus === 'function') el.focus()
+          }}
+          ariaLabel="First visit tip on Biomarkers — dismiss"
+        />
         {/* Header */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="max-w-2xl">

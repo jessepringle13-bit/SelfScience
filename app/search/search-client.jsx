@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  Search,
+  Search as SearchIcon,
   SlidersHorizontal,
   Loader2,
   AlertCircle,
@@ -22,6 +22,7 @@ import { getPillarQuery, isYouthQuery, normalizePillarName } from '@/lib/pillars
 import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
+import FirstVisitBanner from '@/components/FirstVisitBanner'
 
 const SOURCE_TYPE_OPTIONS = [
   { key: 'all',       label: 'All' },
@@ -913,7 +914,7 @@ export default function SearchClient() {
         <div className="container">
           <form onSubmit={submit} className="relative mx-auto max-w-4xl">
             <div className="flex items-center overflow-hidden rounded-full bg-white text-ss-text shadow-lg ring-1 ring-black/10">
-              <Search className="ml-4 shrink-0 text-ss-muted" size={18} />
+              <SearchIcon className="ml-4 shrink-0 text-ss-muted" size={18} />
               <input
                 type="text"
                 value={query}
@@ -966,7 +967,7 @@ export default function SearchClient() {
                     }}
                     className="flex w-full items-start gap-3 border-t border-ss-border-warm/60 px-4 py-3 text-left transition hover:bg-ss-bg first:border-t-0"
                   >
-                    <Search size={14} className="mt-1 shrink-0 text-ss-muted" />
+                    <SearchIcon size={14} className="mt-1 shrink-0 text-ss-muted" />
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold text-ss-teal line-clamp-2">{s.title}</span>
                       {s.authorsShort && (
@@ -1179,6 +1180,18 @@ export default function SearchClient() {
             and drug checker pages so users see it wherever PGx content
             surfaces. */}
         {pillar === 'Pharmacogenomics' && <PgxDisclaimer />}
+        <FirstVisitBanner
+          storageKey="ss_visited_search"
+          Icon={SearchIcon}
+          text="Try typing a health topic — or tap one of your gene chips to search research matched to your DNA."
+          buttonText="Search MTHFR →"
+          onAction={() => {
+            setQuery('MTHFR methylation')
+            setSubmittedQ('MTHFR methylation')
+            runSearch('MTHFR methylation', pillar, activeGenes)
+          }}
+          ariaLabel="First visit tip on Search — dismiss"
+        />
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-2xl font-extrabold text-ss-teal">
             {data?.isPillarBrowse && pillar

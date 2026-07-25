@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import EmptyStatePrompt from '@/components/EmptyStatePrompt'
 import { fireGuideAction, GUIDE_ACTIONS } from '@/lib/guideActions'
+import FirstVisitBanner from '@/components/FirstVisitBanner'
 import {
   Apple,
   Utensils,
@@ -110,6 +111,18 @@ export default function NutritionClient() {
       <SiteNav />
 
       <div className="container pt-8 pb-24">
+        <FirstVisitBanner
+          storageKey="ss_visited_nutrition"
+          Icon={Apple}
+          text="Your food results are filtered for your genome. Start by searching a food you eat every day."
+          buttonText="Search a food →"
+          onAction={() => {
+            const el = document.querySelector('input[data-role="food-search"], input[placeholder*="food" i], input[placeholder*="Search" i]')
+            if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            if (el && typeof el.focus === 'function') el.focus()
+          }}
+          ariaLabel="First visit tip on Nutrition — dismiss"
+        />
         {/* Header */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

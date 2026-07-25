@@ -15,9 +15,10 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Sparkles, RefreshCw, Save, Printer, Dna, ClipboardList,
-  ArrowLeft, Activity, Info, BookOpen, Baby,
+  ArrowLeft, Activity, Info, BookOpen, Baby, Zap,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
+import FirstVisitBanner from '@/components/FirstVisitBanner'
 
 import { getGenomeResults } from '@/lib/genomeSession'
 import { getBiomarkerValues } from '@/lib/biomarkersSession'
@@ -147,6 +148,17 @@ function TrainingProtocolInner() {
       </div>
 
       <div className="container pt-8 pb-24">
+        <FirstVisitBanner
+          storageKey="ss_visited_training"
+          Icon={Zap}
+          text="Your training zones and sport affinity are based on your performance genes. Review your profile below."
+          buttonText="See my zones →"
+          onAction={() => {
+            const el = document.getElementById('training-zones') || document.querySelector('[data-role="training-zones"]')
+            if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          ariaLabel="First visit tip on Training — dismiss"
+        />
         {/* Hero */}
         <div className="mb-8">
           <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">

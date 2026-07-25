@@ -18,7 +18,8 @@ import { GOALS, getGoalById } from '@/lib/supplements/goalCategories'
 import { computePersonalisation, signalsForCategory } from '@/lib/supplements/personalisation'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { getBiomarkerValues } from '@/lib/biomarkersSession'
-import { Pill, ShieldCheck, ShieldAlert, Dna, Sparkles, Camera } from 'lucide-react'
+import { Pill, ShieldCheck, ShieldAlert, Dna, Sparkles, Camera, FlaskConical } from 'lucide-react'
+import FirstVisitBanner from '@/components/FirstVisitBanner'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import MyStackDrawer from '@/components/supplements/MyStackDrawer'
 import SupplementScanner from '@/components/supplements/SupplementScanner'
@@ -169,6 +170,17 @@ function SupplementsClientInner() {
       </section>
 
       <main className="mx-auto max-w-6xl px-4 md:px-6 pt-6 md:pt-8 pb-24 space-y-6">
+        <FirstVisitBanner
+          storageKey="ss_visited_supplements"
+          Icon={FlaskConical}
+          text="Pick a health goal to see supplements matched to your genes — ranked by quality and transparency."
+          buttonText="Choose a goal →"
+          onAction={() => {
+            const el = document.getElementById('goal-picker') || document.querySelector('[data-role="goal-picker"]')
+            if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          ariaLabel="First visit tip on Supplements — dismiss"
+        />
         <GoalPicker onSelect={onGoalSelect} initialGoalId={goal?.id} />
         {goal && (
           <CategoryStrip
