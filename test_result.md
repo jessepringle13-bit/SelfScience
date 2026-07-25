@@ -7579,19 +7579,127 @@ frontend:
               • Dashboard's Nutrition pillar auto-select still works
                 and does not conflict with achievement tracking.
 
+  - task: "Phase N — Personal Health Journal & Progress Timeline"
+    implemented: true
+    working: true
+    file: "/app/lib/journal.js, /app/components/JournalFloatingButton.jsx, /app/components/JournalEntryModal.jsx, /app/components/dashboard/JournalWidget.jsx, /app/app/journal/page.js, /app/app/journal/journal-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+            Delivered the Personal Health Journal & Progress Timeline
+            per Message 425 spec.
+
+            PART 1 — lib/journal.js (single source of truth)
+              Storage in ss_journal (localStorage, additive, ss_-namespaced).
+              Entry shape: {id, type, text, findingId, findingName,
+              actionCategory, moodRating, tags, createdAt, editedAt,
+              searchQuery}. addEntry/updateEntry/deleteEntry all fire
+              selfscience:journal-changed. useJournal() hook auto-
+              subscribes. Helpers: groupByDay, moodSeries (30-day
+              rolling with gap support), topTags, formatFullDate/
+              formatShortDate/relativeTime, collectFindings from
+              session-storage genome.
+              Exports: downloadCsv (Blob + a.click, no libs) and
+              openPrintablePdf (new-tab formatted HTML with auto-
+              print — user picks "Save as PDF"). No jspdf dependency.
+
+            PART 2 — JournalFloatingButton (bottom-left pencil FAB)
+              Fixed left-4 bottom-24 (mobile) / bottom-6 (desktop).
+              Scoped via usePathname to Dashboard (/), all /genome/*,
+              /search, /tools/training. Also listens for
+              selfscience:journal-open custom event so the dashboard
+              widget can trigger the same modal without prop drilling.
+
+            PART 3 — JournalEntryModal
+              4 entry-type chips (Observation / Reflection / Action /
+              Question) with unique accent (teal/amber/green/orange).
+              Dynamic conditional fields:
+                - Observation → optional finding selector populated from
+                  session-storage genome (collectFindings).
+                - Action → mandatory category dropdown (9 options).
+              Common: textarea with 20-char minimum + live counter,
+              5-star mood rating (1–5 with plain labels), comma-tag
+              input (max 12), date picker with today as max (backdating
+              only). Save disabled until 20-char threshold met.
+              ESC + click-outside close. Body-scroll lock.
+
+            PART 4 — /journal page (list + timeline views)
+              Header: eyebrow + title + private-record subtitle + New
+              entry button.
+              4 stat cards: Total, Avg mood, Actions, Questions.
+              Mood-trend SVG chart (30-day rolling, gridlines at 1/3/5,
+              area fill + line + circle markers, gap-safe with nullable
+              days).
+              Toolbar: List/Timeline toggle, search input, CSV/PDF
+              buttons (disabled when filtered set is empty).
+              Type filter chips (All + 4 types) + Tag filter chips
+              (top 12).
+              List view: full-width entry cards with icon-in-bubble,
+              type eyebrow, absolute + relative date, mood star,
+              edit/delete controls, finding/category meta, text,
+              hashtag chips.
+              Timeline view: vertical rail with day-anchor dots,
+              date headers, compact entry cards below each date.
+              Empty state: contextual (empty vs no-match).
+              Footer privacy reassurance.
+
+            PART 5 — Dashboard JournalWidget
+              Mounted below Weekly Digest via data-tour-target=
+              "journal-widget". Shows 3 most-recent entries as compact
+              rows (bubble icon + type eyebrow + relative time + mood
+              + preview text + finding/category meta). New entry
+              button fires the global open event. Empty state shows
+              "Start your health journal" copy + FAB hint. "Open full
+              journal →" deep-links to /journal.
+
+            Integration
+              layout.js mounts <JournalFloatingButton/> once, globally.
+              Dashboard.jsx renders <JournalWidget/> directly after
+              <WeeklyDigest/>.
+              site-nav.jsx adds Health Journal item to Tools dropdown
+              (desktop) + mobile drawer Tools group.
+
+            Verified via screenshot tool:
+              • /journal empty state renders correctly with all stat
+                cards at 0, disabled export buttons, empty-state CTA.
+              • Modal opens from top-right "New entry" button. All 4
+                entry-type chips clickable, prompt hint updates, mood
+                stars fillable, tags input persistent, date backdating.
+              • Saved entry appears immediately in list; seeded 7
+                entries across 30 days verified stats math: Total 7,
+                Avg mood 3.9/5, Actions 2, Questions 1. Tag chips
+                aggregate: sleep·4, caffeine·2, magnesium·1, etc.
+              • Timeline view: day-grouped, mood chart shows all 7
+                dots correctly plotted, gridlines visible.
+              • Search filter: "coffee" narrows list to two matching
+                entries.
+              • Filter chips (All / Observation / Reflection / Action /
+                Question) correctly narrow visible entries.
+              • Dashboard widget appears below Weekly Digest with the
+                3 most-recent entries (OBSERVATION/ACTION/QUESTION),
+                relative timestamps, and mood ratings.
+              • FAB visible on Dashboard (aria-label="Add journal
+                entry"). Achievement toaster fires as expected.
+              • No changes to any existing dashboard/genome/search
+                layouts — strictly additive.
+
 metadata:
   created_by: "main_agent"
-  version: "2.3"
-  test_sequence: 13
+  version: "2.4"
+  test_sequence: 14
   run_ui: false
 
 agent_communication:
     - agent: "main"
       message: |
-        Phase M shipped: 20-achievement milestone system. Fully event-
-        driven via existing LS state — no new state plumbing needed for
-        most triggers. Celebration toaster is a single global mount
-        that queues unlocks, respects prefers-reduced-motion, and
-        confetti-bursts for T3/T4. Achievements page groups by 4 tiers
-        with correct unlocked/locked visual states and "???" hiding for
-        higher-tier locked achievements.
+        Phase N shipped: Personal Health Journal & Progress Timeline.
+        100% client-side (ss_journal in localStorage). CSV export via
+        Blob, PDF export via print-window (no jspdf dependency per
+        user direction). FAB scoped to Dashboard + all /genome/* +
+        /search + /tools/training. Dashboard widget mounted below
+        Weekly Digest. /journal page shows list + timeline + SVG mood
+        chart + filter/search/export. All existing content untouched.

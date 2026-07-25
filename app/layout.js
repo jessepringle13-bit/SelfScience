@@ -12,6 +12,7 @@ import Toast from '@/components/Toast'
 import ReadingListToaster from '@/components/ReadingListToaster'
 import AchievementToaster from '@/components/AchievementToaster'
 import FeaturesTracker from '@/components/FeaturesTracker'
+import JournalFloatingButton from '@/components/JournalFloatingButton'
 import { NO_FLASH_SCRIPT } from '@/lib/theme'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
@@ -110,6 +111,7 @@ export default function RootLayout({ children }) {
         <ReadingListToaster />
         <AchievementToaster />
         <FeaturesTracker />
+        <JournalFloatingButton />
         <Analytics />
         <ChunkReloader />
       </body>

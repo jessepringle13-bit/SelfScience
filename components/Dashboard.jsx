@@ -35,6 +35,7 @@ import OnboardingTour from '@/components/dashboard/OnboardingTour'
 import PostUploadOrientation from '@/components/PostUploadOrientation'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
 import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
+import JournalWidget from '@/components/dashboard/JournalWidget'
 import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
 
@@ -360,6 +361,13 @@ export default function Dashboard() {
              existing dashboard content is changed. */}
         <div data-tour-target="weekly-digest">
           <WeeklyDigest report={report} />
+        </div>
+
+        {/* Personal Health Journal — recent entries + quick add.
+             Placed below Weekly Digest per product spec. Additive: does
+             not affect any other dashboard section. */}
+        <div data-tour-target="journal-widget">
+          <JournalWidget />
         </div>
 
         {/* 3. YOUR PILLARS (merged: was "Pillar Score Overview" + "Explore Your Pillars")
