@@ -186,6 +186,12 @@ export default function PractitionerReportClient() {
               <p className="mt-2 max-w-2xl text-ss-muted">
                 Fill in the intake form, choose which sections to include, then print (or save as PDF) to hand to your primary-care physician, functional-medicine practitioner, or pharmacist. Every value stays on your device.
               </p>
+              <Link
+                href="/blueprint"
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-ss-teal hover:underline"
+              >
+                View your Blueprint before generating report <ArrowRight size={13} />
+              </Link>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button

@@ -7687,19 +7687,143 @@ frontend:
               • No changes to any existing dashboard/genome/search
                 layouts — strictly additive.
 
+  - task: "Phase O — Personal Health Blueprint (/blueprint)"
+    implemented: true
+    working: true
+    file: "/app/lib/blueprint.js, /app/app/blueprint/page.js, /app/app/blueprint/blueprint-client.jsx, /app/components/Dashboard.jsx, /app/components/site-nav.jsx, /app/app/practitioner-report/practitioner-report-client.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+            Delivered the Personal Health Blueprint page per user's
+            master spec. Unified 7-section synthesis of everything the
+            platform knows about the user — 100% additive.
+
+            PART 1 — lib/blueprint.js (rule engine, pure functions)
+              • getGenomeStats(report), getTopPillar(report),
+                getGenomeSummarySentence(report) — Section 1 helpers.
+              • getTopPriorities(report, n=5) — impact-ranked using
+                EVIDENCE_STRENGTH (established > emerging > preliminary)
+                + classification (awareness > strength). ACTION_LIBRARY
+                supplies a one-sentence action per known rsID with a
+                graceful default.
+              • getDailyProtocol(report) — variant-gated morning /
+                training / evening rules (MTHFR, MTNR1B, PPARA, CYP1A2,
+                VDR, COL5A1, PPARGC1A, ACTN3, FKBP5).
+              • getNutritionProfile(report) — variant-gated
+                prioritize / mindful / timing food rules.
+              • getSupplementPicture(report) — reuses
+                matchProtocolToUserVariants() and reshapes into 3 tiers
+                (Most Supported / Worth Considering / General Foundation
+                → provider discussion).
+              • getNextSteps() — dynamic checklist from LS state
+                (ss_journal, ss_reading_list, ss_features_explored,
+                ss_user_profile, ss_learning_*, session genome).
+                Returns up to 6 undone items followed by all done
+                items (kept visible per spec).
+              • useLastUpdated() hook — subscribes to journal,
+                reading-list, achievements, genome, profile change
+                events plus 'storage' events on all tracked LS keys.
+
+            PART 2 — /blueprint page (7 sections + print)
+              • Header: 'PERSONALIZED SYNTHESIS' eyebrow, big title
+                (clamp 2rem/5vw/3rem), subheading, live 'Last updated'
+                timestamp, Print Blueprint button (window.print()).
+              • Section 1 — Genetic Identity: 3 cards
+                (At-a-Glance stats / Top Pillar / Summary Sentence).
+              • Section 2 — Top Priorities: 5 impact-ranked rows,
+                30/70 split desktop, stacked mobile. Badge +
+                gene + pillar chip + plain-English + green
+                'Action:' line + confidence pill.
+              • Section 3 — Daily Protocol: 3 time-of-day columns
+                (Sun/Zap/Moon icons). Only shows items whose variant
+                is present. Gene chip on each row.
+              • Section 4 — Supplement Picture: 3 stacked tiers
+                (border-left + soft tinted bg per spec). Name +
+                dose (mono) + why-for-you + gene chip pill.
+              • Section 5 — Nutrition Profile: 3 columns
+                (Prioritize / Mindful / Timing) with icon + tone
+                colour. Variant-gated.
+              • Section 6 — Research Snapshot: reuses the digest
+                cache (ss_digest_cache / digestIsFresh) and calls
+                fetchWeeklyPaper() once per top-3 variants for
+                breadth. Reuses SaveButton for each card.
+              • Section 7 — Next Steps: interactive checklist.
+                Uses <Circle> for undone rows (with 'Start →'
+                affordance) and filled <CheckCircle2> for done rows
+                (line-through + opacity-60, staying visible per spec).
+              • Print CSS (styled-jsx global @media print): hides
+                nav / footer / .no-print / floating journal button /
+                Journey Guide / toasters. Adds print-only timestamp
+                footer. Uses break-inside:avoid on cards.
+
+            PART 3 — Integration
+              • Dashboard.jsx header row: added 'My Health Blueprint'
+                secondary button (transparent bg + 1px border) next
+                to 'See your full genome report' — same visual weight,
+                does not compete with Start Here.
+              • site-nav.jsx: added 'My Health Blueprint' as the
+                first item in the Tools dropdown (with Compass icon +
+                'Unified synthesis…' blurb) + mobile drawer.
+              • practitioner-report-client.jsx: added
+                'View your Blueprint before generating report →' link
+                below the intake description.
+
+            Verified via screenshot tool (fake genome seeded via
+            sessionStorage with MTHFR compound-het, MTNR1B GG, FADS1
+            TT, COL5A1 TT, PPARA GG, CYP1A2 AA, ACTN3 CC):
+              • Section 1 renders 7 total / 3 strengths / 4 explore /
+                0 neutral. Top Pillar = Nutrition (4 findings).
+                Summary sentence built dynamically from user's top 2
+                strengths + top awareness finding.
+              • Section 2 ranks correctly: MTHFR, MTNR1B, FADS1
+                (all Explore + Established), COL5A1 (Explore +
+                Emerging), ACTN3 (Strength + Established). Action
+                lines display in mono green. Confidence pills show
+                'Established research' / 'Emerging research'.
+              • Section 3 shows correct variant-gated items in each
+                column (Morning: MTHFR/MTNR1B/PPARA/CYP1A2; Training:
+                COL5A1/ACTN3 power; Evening: MTNR1B + General
+                magnesium). Gene chips per row.
+              • Section 4 Tier 1 shows all MTHFR compound-het
+                recommendations (5-MTHF, Methylcobalamin, P5P,
+                Riboflavin) + Hydrolyzed Collagen for COL5A1 in
+                soft-green tinted panel with left border.
+              • Section 6 successfully fetched real PubMed papers
+                for ACTN3 and MTHFR ('Matched: ACTN3' / 'Matched:
+                MTHFR' chips + working 'Read study →' links).
+              • Section 7 shows both undone items ('Generate
+                Practitioner Report', 'Check medications', etc.) with
+                'Start →' affordance AND completed items
+                ('Upload genome file', 'Complete quiz', 'Log
+                biomarkers') as strikethrough with green filled
+                checkbox at opacity 0.6 — exactly per spec.
+              • Dashboard header shows 'My Health Blueprint' button
+                between Clear&Reset and 'See your full genome
+                report' — matches the requested placement.
+              • Timestamp updates live as LS changes fire events.
+              • Print CSS scoped correctly: nav/FAB/JourneyGuide/
+                toasters hidden on print, sections preserved.
+              • No existing dashboard/genome/search/practitioner
+                layouts modified beyond the two additive links.
+
 metadata:
   created_by: "main_agent"
-  version: "2.4"
-  test_sequence: 14
+  version: "2.5"
+  test_sequence: 15
   run_ui: false
 
 agent_communication:
     - agent: "main"
       message: |
-        Phase N shipped: Personal Health Journal & Progress Timeline.
-        100% client-side (ss_journal in localStorage). CSV export via
-        Blob, PDF export via print-window (no jspdf dependency per
-        user direction). FAB scoped to Dashboard + all /genome/* +
-        /search + /tools/training. Dashboard widget mounted below
-        Weekly Digest. /journal page shows list + timeline + SVG mood
-        chart + filter/search/export. All existing content untouched.
+        Phase O shipped: Personal Health Blueprint at /blueprint. Seven
+        section-based synthesis view (Genetic Identity, Top Priorities,
+        Daily Protocol, Supplements, Nutrition, Research Snapshot,
+        Next Steps) with dynamic rule engine, cache-aware research
+        fetching, live 'Last updated' hook, and print-optimized CSS
+        (window.print()). Dashboard header, Tools dropdown, and
+        Practitioner Report page all link to it. No existing
+        functionality changed.

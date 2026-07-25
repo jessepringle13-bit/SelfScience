@@ -277,6 +277,12 @@ export default function Dashboard() {
           <div className="flex flex-shrink-0 items-center gap-2">
             <ResetGenomeButton variant="button" />
             <Link
+              href="/blueprint"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-ss-text/60 px-4 py-2 text-sm font-semibold text-ss-text transition hover:border-ss-teal hover:text-ss-teal"
+            >
+              <Compass size={14} /> My Health Blueprint
+            </Link>
+            <Link
               href="/genome/overview"
               className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-4 py-2 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
             >
