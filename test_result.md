@@ -7201,3 +7201,98 @@ agent_communication:
         animations, per-pillar LS dismissal (ss_pillar_intro_<slug>).
         "All Pillars" chip never triggers an intro. Renders inline as the
         topmost card in filtered content — no modal, no overlay.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Pillar Learning Path
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "Per-pillar three-step Learning Path"
+    implemented: true
+    working: true
+    file: "/app/lib/learningPath.js, /app/components/LearningPath.jsx, /app/components/Dashboard.jsx, /app/components/genome/VariantInterpretation.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Additive Learning Path section that appears at the top of the
+            filtered pillar view — ABOVE the PillarIntroCard and finding
+            cards — whenever a specific pillar is active on the Dashboard.
+            Never renders for "All Pillars", never on the main dashboard or
+            Search page. Nothing existing removed or repositioned.
+
+            THREE STEPS
+              • Step 1 "Understand the basics" — links to a pillar-specific
+                search fallback URL (see PILLAR_SPEC in lib) per spec §
+                "If the article does not exist yet, link to the Search page
+                with the pillar pre-filtered." Marks step 1 complete on click.
+              • Step 2 "Read your personal findings" — dynamic count line
+                showing user's real X strengths / Y to explore. "See my
+                findings" button smooth-scrolls to id="pillar-findings"
+                anchor placed above the Top Findings section, and marks
+                step 2 complete.
+              • Step 3 "Apply to daily life" — pillar-specific CTA + URL
+                (Nutrition → /nutrition, Sports → /tools/training, PGx →
+                /drug-check, etc). Marks step 3 complete on click.
+
+            AUTO STEP-2 COMPLETION
+              • VariantInterpretation.jsx now emits a `selfscience:
+                variant-expanded` CustomEvent with the card's pillar when
+                the user opens the "What does this mean for me?" panel.
+              • LearningPath listens for this event and marks step 2 done
+                when the pillar matches the active pillar — so simply
+                engaging with the findings advances the path.
+
+            THREE VISUAL STATES per spec:
+              • Not started — 35% opacity numeral, secondary outline CTA.
+              • In progress (lowest incomplete step) — full-opacity numeral,
+                border-top 3px ss-teal, "START HERE" green eyebrow, primary
+                green CTA (elevated).
+              • Completed — check badge + "STEP N" label, strikethrough
+                title, muted card bg (rgba(46,158,107,0.06)), "✓ Done"
+                mono green text (no button).
+
+            PROGRESS BAR — 4px height, ss-green fill, 500ms width transition
+            keyed to done-count / 3. Live-updates whenever any of the four
+            LS keys change (same-tab CustomEvent + cross-tab `storage`).
+
+            COMPLETION BANNER — green banner with Star icon appears when
+            all three steps done. "Search {Pillar} research" white pill
+            links to /search?pillar=<pillar>.
+
+            CONNECTORS — desktop chevron between cards (hidden on mobile),
+            mobile 2px dashed vertical line between cards (hidden on desktop).
+
+            Verified via screenshot tool:
+              • 1280px: Not-started, mixed, and all-done states all render
+                correctly. Nutrition path with step 3 elevated to primary
+                CTA; completion banner rendered on 3/3 with correct copy
+                and search deep-link.
+              • 375px mobile: LearningPath box = 311px (no horizontal
+                overflow), 3 cards stacked vertically with dashed connectors,
+                CTAs stretch full width, progress bar responsive.
+              • Correct LS keys written: ss_learning_step1_nutrition,
+                ss_learning_step2_nutrition, ss_learning_step3_nutrition,
+                ss_learning_complete_nutrition.
+              • Step 2 auto-complete via variant-expanded event verified
+                (LS = 'true' after dispatch).
+
+metadata:
+  created_by: "main_agent"
+  version: "2.0"
+  test_sequence: 10
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase J shipped: per-pillar 3-step Learning Path. Renders above
+        PillarIntroCard when a specific pillar chip is active. Three
+        state machine (not-started → in-progress → completed), progress
+        bar w/ 500ms transition, chevron/dashed connectors, all-done
+        celebration banner. Step 2 auto-completes when the user expands
+        any variant interpretation on the pillar's page — no extra clicks
+        needed for organic engagement. Nothing existing removed.

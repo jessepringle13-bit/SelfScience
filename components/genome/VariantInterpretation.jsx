@@ -23,6 +23,7 @@ import {
   getConfidenceMeta,
 } from '@/lib/variantInterpretations'
 import ExplainToDoctorButton from '@/components/genome/ExplainToDoctorModal'
+import { emitVariantExpanded } from '@/lib/learningPath'
 
 export default function VariantInterpretation({ card, className = '' }) {
   const [open, setOpen] = useState(false)
@@ -38,7 +39,16 @@ export default function VariantInterpretation({ card, className = '' }) {
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((v) => {
+          const next = !v
+          if (next) {
+            // Signal to any listening LearningPath component that a
+            // variant card was expanded on this pillar page — Step 2
+            // completes automatically. No-op if pillar tag is missing.
+            emitVariantExpanded(card?.pillar || null)
+          }
+          return next
+        })}
         aria-expanded={open}
         // Font-mono + 11px + teal per product spec. Full-width click
         // target with min-h-11 for mobile ergonomics.

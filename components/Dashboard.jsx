@@ -34,6 +34,7 @@ import PostUploadOrientation from '@/components/PostUploadOrientation'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
 import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
 import PillarIntroCard from '@/components/PillarIntroCard'
+import LearningPath from '@/components/LearningPath'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -276,11 +277,28 @@ export default function Dashboard() {
       </div>
 
       <div ref={topFindingsRef} className="container mt-10 space-y-14">
+        {/* Learning Path (Phase J) — three-step guided journey per
+            pillar. Renders ONLY when a specific pillar is active;
+            hidden for "All Pillars". Placed above PillarIntroCard so
+            users see the guided path first, then the pillar overview. */}
+        {activePillar && (
+          <LearningPath
+            pillarName={activePillar}
+            genomeReport={report}
+            findingsAnchorId="pillar-findings"
+          />
+        )}
+
         {/* Pillar intro card (Phase I) — additive. Renders as the
             topmost item in the filtered content, once per pillar, the
             first time a user activates that pillar. Never appears for
             "All Pillars". Handles its own dismissal + animation. */}
         <PillarIntroCard pillarName={activePillar} genomeReport={report} />
+
+        {/* Anchor target for Learning Path's Step 2 "See my findings"
+            scroll — kept invisible + zero-height so it doesn't shift
+            any existing layout. */}
+        <div id="pillar-findings" aria-hidden="true" className="scroll-mt-24" />
 
         {/* 1. TOP FINDINGS (Be Aware) */}
         <div data-tour-target="top-findings">
