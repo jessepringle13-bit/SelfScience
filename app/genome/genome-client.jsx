@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Dna,
   Lock,
@@ -61,6 +61,7 @@ const CLASSIFICATION_STYLE = {
 
 export default function GenomeClient() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const inputRef = useRef(null)
 
   const [stage, setStage] = useState('upload') // upload | processing | summary | results | error
@@ -226,6 +227,16 @@ export default function GenomeClient() {
       stats: { totalDataLines: 0, recognized: Object.keys(SAMPLE_VARIANTS).length, format: 'Sample data' },
     }, { skipSummary: true })
   }, [runAnalysis])
+
+  // Auto-fire the sample-data flow when the URL carries ?autosample=1
+  // — used by the Health Story quiz's "Explore without a file" link so
+  // the user lands on a fully-populated dashboard without an extra tap.
+  useEffect(() => {
+    if (searchParams?.get('autosample') === '1' && stage === 'upload') {
+      handleSample()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const reset = () => {
     setStage('upload')

@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { useShowTechnicalTerms, setShowTechnicalTerms } from '@/lib/uiPrefs'
 import { resetGuideOnly, showGuideAgain, resetGenomeAndGuide, fireToast } from '@/lib/journeyReset'
 import ThemeToggle from '@/components/ThemeToggle'
+import { openHealthStoryQuiz } from '@/lib/userProfile'
 
 export default function PrefsMenu({ isDark = false }) {
   const router = useRouter()
@@ -69,6 +70,17 @@ export default function PrefsMenu({ isDark = false }) {
               Dark mode is optimised for the core reading surfaces. Some pages may still render in light shades.
             </div>
           </div>
+
+          {/* Update my preferences — re-open the Health Story quiz.
+              Answers pre-populate from the previous run. */}
+          <button
+            type="button"
+            onClick={() => { setOpen(false); openHealthStoryQuiz() }}
+            className="flex w-full items-center gap-2 border-b border-ss-border-warm/60 px-4 py-3 text-left text-sm font-semibold text-ss-teal transition hover:bg-ss-bg"
+          >
+            <span aria-hidden="true">⚙</span>
+            Update my preferences
+          </button>
 
           <label className="flex cursor-pointer items-start gap-3 px-4 py-3 text-left hover:bg-ss-bg">
             <div className="min-w-0 flex-1">

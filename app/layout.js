@@ -6,6 +6,7 @@ import MobileNav from '@/components/MobileNav'
 import ChunkReloader from '@/components/ChunkReloader'
 import BookmarkToast from '@/components/BookmarkToast'
 import FirstTimeWelcome from '@/components/FirstTimeWelcome'
+import HealthStoryQuiz from '@/components/HealthStoryQuiz'
 import JourneyGuide from '@/components/JourneyGuide'
 import Toast from '@/components/Toast'
 import FeaturesTracker from '@/components/FeaturesTracker'
@@ -101,6 +102,7 @@ export default function RootLayout({ children }) {
         <PWAUpdater />
         <BookmarkToast />
         <FirstTimeWelcome />
+        <HealthStoryQuiz />
         <JourneyGuide />
         <Toast />
         <FeaturesTracker />

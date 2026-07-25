@@ -19,6 +19,7 @@ import { matchProtocolToUserVariants, flattenReportCards } from '@/lib/supplemen
 import { normalizePillarName } from '@/lib/pillars'
 import { PILLARS, default as SiteNav } from '@/components/site-nav'
 import { usePillarFilter } from '@/components/PillarFilter'
+import { shouldApplyGoalPillar, markGoalPillarApplied } from '@/lib/userProfile'
 import PillarChipBar from '@/components/dashboard/PillarChipBar'
 import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
@@ -54,6 +55,21 @@ export default function Dashboard() {
       const seen = window.localStorage.getItem('ss_orientation_seen')
       if (seen) setOrientationDone(true)
     } catch {}
+  }, [])
+
+  // Health Story quiz personalisation (Phase K):
+  // On first Dashboard mount, if the user completed the quiz and has a
+  // goal but no ?pillar= param yet, pre-select the pillar that matches
+  // their goal. Idempotent — writes ss_pillar_default_applied so the
+  // auto-select fires exactly once.
+  useEffect(() => {
+    const target = shouldApplyGoalPillar(activePillar)
+    if (target) {
+      setPillar(target)
+      markGoalPillarApplied()
+    }
+    // Intentionally only on mount — subsequent pillar changes are user-driven.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // \u2014 Persist pillar chip to ss_dashboard_pillar_filter and read it back on

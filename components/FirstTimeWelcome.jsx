@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { INTERESTS, needsOnboarding, setInterests, LS_ONBOARDED } from '@/lib/interests'
+import { openHealthStoryQuiz, markQuizSkipped } from '@/lib/userProfile'
 
 export default function FirstTimeWelcome() {
   const [open, setOpen]         = useState(false)
@@ -53,9 +54,17 @@ export default function FirstTimeWelcome() {
     } else {
       // Skip → mark onboarded but empty selection.
       try { window.localStorage.setItem(LS_ONBOARDED, '1') } catch {}
+      // Skipping the welcome also skips the quiz per product spec.
+      markQuizSkipped(true)
       window.dispatchEvent(new Event('selfscience:interests-changed'))
     }
     setOpen(false)
+    // After the welcome modal closes with "Let's get started", chain
+    // into the Health Story quiz (Phase K). Delay one animation frame
+    // so the welcome modal's exit doesn't paint over the quiz.
+    if (persistSelection) {
+      setTimeout(() => openHealthStoryQuiz(), 100)
+    }
   }
 
   return (

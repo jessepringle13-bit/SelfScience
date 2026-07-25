@@ -7296,3 +7296,106 @@ agent_communication:
         celebration banner. Step 2 auto-completes when the user expands
         any variant interpretation on the pillar's page — no extra clicks
         needed for organic engagement. Nothing existing removed.
+
+═══════════════════════════════════════════════════════════
+2026-06 (Session): Health Story quiz + user profile
+═══════════════════════════════════════════════════════════
+
+frontend:
+  - task: "Health Story onboarding quiz + platform personalisation"
+    implemented: true
+    working: true
+    file: "/app/lib/userProfile.js, /app/components/HealthStoryQuiz.jsx, /app/components/FirstTimeWelcome.jsx, /app/components/PrefsMenu.jsx, /app/components/Dashboard.jsx, /app/app/genome/genome-client.jsx, /app/app/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: |
+            Additive 3-question quiz chained after the existing welcome
+            modal. No existing flow removed. Fully client-side / LS-backed.
+
+            FLOW
+              1. Welcome modal (existing).
+              2. Quiz Q1 — 6-card 2-col grid: performance / health /
+                 curiosity / nutrition / clinical / family. Auto-advance
+                 300ms after selection.
+              3. Quiz Q2 — 4-card single col: actionable / research /
+                 clinical / comprehensive. Auto-advance.
+              4. Quiz Q3 — 4-card single col literacy: beginner /
+                 intermediate / advanced / professional. Manual Continue
+                 (disabled until an option is selected).
+              5. Results summary — three summary rows (Goal / Level /
+                 What we'll show), Continue-to-upload primary CTA, and
+                 "Explore without a file →" secondary link.
+
+            KEYS WRITTEN
+              ss_user_profile — {goal, preference, literacy, completed, completedAt}
+              ss_quiz_q1|q2|q3 — mirrored per-question (supports back-nav resume)
+              ss_quiz_skipped — 'true' when user opts out entirely
+              ss_pillar_default_applied — 'true' after Dashboard's one-shot
+                                          goal→pillar auto-select fires
+
+            NAVIGATION
+              • Back link on Q2 & Q3 (reverse slide)
+              • Skip on every question (marks quiz_skipped, closes)
+              • Progress dots at top (green filled / outline)
+              • Slide animation 220ms; reverse slide on back
+
+            PERSONALISATION APPLIED IMMEDIATELY
+              • Literacy → uiPrefs.setShowTechnicalTerms(advanced|professional).
+              • Goal → Dashboard mounts and auto-selects the pillar chip
+                once (nutrition→Nutrition, performance→Sports Performance,
+                clinical→Pharmacogenomics, curiosity→Genomics, etc.).
+                Uses shouldApplyGoalPillar() so it only fires once — user
+                can freely click All Pillars afterward.
+
+            RE-TAKE VIA MENU
+              PrefsMenu now includes an "Update my preferences" button
+              that dispatches OPEN_QUIZ_EVENT. Quiz opens with prior
+              answers pre-populated; saveUserProfile() overwrites and
+              wipes ss_pillar_default_applied so a new goal re-applies
+              on next Dashboard mount.
+
+            EXPLORE WITHOUT A FILE
+              Results summary's secondary link routes to
+              /genome?autosample=1. genome-client.jsx now watches for
+              that query flag and auto-fires handleSample() so the user
+              lands on a fully populated dashboard.
+
+            Verified live via screenshot tool at 1280px:
+              1. Welcome modal renders unchanged.
+              2. Clicking "Let's get started" opens Quiz Q1 (2-col grid, 6 options).
+              3. Selecting performance auto-advances to Q2 (single-col, 4 options).
+              4. Selecting actionable auto-advances to Q3 (literacy).
+              5. Selecting intermediate + Continue → Results summary with
+                 correct plain-English labels ("more energy and better
+                 performance", "Some knowledge", "Simple explanations…").
+              6. LS written correctly:
+                 {"goal":"performance","preference":"actionable","literacy":"intermediate",...}
+              7. Goal-pillar auto-apply: nutrition profile → dashboard
+                 URL becomes /?pillar=Nutrition on first mount; second
+                 visit doesn't re-apply.
+              8. PrefsMenu shows "Update my preferences" link at the top.
+              9. Professional literacy correctly shows technical terms
+                 (MTHFR rs1801133 CT visible on variant card).
+
+metadata:
+  created_by: "main_agent"
+  version: "2.1"
+  test_sequence: 11
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: |
+        Phase K shipped: Health Story 3-question quiz chained after
+        welcome modal. Answers persist to ss_user_profile and drive
+        three concrete personalisations: literacy → tech-terms toggle,
+        goal → auto-selected pillar chip (one-shot), preference stored
+        for future use by finding cards. Re-take path via PrefsMenu
+        "Update my preferences" opens the quiz with prior answers
+        pre-populated. "Explore without a file" routes to
+        /genome?autosample=1 which auto-fires the sample-data flow so
+        users land on a populated dashboard with a single tap.
