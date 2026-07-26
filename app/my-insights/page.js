@@ -6,13 +6,15 @@
 // don’t just see conclusions — they see the reasoning behind them.
 
 import Link from 'next/link'
-import { ArrowRight, Lock } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { ArrowRight, Lock, Sparkles } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import InsightLadder from '@/components/InsightLadder'
 import UnknownsPanel from '@/components/UnknownsPanel'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
 import { usePath, GOALS } from '@/lib/userPath'
 import { useModuleProgress } from '@/lib/learningModules'
+import { connectionsFor } from '@/lib/insightConnections'
 
 function goalLabel(id) { return (GOALS.find((g) => g.id === id) || {}).label || 'your goal' }
 
@@ -115,9 +117,15 @@ const FIRST_INSIGHT = {
 export default function MyInsightsPage() {
   const path = usePath()
   const progress = useModuleProgress()
+  const params = useSearchParams()
+  const goalOverride = params?.get('goal')
 
   const foundationDone = ['foundations', 'genes', 'biomarkers'].every((id) => progress?.[id]?.completedAt)
-  const primary = path?.primary || 'genome'
+  const primaryFromPath = path?.primary || 'genome'
+  // Allow ?goal=... to preview a related insight without changing the
+  // user's saved primary goal. Only accepts a known goal id.
+  const primary = (goalOverride && FIRST_INSIGHT[goalOverride]) ? goalOverride : primaryFromPath
+  const isPreview = primary !== primaryFromPath
   const insight = FIRST_INSIGHT[primary] || FIRST_INSIGHT.genome
 
   return (
@@ -131,6 +139,16 @@ export default function MyInsightsPage() {
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ss-muted">
           One insight at a time, reasoned in five steps. Skip a rung and you can always come back — the ladder waits.
         </p>
+
+        {isPreview && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-ss-teal/40 bg-ss-teal/[0.04] px-4 py-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-teal">Previewing</span>
+            <span className="text-[13px] text-ss-text">You're viewing the <strong>{goalLabel(primary)}</strong> insight. This isn't your primary goal — nothing has changed in your path.</span>
+            <Link href="/my-insights" className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-bold text-ss-teal hover:underline">
+              Back to my primary ({goalLabel(primaryFromPath)}) <ArrowRight size={11} />
+            </Link>
+          </div>
+        )}
 
         {/* If foundational modules aren’t complete, gently redirect */}
         {!foundationDone && (
@@ -155,6 +173,33 @@ export default function MyInsightsPage() {
         <div className="mt-8">
           <UnknownsPanel />
         </div>
+
+        {/* Cross-topic connectors — Phase U-3. Shows how the current
+            insight connects into the user's other interests so goals
+            don't feel siloed. Tapping a connector switches the visible
+            insight ladder to that goal via ?goal=... */}
+        {connectionsFor(primary).length > 0 && (
+          <section className="mt-8">
+            <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-teal">
+              <Sparkles size={11} /> Related in your other goals
+            </div>
+            <div className="mt-3 grid gap-2.5 md:grid-cols-2">
+              {connectionsFor(primary).map((c) => (
+                <Link
+                  key={c.to}
+                  href={`/my-insights?goal=${encodeURIComponent(c.to)}`}
+                  className="group flex flex-col gap-1.5 rounded-2xl border border-ss-border-warm bg-white p-4 transition hover:border-ss-teal hover:bg-ss-teal/[0.04]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-bold text-ss-teal">{goalLabel(c.to)}</span>
+                    <ArrowRight size={13} className="text-ss-muted transition group-hover:translate-x-0.5 group-hover:text-ss-teal" />
+                  </div>
+                  <p className="text-[12.5px] leading-relaxed text-ss-text">{c.reason}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Explainer */}
         <WhyYoureSeeingThis

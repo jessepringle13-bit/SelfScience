@@ -859,6 +859,93 @@ backend:
                  /learn/longevity, /learn/performance, /learn/sleep,
                  /learn/metabolism, /learn/cognition) return HTTP 200.
 
+  - task: "Phase U-3 \u2014 Adaptive difficulty + cadence-aware alerts + cross-topic connectors + module-completion actions"
+    implemented: true
+    working: true
+    file: "/app/lib/moduleExtras.js, /app/lib/insightConnections.js, /app/lib/userPath.js, /app/app/learn/[moduleId]/page.js, /app/app/my-insights/page.js, /app/components/dashboard/AlertPreview.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Phase U-3 delivered on four fronts, all layered on top of
+            the existing Phase U-1/U-2 architecture without touching
+            the base data models.
+
+            1. ADAPTIVE DIFFICULTY per literacy level.
+               New /app/lib/moduleExtras.js contains a DEEPER_CUT map
+               with a technical addendum for each of the 9 modules
+               (heading + body + 3 primary citations). /learn/[moduleId]
+               renders this block only when the user\u2019s literacy is
+               \u201cbasics\u201d or \u201cadvanced\u201d. Beginners and \u201creading\u201d
+               users don\u2019t see it \u2014 the main flow stays
+               approachable. The label switches between \u201cfor
+               intermediate readers\u201d and \u201cfor advanced readers\u201d
+               depending on which tier the user is in.
+
+            2. CADENCE-AWARE ALERT FREQUENCY.
+               userPath.js now exports cadenceLimit() and
+               useCadenceLimit(). Mapping:
+                 15min  \u2192 1 alert max
+                 30min  \u2192 2 alerts max
+                 1hr    \u2192 3 alerts max
+                 whenever \u2192 3 alerts max (default cap)
+               AlertPreview.jsx applies this cap to the sorted top
+               list. A 15-minute-per-week user now only sees the
+               single most-signal unread alert; a whenever-user sees
+               the original 3.
+
+            3. CROSS-TOPIC CONNECTORS between insights.
+               New /app/lib/insightConnections.js maps each primary
+               goal to its 2 most-relevant sibling goals with a real
+               one-liner reason (e.g. energy \u2194 metabolism, longevity
+               \u2194 performance). /my-insights renders these as a
+               grid of clickable cards below the InsightLadder. Each
+               card links to /my-insights?goal=<id> \u2014 a preview
+               mode that swaps the visible insight without changing
+               the user\u2019s saved primary goal, plus a banner and
+               \u201cBack to my primary\u201d control.
+
+            4. MODULE-COMPLETION RECOMMENDATION UI.
+               moduleExtras.js also exports COMPLETION_ACTIONS with
+               a per-module CTA card (title, body, href, ctaLabel,
+               tone). /learn/[moduleId] renders it right below the
+               Mark-as-read button once `done=true`. Example:
+                 * foundations \u2192 \u201cRead module 2 next\u201d (teal)
+                 * biomarkers  \u2192 \u201cLog any recent bloodwork\u201d (orange)
+                 * energy      \u2192 \u201cBook or upload a basic panel\u201d (orange)
+                 * sleep       \u2192 \u201cTrack a free-day wake time\u201d
+                                  (\u2192 /tracker)
+                 * performance \u2192 \u201cSet a 6-week training log\u201d
+                                  (\u2192 /goals)
+               This bridges module-read \u2192 real-world action so
+               \u201cread\u201d never becomes the end state.
+
+            Verified via Playwright at 1400x900:
+              a) /learn/energy for a user with literacy=advanced
+                 renders the orange \u201cDeeper cut \u00b7 for advanced
+                 readers\u201d block. Same URL for literacy=beginner or
+                 reading hides the block entirely (checked by
+                 counting the deeper cut section \u2014 1 for advanced,
+                 0 for beginner).
+              b) /learn/energy with the module marked complete shows
+                 the \u201cNow do this\u201d completion card with the orange
+                 \u201cLog a panel\u201d CTA linking to /biomarkers.
+              c) /my-insights for primary=energy renders 2 cross-topic
+                 connector cards: metabolism + sleep, matching the
+                 declared map. Each card links to
+                 /my-insights?goal=<id>.
+              d) /my-insights?goal=metabolism previews the metabolism
+                 insight ladder and shows the \u201cPreviewing\u201d banner
+                 with a \u201cBack to my primary\u201d link.
+              e) AlertPreview no longer hard-codes .slice(0, 3) \u2014
+                 now respects the user\u2019s cadence choice.
+
+            All 12 previously-verified pages still return HTTP 200
+            (checked). No regressions.
+
 
 frontend:
   - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"

@@ -16,12 +16,17 @@ import {
 } from '@/lib/alerts'
 import AlertCenterPanel from '@/components/AlertCenterPanel'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
+import { useCadenceLimit } from '@/lib/userPath'
 
 const LS_HIDE_KEY = 'ss_alerts_preview_hidden_at'
 
 export default function AlertPreview() {
   const alerts = useAlerts()
   const [panelOpen, setPanelOpen] = useState(false)
+  // Phase U-3: cadence-aware throttling. Users who chose "15min/week"
+  // in the onboarding quiz get a single curated alert; "whenever"
+  // users see up to 3.
+  const cap = useCadenceLimit(3)
   const [hiddenTs, setHiddenTs] = useState(() => {
     if (typeof window === 'undefined') return 0
     try { return Number(window.localStorage.getItem(LS_HIDE_KEY) || 0) } catch { return 0 }
@@ -31,8 +36,8 @@ export default function AlertPreview() {
     return alerts
       .filter((a) => !a.isRead && !a.isDismissed)
       .sort(sortAlerts)
-      .slice(0, 3)
-  }, [alerts])
+      .slice(0, cap)
+  }, [alerts, cap])
 
   // Snooze: if the user dismissed the whole preview in the last hour,
   // don't show it again until an even newer unread alert arrives.

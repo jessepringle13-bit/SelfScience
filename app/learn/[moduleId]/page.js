@@ -13,6 +13,7 @@ import SiteNav from '@/components/site-nav'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
 import { moduleById, useModuleProgress, markModuleComplete, MODULES } from '@/lib/learningModules'
 import { usePath, GOALS, modulePathFor } from '@/lib/userPath'
+import { DEEPER_CUT, COMPLETION_ACTIONS } from '@/lib/moduleExtras'
 
 function goalLabel(id) { return (GOALS.find((g) => g.id === id) || {}).label?.toLowerCase() || 'your goal' }
 
@@ -94,6 +95,22 @@ export default function ModulePage() {
           <p className="mt-3 text-[15px] leading-[1.75] text-ss-text">{m.mentalModel.body}</p>
         </section>
 
+        {/* DEEPER CUT \u2014 only for basics/advanced literacy. Phase U-3
+            adaptive-difficulty layer. Beginners never see this so the
+            module stays approachable. */}
+        {DEEPER_CUT[m.id] && (path?.literacy === 'basics' || path?.literacy === 'advanced') && (
+          <section className="mt-6 rounded-2xl border-l-4 border-ss-orange bg-ss-orange/[0.05] p-6">
+            <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">Deeper cut · for {path?.literacy === 'advanced' ? 'advanced' : 'intermediate'} readers</div>
+            <h3 className="mt-2 text-lg font-extrabold text-ss-text">{DEEPER_CUT[m.id].heading}</h3>
+            <p className="mt-3 text-[14.5px] leading-[1.75] text-ss-text">{DEEPER_CUT[m.id].body}</p>
+            {DEEPER_CUT[m.id].citations?.length > 0 && (
+              <ul className="mt-3 space-y-0.5 font-mono text-[11px] text-ss-muted">
+                {DEEPER_CUT[m.id].citations.map((c, i) => <li key={i}>\u2022 {c}</li>)}
+              </ul>
+            )}
+          </section>
+        )}
+
         {/* DATA SHOWS */}
         <section className="mt-10">
           <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-teal">What your data could show</div>
@@ -136,6 +153,25 @@ export default function ModulePage() {
             )}
           </button>
         </section>
+
+        {/* COMPLETION ACTION — Phase U-3. Shown once the module is
+            marked complete. Bridges module → real-world action so
+            "read" never becomes the end state. */}
+        {done && COMPLETION_ACTIONS[m.id] && (() => {
+          const ca = COMPLETION_ACTIONS[m.id]
+          const tone = ca.tone === 'orange' ? 'border-ss-orange bg-ss-orange/[0.06]' : 'border-ss-teal bg-ss-teal/[0.06]'
+          const chip = ca.tone === 'orange' ? 'bg-ss-orange text-white' : 'bg-ss-teal text-white'
+          return (
+            <section className={`mt-6 rounded-2xl border-2 p-6 ${tone}`}>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">Now do this</div>
+              <h3 className="mt-2 text-lg font-extrabold text-ss-text">{ca.title}</h3>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-ss-text">{ca.body}</p>
+              <Link href={ca.href} className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold shadow-sm transition hover:brightness-95 ${chip}`}>
+                {ca.ctaLabel} <ArrowRight size={13} />
+              </Link>
+            </section>
+          )
+        })()}
 
         {/* Sources */}
         {m.sources?.length > 0 && (
