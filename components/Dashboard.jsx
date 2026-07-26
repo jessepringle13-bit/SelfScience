@@ -42,6 +42,7 @@ import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
 import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
 import AlertPreview from '@/components/dashboard/AlertPreview'
+import NextGenePrompt from '@/components/dashboard/NextGenePrompt'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -307,6 +308,13 @@ export default function Dashboard() {
 
         {/* Community opt-in banner (gated by First Insight + 3 findings + 2+ sessions). */}
         <CommunityOptInBanner />
+
+        {/* Your Next Gene prompt — silent unless there are unexplored
+            findings. Sits directly below the welcome message and above
+            the pillar chip bar per Part 3 spec. */}
+        <div className="mt-6">
+          <NextGenePrompt />
+        </div>
 
         {/* Phase D · Part 4 — journey progress bar. */}
         <FeaturesProgressBar />

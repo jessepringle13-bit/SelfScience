@@ -119,6 +119,12 @@ export default function PrefsMenu({ isDark = false }) {
           {/* Guide actions (Parts 2 + 3) */}
           <div className="border-t border-ss-border-warm/60">
             <MenuItem
+              Icon={Compass}
+              label="Explore Your Genes"
+              hint="Focus Mode — one finding at a time"
+              onClick={() => { setOpen(false); router.push('/explore') }}
+            />
+            <MenuItem
               Icon={Target}
               label="My Goals"
               hint="Set genome-informed goals and track progress"

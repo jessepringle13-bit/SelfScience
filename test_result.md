@@ -8217,3 +8217,132 @@ agent_communication:
           all existing dashboard/habits/journal/community/alerts
           functionality untouched.
 
+
+## 2025-06 — Gene Explorer & Focus Mode (Phase T-1) — COMPLETE
+  - task: "Gene Explorer list + Focus Mode single-variant deep dive + Your Next Gene prompt + all_explored achievement"
+    implemented: true
+    working: true
+    file: "lib/explore.js, app/explore/page.js, app/explore/[findingId]/page.js, components/dashboard/NextGenePrompt.jsx, components/site-nav.jsx, components/PrefsMenu.jsx, components/Dashboard.jsx, lib/achievements.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: |
+          T-1 slice of the 8-part Gene Explorer spec. Confirmed with user
+          up-front: this ships Parts 1 (Explorer list), 2 (Focus Mode),
+          3 (Your Next Gene prompt), 8 (empty states + all_explored
+          achievement) + header nav integrations. Parts 4/5/6/7 are the
+          T-2 slice (Guide integration, Focus link on every card,
+          Isolation Mode toggle, Smart grouping).
+
+          Core lib (/lib/explore.js):
+            - ss_explored_findings array (rsid lowercase, dedup, 500 cap)
+            - findingIdFor()/slugGene() \u2014 rsid preferred; else
+              lowercase-alphanumeric hyphenated gene slug (e.g. mthfr-c677t)
+            - getFindings() dedups by finding ID (fixed initial dup issue
+              where MTHFR appeared twice via overview + variants_recognized)
+            - impactRankedFindings() \u2014 awareness/high first, awareness rest,
+              positives, neutrals; secondary sort by confidence
+            - getNextUnexplored() drives the dashboard prompt
+            - actionTypeBucket() classifier for T-2 smart grouping
+            - useExploredIds() reactive hook; markExplored /
+              unmarkExplored; achievements checkAll() poked on write
+
+          /app/explore/page.js (Explorer List):
+            - Three sections per spec: \"Start here\" (top 5 awareness by
+              impact, teal-tinted, PRIORITY label), collapsible
+              strengths, collapsible rest.
+            - Row design per spec: 52px min-height, category chip,
+              classification pill, Go deeper / Revisit link, circle
+              toggle with green fill + line-through + opacity 0.5 when
+              explored.
+            - Filter chips: All / Unexplored / Strengths / Awareness /
+              Neutral.
+            - Sort: Impact (default) / Rarity / Pillar / A\u2013Z.
+            - Progress bar (X explored \u2022 Y remaining \u2022 pct%).
+            - All-explored celebration state (star icon, ss-green card).
+            - No-genome empty state with Upload / Sample data buttons.
+            - Loading skeleton (8 rows) during hydration check.
+
+          /app/explore/[findingId]/page.js (Focus Mode):
+            - 7 sections A\u2013G per spec.
+            - Top nav: Back to Explorer breadcrumb + Previous/Next arrows
+              (keyboard \u2190/\u2192 also work) + Mark explored toggle.
+            - Section A Identity: gene name, trait name, pillar chip,
+              classification, confidence, rsID, genotype, global freq bar.
+            - Section B fully-expanded \"What this means\" + \"What you can
+              do about it\" bulleted list.
+            - Section C: 3 recent PubMed papers fetched from /api/search
+              with skeleton loader and search-fallback link.
+            - Section D: structured action list (decorative checkboxes)
+              + related tools chips (Nutrition / Supplements / Training /
+              Drug-check depending on gene / actions).
+            - Section E: expanded frequency block with global bar + rarity
+              phrase + See how it varies by ancestry link.
+            - Section F: three connection prompts (Journal, Goal, Doctor)
+              with correct fallback deep links:
+                Journal:  /journal?type=reflection&finding=<id>
+                Goal:     /goals?new=1&category=<cat>&variant=<id>
+                Doctor:   /practitioner-report?focus=<id>
+              (TODO T-2 comments added on Journal + Doctor for future
+              global-event wiring.)
+            - Section G: 3 next unexplored suggestions + Back to Explorer.
+            - Bottom explored toggle (48px circle) + micro-toast
+              (\"[Gene] marked as explored. X findings remaining.\").
+            - Auto-marks explored on mount (so revisit tracking is
+              faithful to \"the user opened it\").
+            - No-genome redirects to /explore per spec.
+            - Not-found state renders with amber icon + back link.
+
+          components/dashboard/NextGenePrompt.jsx:
+            - Renders directly below welcome message, above pillar bar.
+            - Silent unless genome loaded AND unexplored findings exist.
+            - Session-only dismiss via ss_next_gene_dismissed
+              (reappears next visit).
+            - Shows gene, rsID, one-sentence teaser from getVariantInterpretation,
+              pillar chip + classification pill, remaining count.
+            - CTA links to /explore/<id>.
+
+          Integrations:
+            - Tools nav dropdown gained \"Explore Your Genes\" (Compass
+              icon) between Blueprint and Health Goals.
+            - Mobile drawer gained \"Explore Your Genes\" link.
+            - PrefsMenu gained \"Explore Your Genes\" menu item.
+            - Dashboard.jsx renders <NextGenePrompt /> below
+              CommunityOptInBanner and above FeaturesProgressBar.
+            - achievements.js: added `all_explored` (T4, Dna icon)
+              with triggerMet reading sessionStorage's
+              selfscience_genome_results + ss_explored_findings to
+              confirm every rsid in the report has been explored.
+
+          Verified via screenshot tool:
+            - /explore page: 7 findings deduped (previous bug showed 11);
+              5-item priority section with teal border-left and PRIORITY
+              label; strengths + rest sections collapsed with correct
+              counts; filter/sort chips; progress bar 0/7 0%.
+            - /explore/rs1801133 Focus Mode: MTHFR C677T with all seven
+              sections rendered end-to-end; PubMed research loaded via
+              /api/search; connection cards with proper deep links;
+              next-3 suggestions with EXPLORE badges + Go deeper links.
+            - Auto-mark-explored: nav badge switches to green Explored;
+              MTHFR then correctly excluded from NextGenePrompt (next
+              unexplored surfaces MTNR1B).
+            - `yarn build` succeeds. All 46 routes compile including
+              /explore and /explore/[findingId].
+
+          Notes / issues fixed during T-1:
+            1. bulk_file_writer path with [findingId] brackets skipped
+               folder creation \u2014 fixed by creating the subdir with
+               mkdir -p then create_file.
+            2. getFindings() previously produced duplicates because
+               flattenReportCards dedups by (rsid + genotype) but
+               overview cards often ship rsid without genotype \u2014
+               added a second dedup pass keyed on the final finding ID.
+            3. Suspense-boundary lesson from Phase R applies here too;
+               explore/page.js does NOT use useSearchParams so no
+               Suspense wrapper needed.
+
+          Awaiting user review before starting T-2 (Parts 4\u20137).
+
