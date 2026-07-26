@@ -23,19 +23,21 @@ module.exports = {
         },
         colors: {
           ss: {
-            // Brand colors — kept fixed across light/dark so identity
-            // stays consistent (accents don't need to flip).
-            teal: '#1B474D',
-            'teal-dark': '#123539',
-            'teal-ink': '#0F2A2E',
-            orange: '#C45820',
-            'orange-dark': '#A5471A',
-            green: '#2E7D32',
-            amber: '#964219',
-            red: '#B23A3A',
-            critical: '#A12C7B',
-            'preprint-yellow': '#B07D00',
-            'editorial-blue': '#006494',
+            // Brand colors — CSS-variable driven so `.dark` on <html>
+            // can flip them to lighter values that stay readable on
+            // dark surfaces. Fallback literals are the original
+            // light-mode values so any pre-CSS-var usage still works.
+            teal: 'var(--ss-teal, #1B474D)',
+            'teal-dark': 'var(--ss-teal-dark, #123539)',
+            'teal-ink': 'var(--ss-teal-ink, #0F2A2E)',
+            orange: 'var(--ss-orange, #C45820)',
+            'orange-dark': 'var(--ss-orange-dark, #A5471A)',
+            green: 'var(--ss-green, #2E7D32)',
+            amber: 'var(--ss-amber, #964219)',
+            red: 'var(--ss-red, #B23A3A)',
+            critical: 'var(--ss-critical, #A12C7B)',
+            'preprint-yellow': 'var(--ss-preprint-yellow, #B07D00)',
+            'editorial-blue': 'var(--ss-editorial-blue, #006494)',
             // Surfaces / neutrals — driven by CSS variables so a single
             // `.dark` class on <html> swaps the entire palette. Fallback
             // literals are the original light-mode values so pre-CSS-var

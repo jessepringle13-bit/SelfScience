@@ -17,6 +17,20 @@
     --ss-row-alt: #EEF7F7;
     --ss-privacy-tint: #EAF5F5;
 
+    /* Brand accents — light mode values match the original hardcoded
+       hexes so nothing changes visually in light theme. */
+    --ss-teal: #1B474D;
+    --ss-teal-dark: #123539;
+    --ss-teal-ink: #0F2A2E;
+    --ss-orange: #C45820;
+    --ss-orange-dark: #A5471A;
+    --ss-green: #2E7D32;
+    --ss-amber: #964219;
+    --ss-red: #B23A3A;
+    --ss-critical: #A12C7B;
+    --ss-preprint-yellow: #B07D00;
+    --ss-editorial-blue: #006494;
+
     --background: 44 27% 96%;
     --foreground: 42 15% 14%;
     --card: 45 25% 97%;
@@ -50,6 +64,22 @@
     --ss-border-warm: #2A3A42;
     --ss-row-alt: #17262E;
     --ss-privacy-tint: #16303A;
+
+    /* Brand accents — brightened for readability on dark navy.
+       The original dark-teal / dark-amber hexes disappear on the
+       dark canvas; these variants preserve brand identity while
+       hitting AA contrast (4.5:1) against --ss-bg. */
+    --ss-teal: #6FD3D0;            /* was #1B474D — bright teal on navy */
+    --ss-teal-dark: #4FB3B0;       /* darker accent variant */
+    --ss-teal-ink: #1F5A5F;        /* inky teal for surface fills */
+    --ss-orange: #F58642;          /* was #C45820 — warm bright orange */
+    --ss-orange-dark: #E27235;
+    --ss-green: #6FCF77;            /* was #2E7D32 — vivid mint green */
+    --ss-amber: #F0B060;            /* was #964219 — warm tan / amber */
+    --ss-red: #FF7A7A;               /* was #B23A3A */
+    --ss-critical: #E86BC6;         /* was #A12C7B */
+    --ss-preprint-yellow: #E5C34F;  /* was #B07D00 */
+    --ss-editorial-blue: #3DAFE5;   /* was #006494 */
 
     --background: 200 40% 8%;
     --foreground: 160 8% 92%;
