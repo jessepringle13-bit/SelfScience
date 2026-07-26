@@ -40,6 +40,7 @@ import TrackerWidget from '@/components/dashboard/TrackerWidget'
 import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
 import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
+import AlertPreview from '@/components/dashboard/AlertPreview'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -261,6 +262,12 @@ export default function Dashboard() {
       {/* Header — pt-24 clears the absolute-positioned SiteNav (~64px) + a
           gap for the fixed dashboard/discover toggle beneath it. */}
       <div className="container pt-24 md:pt-28">
+        {/* Genome Alert System banner — first thing above the header text
+            so returning users see updates at a glance. Silent when there
+            are no unread alerts. Full-container width. */}
+        <div className="-mx-4 mb-4 overflow-hidden rounded-2xl border border-ss-border-warm/60 shadow-sm md:-mx-6">
+          <AlertPreview />
+        </div>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">

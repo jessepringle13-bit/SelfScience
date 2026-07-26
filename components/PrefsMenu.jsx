@@ -8,19 +8,21 @@
 // Click / touch outside or Escape closes the menu.
 
 import { useEffect, useRef, useState } from 'react'
-import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X, Users } from 'lucide-react'
+import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X, Users, Bell } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useShowTechnicalTerms, setShowTechnicalTerms } from '@/lib/uiPrefs'
 import { resetGuideOnly, showGuideAgain, resetGenomeAndGuide, fireToast } from '@/lib/journeyReset'
 import ThemeToggle from '@/components/ThemeToggle'
 import { openHealthStoryQuiz } from '@/lib/userProfile'
 import { useCommunityState } from '@/lib/community'
+import { usePrefs as useAlertPrefs, clearAllAlerts, TYPE_META } from '@/lib/alerts'
 
 export default function PrefsMenu({ isDark = false }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const showTech = useShowTechnicalTerms()
+  const [alertPrefs, updateAlertPrefs] = useAlertPrefs()
   const { optedIn: communityOptedIn } = useCommunityState()
   const wrapRef = useRef(null)
 
@@ -57,7 +59,7 @@ export default function PrefsMenu({ isDark = false }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-ss-border-warm bg-white shadow-xl ring-1 ring-black/5"
+          className="absolute right-0 top-full z-50 mt-2 max-h-[85vh] w-80 overflow-y-auto overflow-x-hidden rounded-2xl border border-ss-border-warm bg-white shadow-xl ring-1 ring-black/5"
         >
           <div className="border-b border-ss-border-warm/60 px-4 py-3">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ss-muted">Display preferences</div>
@@ -136,6 +138,58 @@ export default function PrefsMenu({ isDark = false }) {
               hint="Reset only your Guide progress"
               onClick={() => { resetGuideOnly(); setOpen(false); fireToast('Guide restarted — follow the steps to explore your results') }}
             />
+          </div>
+
+          {/* Alert settings — Genome Alert System (Section: 6 toggles + master). */}
+          <div id="alert-prefs" className="border-t border-ss-border-warm/60">
+            <div className="flex items-center justify-between px-4 pt-3 pb-2">
+              <div className="flex items-center gap-2">
+                <Bell size={13} className="text-ss-teal" />
+                <span className="text-xs font-bold uppercase tracking-[0.14em] text-ss-teal">Alerts</span>
+              </div>
+              <MiniSwitch
+                checked={!!alertPrefs.master}
+                onChange={(v) => updateAlertPrefs({ master: v })}
+                label="Master alerts switch"
+              />
+            </div>
+            <p className="px-4 pb-2 text-[10.5px] leading-snug text-ss-muted">
+              Choose which alerts appear in your nav bell. Everything runs on-device — no push, no email.
+            </p>
+            <div className={`px-2 pb-2 ${alertPrefs.master ? '' : 'pointer-events-none opacity-50'}`}>
+              {[
+                { k: 'research',  label: 'New research on your variants',    hint: 'PubMed studies matching your top variants.' },
+                { k: 'habit',     label: 'New habits linked to your genome', hint: 'Genotype-specific habits you haven\u2019t added yet.' },
+                { k: 'trial',     label: 'Clinical trial matches',           hint: 'Recruiting trials for your genes.' },
+                { k: 'community', label: 'Community insights',               hint: 'What other carriers of your variants are sharing.' },
+                { k: 'reminder',  label: 'Reminders',                         hint: 'Journal gaps, habit streaks, reading backlog.' },
+                { k: 'update',    label: 'Platform updates',                  hint: 'New features and improvements to SelfScience.' },
+              ].map((row) => (
+                <label key={row.k} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 hover:bg-ss-bg">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12.5px] font-semibold text-ss-teal">{row.label}</div>
+                    <div className="mt-0.5 text-[10.5px] leading-snug text-ss-muted">{row.hint}</div>
+                  </div>
+                  <MiniSwitch
+                    checked={!!alertPrefs[row.k]}
+                    onChange={(v) => updateAlertPrefs({ [row.k]: v })}
+                    label={row.label}
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm('Clear all non-pinned alerts?')) {
+                  clearAllAlerts()
+                  fireToast('Alerts cleared')
+                }
+              }}
+              className="flex w-full items-center gap-2 border-t border-ss-border-warm/60 px-4 py-2.5 text-left text-[12px] font-semibold text-red-600 transition hover:bg-red-50"
+            >
+              <Trash2 size={12} /> Clear all alerts
+            </button>
           </div>
 
           {/* Danger zone (Part 1) */}
@@ -221,6 +275,28 @@ function MenuItem({ Icon, label, hint, onClick, danger }) {
         <span className="block text-sm font-bold">{label}</span>
         {hint && <span className="mt-0.5 block text-[11px] font-normal text-ss-muted">{hint}</span>}
       </span>
+    </button>
+  )
+}
+
+function MiniSwitch({ checked, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={(e) => { e.preventDefault(); onChange(!checked) }}
+      className={`relative mt-0.5 h-5 w-9 flex-shrink-0 rounded-full transition ${
+        checked ? 'bg-ss-green' : 'bg-ss-border-warm'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${
+          checked ? 'left-[18px]' : 'left-0.5'
+        }`}
+      />
     </button>
   )
 }

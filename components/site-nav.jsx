@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import PrefsMenu from '@/components/PrefsMenu'
+import AlertBell from '@/components/AlertBell'
 import ExplorerChip from '@/components/ExplorerChip'
 import { useSavedCount } from '@/lib/readingList'
 
@@ -369,6 +370,8 @@ export function SiteNav({ variant = 'light' }) {
               Journey Guide once the user completes both Tier 1 and
               Tier 2. Renders null otherwise. */}
           <ExplorerChip isDark={isDark} />
+          {/* Alert Bell — Genome Alert System. Badge shows unread count. */}
+          <AlertBell isDark={isDark} />
           {/* Display prefs (Phase C) — small gear menu with the
               "Show technical terms" toggle. Kept adjacent to the
               other end-of-nav controls so it's discoverable but not

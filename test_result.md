@@ -8027,3 +8027,90 @@ agent_communication:
         Reminder to user: still requires the community SQL from
         /app/scripts/community-schema.sql to be applied in the
         Supabase Dashboard SQL Editor before any writes succeed.
+
+## 2025-06 — Genome Alert System (Phase R) — COMPLETE
+  - task: "Genome Alert System (nav bell + panel + dashboard preview + prefs)"
+    implemented: true
+    working: true
+    file: "lib/alerts.js, components/AlertBell.jsx, components/AlertCenterPanel.jsx, components/dashboard/AlertPreview.jsx, components/AlertsInitializer.jsx, components/site-nav.jsx, components/PrefsMenu.jsx, components/Dashboard.jsx, app/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: |
+          Built full Genome Alert System per Message 316 spec.
+
+          Core lib (/lib/alerts.js):
+            - ss_alerts array (max 50, pinned exempt from cap)
+            - 6 types: research, habit, trial, community, reminder, update
+              each with TTL (30d for content, 14d for reminders)
+            - Prefs: master switch + 6 type toggles → ss_alert_prefs
+            - Debounced check (1h) via requestIdleCallback
+            - Dedupe: existing IDs get title/body/action refresh; user
+              flags (isRead, pinned) never clobbered
+            - Sort: pinned first (newest first), then non-pinned newest first
+            - Pinning: max 5 pins; pinned alerts NEVER expire and NEVER
+              deleted by the 50-cap (per user requirement)
+            - Generators (all read cached data, no fresh fetches):
+                • Research — reads ss_digest_cache (variants[].research)
+                • Trials — reads ss_digest_cache (variants[].trials)
+                • Habits — reads getHabitSuggestions() and skips names
+                  already in ss_habits
+                • Community — one anonymous nudge per (top gene × ISO week)
+                • Reminders — journal gap >=14d, streak-at-risk today,
+                  reading backlog >=5
+                • Platform updates — hardcoded PLATFORM_UPDATES array,
+                  fires exactly once per key via ss_alerts_seen_updates
+
+          UI Components:
+            - AlertBell.jsx — nav pill with unread badge, opens panel.
+              Injected next to PrefsMenu gear (desktop + mobile).
+            - AlertCenterPanel.jsx — slide-out on desktop / bottom sheet
+              on mobile. Rendered via createPortal to document.body so
+              it escapes the SiteNav backdrop-blur containing block
+              (fixed positioning was being trapped inside the 64px nav).
+              Tabs: All / Unread / Pinned. Type filter chips for all 6.
+              Actions: Mark read (all), Clear (all non-pinned).
+              Context menu: right-click OR long-press (550ms) → Pin/
+              Unpin + Mark read + Dismiss + Cancel.
+              Toast overlay for feedback ("Pinned", "Unpinned", cap msg).
+            - dashboard/AlertPreview.jsx — full-width banner at top of
+              /Dashboard.jsx above ALL other widgets (per user answer 1).
+              Shows top 3 unread. Dismissible per session; auto-shows
+              again when a newer unread alert arrives.
+            - AlertsInitializer.jsx — mounted in app/layout.js; runs
+              runAlertChecks() on load + focus + genome-changed. Non-
+              blocking (idle callback / setTimeout).
+
+          PrefsMenu additions (with anchor #alert-prefs):
+            - ALERTS section: master switch (top-right), 6 typed toggles
+              with hints, "Clear all alerts" red button.
+            - MiniSwitch component for compact 5x9 switches.
+            - Menu widened to w-80 and scrollable (max-h-[85vh]).
+
+          User answers honored:
+            1. Preview banner is full-width above dashboard header ✓
+            2. Research alerts read cached ss_digest_cache only, no
+               fresh PubMed fetch on load ✓
+            3. 50 cap + 30d expiry + 5-pin cap; pinned never expire,
+               never trimmed; long-press mobile / right-click desktop
+               opens context menu with "Pin this alert" option; filled
+               amber pin icon in top-right of pinned rows; pinned sort
+               to top of All tab ✓
+
+          Verified via screenshot tool:
+            - Nav bell renders on both dark hero + light nav variants,
+              badge shows unread count (4 platform updates fire on
+              first visit for existing users).
+            - Panel opens as full-height slide-out, all 4 platform
+              alerts render with type label, title, body, action, "just
+              now" timestamp, unread dot.
+            - PrefsMenu → ALERTS section shows master + 6 toggles +
+              Clear all button; menu scrolls when needed.
+            - createPortal fix resolved the backdrop-blur containment
+              bug that was collapsing the panel to 64px height.
+
+          No backend changes. No new dependencies. Additive only.
+
