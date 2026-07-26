@@ -771,6 +771,94 @@ backend:
             before hydration). Not caused by Phase U-1; existed
             before this work. Does not affect production.
 
+  - task: "Phase U-2 \u2014 Goal-specific modules + UnknownsPanel + InsightLadder + My Insights + WhyYoureSeeingThis polish"
+    implemented: true
+    working: true
+    file: "/app/lib/learningModules.js, /app/lib/userPath.js, /app/components/UnknownsPanel.jsx, /app/components/InsightLadder.jsx, /app/app/my-insights/page.js, /app/components/site-nav.jsx, /app/components/dashboard/AlertPreview.jsx, /app/app/explore/[findingId]/page.js, /app/app/my-path/page.js, /app/app/learn/[moduleId]/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Built the next layer of the Guided-First architecture.
+
+            1. SIX goal-specific learning modules added to
+               /app/lib/learningModules.js:
+                 - energy (Where Your Energy Actually Comes From)
+                 - longevity (The Longevity Levers That Actually Move
+                   The Needle)
+                 - performance (How Your Genes Shape Athletic Response)
+                 - sleep (Reading Your Sleep Biology)
+                 - metabolism (Metabolic Health Beyond Blood Sugar)
+                 - cognition (The Neurochemistry Of Focus And Memory)
+               Each has a real 5\u20137 min read with hook, why-this-matters,
+               mental model, dataShows, misconceptions, next step, and
+               sources. Total is now 9 modules (3 foundation + 6 goal).
+
+            2. modulePathFor() in /app/lib/userPath.js now returns the
+               user\u2019s ordered chain based on their primary goal:
+                 foundation (3) + goal-specific (1) = 4-module chain
+                 for most goals. Hormones \u2192 metabolism, supplements
+                 \u2192 energy as sensible fallbacks. Genome-broadly
+                 stays at 3 modules.
+
+            3. /learn/[moduleId] now resolves nextM dynamically via
+               modulePathFor() when the module doesn\u2019t declare its
+               own nextModuleId \u2014 so biomarkers (foundation module
+               3) auto-chains into the correct goal-specific module.
+               Header now shows \"Module X of Y\" where Y is chain
+               length.
+
+            4. NEW <UnknownsPanel /> component. Reads
+               ss_user_path + ss_learning_progress + genome/bloodwork
+               state and returns the single highest-value next data
+               step, ranked per primary goal:
+                 - Missing genome           \u2192 orange \u201cUpload your genome\u201d
+                 - Missing bloodwork        \u2192 orange \u201cAdd recent bloodwork\u201d
+                 - Missing foundation read  \u2192 muted \u201cRead module 1\u201d
+               Included on /my-path and /my-insights. Auto-hides
+               when all gaps are resolved.
+
+            5. NEW <InsightLadder /> component. Five-rung progressive
+               reveal: signal \u2192 science \u2192 personal \u2192 trade-offs
+               \u2192 action. Users tap each rung to expand; the ladder
+               shows completion percentage and preserves reading pace.
+
+            6. NEW /my-insights page. The fourth pillar of the
+               guided nav. Renders the primary insight ladder tuned
+               to the user\u2019s primary goal (9 curated insights, one
+               per goal), the UnknownsPanel, and a
+               WhyYoureSeeingThis explainer. Gently redirects users
+               back to /my-path if the foundation isn\u2019t complete.
+
+            7. Nav gating updated: My Insights added to guided
+               desktop nav and mobile drawer, right after My Path.
+               New guided nav = [Start Here, My Path, My Insights,
+               Search, Support] \u2014 5 items.
+
+            8. WhyYoureSeeingThis injected into two more surfaces:
+                 - Dashboard AlertPreview (bottom of the alerts list)
+                 - Focus Mode /explore/[findingId] (after Section G)
+               So the \u201cwhy did the platform pick this?\u201d
+               explanation now shows on My Path, /learn/*,
+               /my-insights, Focus Mode, and Dashboard alerts.
+
+            Verified via screenshot at 1400x900:
+              a) /my-insights renders 5-rung insight ladder tuned to
+                 primary=energy. Guided nav shows all 5 items.
+                 UnknownsPanel correctly surfaces \u201cAdd recent
+                 bloodwork\u201d because the seeded user has genome but
+                 no bloodwork.
+              b) /my-path shows \u201c1 of 4 complete \u00b7 25%\u201d and
+                 lists the correct 4-module chain ending in \u201cWhere
+                 Your Energy Actually Comes From\u201d (module 4).
+              c) All 12 pages (/, /start, /onboarding/quiz, /my-path,
+                 /my-insights, /learn/foundations, /learn/energy,
+                 /learn/longevity, /learn/performance, /learn/sleep,
+                 /learn/metabolism, /learn/cognition) return HTTP 200.
+
 
 frontend:
   - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"

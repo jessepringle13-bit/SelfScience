@@ -11,8 +11,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Clock, BookOpen } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
-import { moduleById, useModuleProgress, markModuleComplete } from '@/lib/learningModules'
-import { usePath, GOALS } from '@/lib/userPath'
+import { moduleById, useModuleProgress, markModuleComplete, MODULES } from '@/lib/learningModules'
+import { usePath, GOALS, modulePathFor } from '@/lib/userPath'
 
 function goalLabel(id) { return (GOALS.find((g) => g.id === id) || {}).label?.toLowerCase() || 'your goal' }
 
@@ -38,7 +38,17 @@ export default function ModulePage() {
     )
   }
 
-  const nextM = m.nextModuleId ? moduleById(m.nextModuleId) : null
+  const nextM = useMemo(() => {
+    // If the module explicitly defines a next, honour it.
+    if (m?.nextModuleId) return moduleById(m.nextModuleId)
+    // Otherwise resolve dynamically from the user\u2019s modulePathFor chain.
+    if (!path) return null
+    const chain = modulePathFor(path.primary)
+    const idx = chain.indexOf(m.id)
+    if (idx === -1) return null
+    const nextId = chain[idx + 1]
+    return nextId ? moduleById(nextId) : null
+  }, [m, path])
   const gl = goalLabel(path?.primary)
 
   const complete = () => {
@@ -59,7 +69,7 @@ export default function ModulePage() {
         {/* Header */}
         <div className="mt-6 flex items-center gap-2 font-mono text-[10px] text-ss-muted">
           <BookOpen size={11} className="text-ss-teal" />
-          <span className="font-bold uppercase tracking-[0.14em] text-ss-teal">Module {m.order} of 3</span>
+          <span className="font-bold uppercase tracking-[0.14em] text-ss-teal">Module {m.order} of {path ? modulePathFor(path.primary).length : 3}</span>
           <span className="text-ss-border-warm">·</span>
           <Clock size={10} /><span>{m.readMinutes} min read</span>
         </div>

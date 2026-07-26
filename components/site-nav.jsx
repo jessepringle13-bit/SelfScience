@@ -231,6 +231,18 @@ export function SiteNav({ variant = 'light' }) {
               <Route size={13} /> My Path
             </a>
           )}
+          {guided && (
+            <a
+              href="/my-insights"
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
+                pathname === '/my-insights'
+                  ? 'bg-ss-teal/10 text-ss-teal'
+                  : 'text-ss-teal hover:bg-ss-teal/10'
+              }`}
+            >
+              My Insights
+            </a>
+          )}
           {/* Dashboard \u2014 only surfaces once the user has actually loaded a
               genome. Positioned right after Start Here so the reload path
               is obvious. */}
@@ -474,6 +486,15 @@ export function SiteNav({ variant = 'light' }) {
                 className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-2 font-semibold text-white hover:bg-white/25"
               >
                 <Route size={14} /> My Path
+              </a>
+            )}
+            {guided && (
+              <a
+                href="/my-insights"
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-2 font-semibold text-white hover:bg-white/25"
+              >
+                My Insights
               </a>
             )}
             <a href="/search" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Search</a>

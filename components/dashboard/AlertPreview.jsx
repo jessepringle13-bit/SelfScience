@@ -15,6 +15,7 @@ import {
   sortAlerts,
 } from '@/lib/alerts'
 import AlertCenterPanel from '@/components/AlertCenterPanel'
+import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
 
 const LS_HIDE_KEY = 'ss_alerts_preview_hidden_at'
 
@@ -126,6 +127,16 @@ export default function AlertPreview() {
               )
             })}
           </ul>
+
+          {/* Explainer: helps first-time users understand why alerts appeared. */}
+          <WhyYoureSeeingThis
+            className="!mt-3"
+            items={[
+              'Alerts are generated from your genome + saved variants + recent research feeds.',
+              'Only unread alerts appear here \u2014 dismiss or open to clear.',
+              'Manage which alert types run in Preferences \u2192 Alerts.',
+            ]}
+          />
         </div>
       </div>
 

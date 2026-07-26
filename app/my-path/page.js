@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, Check, Lock, Sparkles, Upload } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
+import UnknownsPanel from '@/components/UnknownsPanel'
 import { usePath, GOALS, modulePathFor, useMode, setMode, useGraduation } from '@/lib/userPath'
 import { MODULES, useModuleProgress } from '@/lib/learningModules'
 
@@ -141,6 +142,12 @@ export default function MyPathPage() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* Unknowns \u2192 next-best-data. Reads path + progress and surfaces
+            the single highest-value data step. */}
+        <section className="mt-8">
+          <UnknownsPanel />
         </section>
 
         {/* Explainer */}

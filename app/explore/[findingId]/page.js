@@ -14,6 +14,7 @@ import {
   ExternalLink, AlertTriangle,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
+import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
 import {
   getFindings, getFindingById, impactRankedFindings, useExploredIds,
   markExplored, unmarkExplored, CLASSIFICATION_META, hasGenomeResults,
@@ -337,6 +338,19 @@ export default function FocusModePage() {
             {isExplored ? 'Explored ✓' : 'Mark this gene as explored'}
           </div>
         </section>
+      </div>
+
+      {/* Explainer: helps the user understand why THIS finding was
+          selected \u2014 confidence, classification, provenance. */}
+      <div className="container max-w-3xl pb-8">
+        <WhyYoureSeeingThis
+          items={[
+            finding.geneSymbol ? `Gene: ${finding.geneSymbol}${finding.rsid ? ' \u00b7 rsid ' + finding.rsid : ''}.` : 'Selected from your uploaded genome.',
+            finding.classification ? `Classification: ${finding.classification}. ${classMeta?.blurb || ''}`.trim() : null,
+            'Copy adapts to your data \u2014 more inputs (bloodwork, journal entries) sharpen future rungs.',
+          ].filter(Boolean)}
+          improveWith={'Add recent bloodwork so we can cross-check whether this variant\u2019s biology is actually expressing in your body right now.'}
+        />
       </div>
 
       {/* Micro toast */}
