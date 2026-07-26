@@ -291,7 +291,7 @@ export default function GenomeClient() {
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
       {/* Header */}
-      <section className="relative bg-ss-teal pb-14 pt-24 text-white">
+      <section className="relative bg-ss-teal pb-14 pt-24 text-white dark:bg-ss-canvas">
         <SiteNav variant="dark" />
         <DashboardBackLink className="container pt-20 md:pt-24 -mb-4" />
         <div className="container">
