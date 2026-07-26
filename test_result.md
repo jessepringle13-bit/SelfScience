@@ -8114,3 +8114,106 @@ agent_communication:
 
           No backend changes. No new dependencies. Additive only.
 
+
+## 2025-06 — Goal Setting & Progress Tracking (Phase S) — COMPLETE
+  - task: "Goals system (categories, page, modal, cards, insights, celebration, achievements, exports)"
+    implemented: true
+    working: true
+    file: "lib/goals.js, lib/goalGenomeContext.js, app/goals/page.js, components/goals/*, components/dashboard/GoalsWidget.jsx, components/site-nav.jsx, components/PrefsMenu.jsx, components/Dashboard.jsx, lib/achievements.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: |
+          Built complete Goal Setting & Progress Tracking system per
+          the 11-part spec.
+
+          Core lib (/lib/goals.js):
+            - 8 categories with icons, colors, and suggested goals
+              (performance, nutrition, supplements, biomarkers,
+              longevity, learning, clinical, habits)
+            - ss_goals array with full shape (milestones, progressLog,
+              linkedHabits, linkedBiomarkers, variantSource, status)
+            - createGoal / updateGoal / setStatus / deleteGoal
+            - logProgress with milestone id checkoff + auto-completion
+              signal detection (hitTarget)
+            - progressPercent / daysUntil / daysActive /
+              consecutiveLogStreak / onTrack helpers
+            - MAX_ACTIVE=30, MAX_MILESTONES=5 enforced
+            - generateInsights() with 4 insight types (consistent
+              category, streak >=5, genome-aligned, at-risk with
+              7+ day gap AND deadline within 30d)
+            - CSV export + PDF-via-print export (both device-only)
+
+          Genome context lib (/lib/goalGenomeContext.js):
+            - RULES map: rsid + eligible categories \u2192 one-line context
+            - Covers PPARGC1A, ACTN3, COL5A1, MTNR1B, PPARA, BCMO1,
+              MTHFR (C677T + A1298C), FADS1, FOXO3, OBFC1, SLCO1B1
+            - getGenomeContext(categoryId) surfaces first matching rule
+              for the user's variants
+            - Silent (returns null) when no match
+
+          UI components:
+            - /app/goals/page.js \u2014 tabbed page (Active/Completed/
+              Paused/All), 2-col grid, insights, exports.
+              Supports ?new=1 and ?status=completed deep links.
+              Wrapped in Suspense for Next.js useSearchParams.
+            - GoalCreationModal.jsx \u2014 3-screen wizard (Category \u2192
+              Choose/create goal \u2192 Details). Category auto-advances
+              after 300ms. Screen 2 shows suggested goals + custom
+              input + genome context box. Screen 3 shows target
+              value/unit/date, milestone editor (max 5), habit chip
+              multi-select, biomarker chips for biomarker category.
+              Portal-rendered to escape backdrop-filter.
+            - GoalCard.jsx \u2014 category color border-top, chip row,
+              variant chip (green), progress bar OR milestone dots
+              OR days-active, target date with color coding (green/
+              amber/red/overdue), milestone list (max 3, expandable),
+              genome context section with Learn more link, overflow
+              menu (Edit/Pause/Resume/Complete/Abandon/Delete),
+              inline log panel (numeric OR milestone checkoff + note),
+              micro-toast, auto-completion prompt at target hit.
+            - GoalCompletionCelebration.jsx \u2014 full-screen overlay,
+              6-second auto-dismiss, 15-piece CSS confetti with
+              prefers-reduced-motion guard, genome note, Set new goal /
+              View completed goals buttons. Once-per-goal via
+              ss_goal_celebration_[id] flag.
+            - GoalInsights.jsx \u2014 renders up to 4 dynamic insights
+              with amber styling override for at-risk items.
+            - dashboard/GoalsWidget.jsx \u2014 injected below TrackerWidget
+              on the Dashboard. Empty state with CTA, up to 3 rows
+              with category left-border + compact progress bar +
+              days-left, on-track count, New goal button.
+
+          Integrations:
+            - site-nav.jsx: "Health Goals" added to Tools dropdown +
+              mobile drawer (Target icon)
+            - PrefsMenu.jsx: "My Goals" menu item added to guide section
+            - Dashboard.jsx: GoalsWidget rendered below Tracker
+            - achievements.js: 5 new achievements added
+              (first_goal T1, first_goal_complete T2, genome_goal T2,
+              three_goals_complete T3, all_categories T4) with correct
+              triggerMet cases reading ss_goals
+
+          Verified via screenshot tool:
+            - Empty state page renders with proper header, tabs, and
+              CTA card
+            - Modal opens; Step 1 shows 8 category cards
+            - Seeded 3 goals of different shapes rendered correctly:
+              blue-border performance card with progress bar + variant
+              chip + genetic context + Learn more; green-border
+              supplements card; orange-border clinical card
+            - All 4 insight types fire correctly with proper amber
+              at-risk styling
+            - Export buttons visible when goals exist
+            - Log-again button switches to secondary style when
+              already logged today
+            - Genome context correctly surfaces PPARGC1A + MTHFR
+              interpretations for those variants
+
+          No backend changes. No new dependencies. Purely additive \u2014
+          all existing dashboard/habits/journal/community/alerts
+          functionality untouched.
+

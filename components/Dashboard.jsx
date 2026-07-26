@@ -37,6 +37,7 @@ import VariantInterpretation from '@/components/genome/VariantInterpretation'
 import WeeklyDigest from '@/components/dashboard/WeeklyDigest'
 import JournalWidget from '@/components/dashboard/JournalWidget'
 import TrackerWidget from '@/components/dashboard/TrackerWidget'
+import GoalsWidget from '@/components/dashboard/GoalsWidget'
 import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
 import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
@@ -393,6 +394,13 @@ export default function Dashboard() {
              gracefully by its own empty state. */}
         <div data-tour-target="tracker-widget">
           <TrackerWidget />
+        </div>
+
+        {/* Goals widget — sits directly below the Habit Tracker widget
+             per product spec. Silent when empty; shows top 3 active
+             goals with progress bars + on-track count. */}
+        <div data-tour-target="goals-widget">
+          <GoalsWidget />
         </div>
 
         {/* 3. YOUR PILLARS (merged: was "Pillar Score Overview" + "Explore Your Pillars")

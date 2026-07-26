@@ -8,7 +8,7 @@
 // Click / touch outside or Escape closes the menu.
 
 import { useEffect, useRef, useState } from 'react'
-import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X, Users, Bell } from 'lucide-react'
+import { Settings2, Compass, RefreshCw, Trash2, ShieldAlert, X, Users, Bell, Target } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useShowTechnicalTerms, setShowTechnicalTerms } from '@/lib/uiPrefs'
 import { resetGuideOnly, showGuideAgain, resetGenomeAndGuide, fireToast } from '@/lib/journeyReset'
@@ -118,6 +118,12 @@ export default function PrefsMenu({ isDark = false }) {
 
           {/* Guide actions (Parts 2 + 3) */}
           <div className="border-t border-ss-border-warm/60">
+            <MenuItem
+              Icon={Target}
+              label="My Goals"
+              hint="Set genome-informed goals and track progress"
+              onClick={() => { setOpen(false); router.push('/goals') }}
+            />
             {communityOptedIn && (
               <MenuItem
                 Icon={Users}

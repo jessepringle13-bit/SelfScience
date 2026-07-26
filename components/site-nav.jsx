@@ -25,6 +25,7 @@ import {
   FileText,
   Rocket,
   Award,
+  Target,
   BookOpen as BookOpenIcon,
   CheckCircle2 as CheckCircleIcon,
 } from 'lucide-react'
@@ -173,6 +174,7 @@ export function SiteNav({ variant = 'light' }) {
   // Biomarkers" to match the spec-required labels.
   const TOOL_ITEMS = [
     { href: '/blueprint',                  label: 'My Health Blueprint',   Icon: Compass,   blurb: 'Unified synthesis of your genome, protocol, nutrition, and next steps.' },
+    { href: '/goals',                      label: 'Health Goals',           Icon: Target,   blurb: 'Genome-informed goals with progress tracking, milestones, and insights.' },
     { href: '/nutrition',                 label: 'Nutrition Hub',         Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
     { href: '/drug-check',                label: 'Drug Check',            Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
     { href: '/tools/supplements',         label: 'Supplement Discovery',  Icon: Pill,      blurb: 'Discover supplements by ingredient form. NIH label data. Brand-direct only.' },
@@ -444,6 +446,7 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/genome/strengths"            onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Strengths</a>
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Tools</div>
             <a href="/blueprint"                   onClick={() => setMobileOpen(false)} className="hover:opacity-80">My Health Blueprint</a>
+            <a href="/goals"                       onClick={() => setMobileOpen(false)} className="hover:opacity-80">Health Goals</a>
             <a href="/nutrition"                   onClick={() => setMobileOpen(false)} className="hover:opacity-80">Nutrition Hub</a>
             <a href="/drug-check"                  onClick={() => setMobileOpen(false)} className="hover:opacity-80">Drug Check</a>
             <a href="/tools/supplements"           onClick={() => setMobileOpen(false)} className="hover:opacity-80">Supplement Discovery</a>
