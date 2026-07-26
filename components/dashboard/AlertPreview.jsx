@@ -102,7 +102,7 @@ export default function AlertPreview() {
                   <button
                     type="button"
                     onClick={() => openAlert(a)}
-                    className="group flex w-full items-start gap-2.5 rounded-xl border border-white bg-white/85 p-3 text-left shadow-sm ring-1 ring-black/[0.03] transition hover:bg-white"
+                    className="group flex w-full items-start gap-2.5 rounded-xl border border-white bg-white p-3 text-left shadow-sm ring-1 ring-black/[0.03] transition hover:shadow-md"
                   >
                     <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${meta.softBg}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
