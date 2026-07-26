@@ -248,7 +248,7 @@ export default function Dashboard() {
   }, [report, activePillar, pillarGeneSetForActive])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#DCEDED] via-[#EAF5F5] to-[#F5FAFA] pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-[#DCEDED] via-[#EAF5F5] to-[#F5FAFA] pb-20 dark:from-ss-canvas dark:via-ss-bg dark:to-ss-canvas">
       <SiteNav />
       {/* Post-upload orientation screen (Phase A · Part 4) — shown once
           per genome upload BEFORE the full dashboard. If already dismissed
