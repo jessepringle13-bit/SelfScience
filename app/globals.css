@@ -12,7 +12,11 @@
     --ss-bg: #F7F6F2;
     --ss-surface: #F9F8F5;
     --ss-text: #28251D;
-    --ss-muted: #7A7974;
+    /* Muted text — tightened from #7A7974 (3.8:1 on white — barely
+       fails AA) to #565550 (6.5:1 — passes AAA). This is what powers
+       every "text-ss-muted" subtitle, hint, timestamp, and body-copy
+       secondary line across the platform. */
+    --ss-muted: #565550;
     --ss-border-warm: #D4D1CA;
     --ss-row-alt: #EEF7F7;
     --ss-privacy-tint: #EAF5F5;

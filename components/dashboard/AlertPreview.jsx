@@ -116,7 +116,7 @@ export default function AlertPreview() {
                         {a.title}
                       </span>
                       {a.body && (
-                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-ss-text/80">
+                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-ss-text">
                           {a.body}
                         </span>
                       )}

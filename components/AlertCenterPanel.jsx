@@ -343,7 +343,7 @@ function AlertRow({ alert, onOpen, onContext }) {
             )}
           </div>
           {alert.body && (
-            <p className="mt-1 line-clamp-3 text-[12.5px] leading-snug text-ss-text/85">{alert.body}</p>
+            <p className="mt-1 line-clamp-3 text-[12.5px] leading-snug text-ss-text">{alert.body}</p>
           )}
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="text-[10px] text-ss-muted">{relativeTime(alert.createdAt)}</span>
