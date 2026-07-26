@@ -3,12 +3,16 @@
 // /app/components/FeaturesTracker.jsx
 // Global route-visit listener that marks the matching feature complete
 // in ss_features_explored. Mounted once from the root layout.
+//
+// useSearchParams() must live inside a Suspense boundary in Next.js 15
+// so static prerender does not bail out. We wrap the inner hook-using
+// component in Suspense so any consumer of <FeaturesTracker /> is safe.
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { FEATURES, markFeatureExplored } from '@/lib/featuresExplored'
 
-export default function FeaturesTracker() {
+function FeaturesTrackerInner() {
   const pathname = usePathname() || ''
   const params = useSearchParams()
 
@@ -32,4 +36,12 @@ export default function FeaturesTracker() {
   }, [])
 
   return null
+}
+
+export default function FeaturesTracker() {
+  return (
+    <Suspense fallback={null}>
+      <FeaturesTrackerInner />
+    </Suspense>
+  )
 }
