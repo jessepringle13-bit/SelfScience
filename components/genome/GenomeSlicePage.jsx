@@ -28,6 +28,7 @@ import { normalizePillarName } from '@/lib/pillars'
 import { getPopulationFrequency } from '@/lib/populationFrequencies'
 import { explainGene } from '@/lib/geneExplanations'
 import { useShowTechnicalTerms } from '@/lib/uiPrefs'
+import FocusOnThisGene from '@/components/explore/FocusOnThisGene'
 import DashboardBackLink from '@/components/DashboardBackLink'
 import ResetGenomeButton from '@/components/ResetGenomeButton'
 import VariantInterpretation from '@/components/genome/VariantInterpretation'
@@ -250,6 +251,11 @@ function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
           Collapsed by default. Every card gets one — curated for the
           11 priority rsIDs, dynamically generated for the rest. */}
       <VariantInterpretation card={card} />
+      {/* Focus Mode entry point — every finding card gets a one-tap
+          deep dive to /explore/<id> (Explorer & Focus Mode Part 5). */}
+      <div className="mt-3 flex items-center justify-end border-t border-ss-border-warm/40 pt-2">
+        <FocusOnThisGene card={card} />
+      </div>
     </article>
   )
 }
@@ -262,6 +268,10 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
   const [pillarFilter, setPillarFilter] = useState('all')
   const [sortMode, setSortMode]         = useState('evidence')  // evidence | pillar | alphabet
   const [classFilter, setClassFilter]   = useState('all')       // overview only
+  // Isolation Mode (Part 6): grid | list | focus. Persisted per-user
+  // in ss_genome_view_mode. Focus position in ss_focus_view_index.
+  const [viewMode, setViewMode] = useState('grid')
+  const [focusIdx, setFocusIdx] = useState(0)
 
   useEffect(() => {
     setReport(getGenomeResults())
@@ -270,6 +280,22 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
     window.addEventListener('selfscience:genome-changed', onChange)
     return () => window.removeEventListener('selfscience:genome-changed', onChange)
   }, [])
+
+  // Hydrate persisted view mode + focus index (Part 6).
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem('ss_genome_view_mode')
+      if (v === 'grid' || v === 'list' || v === 'focus') setViewMode(v)
+      const idx = Number(window.sessionStorage.getItem('ss_focus_view_index') || 0)
+      if (Number.isFinite(idx) && idx >= 0) setFocusIdx(idx)
+    } catch {}
+  }, [])
+  useEffect(() => {
+    try { window.localStorage.setItem('ss_genome_view_mode', viewMode) } catch {}
+  }, [viewMode])
+  useEffect(() => {
+    try { window.sessionStorage.setItem('ss_focus_view_index', String(focusIdx)) } catch {}
+  }, [focusIdx])
 
   const allCards = useMemo(() => report ? flattenReportCards(report) : [], [report])
   const strengthPillars = useMemo(() => new Set(allCards.filter((c) => classificationBucket(c.classification) === 'strength').map((c) => normalizePillarName(c.pillar || ''))), [allCards])
@@ -462,8 +488,38 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
           </span>
         </div>
 
+        {/* View Mode toggle (Part 6 — Isolation Mode). Persisted in
+             ss_genome_view_mode so users don't re-select every visit. */}
+        <div className="mb-4 flex items-center gap-1 rounded-full bg-white p-1 shadow-sm ring-1 ring-ss-border-warm w-fit">
+          {[
+            { k: 'grid',  label: 'Grid view' },
+            { k: 'list',  label: 'List view' },
+            { k: 'focus', label: 'Focus view' },
+          ].map((v) => (
+            <button
+              key={v.k}
+              type="button"
+              onClick={() => { setViewMode(v.k); if (v.k === 'focus') setFocusIdx(0) }}
+              className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+                viewMode === v.k ? 'bg-ss-teal text-white' : 'text-ss-muted hover:text-ss-teal'
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+
         {/* Cards — grouped by pillar in strengths/findings, flat in overview */}
-        {mode === 'overview' ? (
+        {viewMode === 'focus' && displayCards.length > 0 ? (
+          <FocusViewCarousel
+            cards={displayCards}
+            index={Math.min(focusIdx, Math.max(0, displayCards.length - 1))}
+            onIndexChange={setFocusIdx}
+            mode={mode}
+          />
+        ) : viewMode === 'list' ? (
+          <ListView cards={displayCards} mode={mode} />
+        ) : mode === 'overview' ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {displayCards.map((c, i) => (
               <VariantCard
@@ -532,6 +588,137 @@ export default function GenomeSlicePage({ mode = 'overview' }) {
         </div>
       </main>
       <SiteFooter />
+    </div>
+  )
+}
+
+
+/* --------------------- Isolation Mode components (Part 6) --------------- */
+
+// Single-card Focus view with prev/next arrows, dot navigation, and
+// keyboard arrow keys. Position persists via ss_focus_view_index
+// (session) so returning to Focus view resumes at last card.
+function FocusViewCarousel({ cards, index, onIndexChange, mode }) {
+  const safeIdx = Math.max(0, Math.min(index, cards.length - 1))
+  const card = cards[safeIdx]
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target && ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return
+      if (e.key === 'ArrowLeft' && safeIdx > 0) onIndexChange(safeIdx - 1)
+      if (e.key === 'ArrowRight' && safeIdx < cards.length - 1) onIndexChange(safeIdx + 1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [safeIdx, cards.length, onIndexChange])
+
+  // Swipe (touch) navigation for mobile
+  const touch = useMemo(() => ({ startX: 0 }), [])
+  const onTouchStart = (e) => { touch.startX = e.touches?.[0]?.clientX || 0 }
+  const onTouchEnd = (e) => {
+    const dx = (e.changedTouches?.[0]?.clientX || 0) - touch.startX
+    if (dx > 60 && safeIdx > 0) onIndexChange(safeIdx - 1)
+    if (dx < -60 && safeIdx < cards.length - 1) onIndexChange(safeIdx + 1)
+  }
+
+  // Dot navigation window (up to 10 visible, scrolling as needed).
+  const DOT_WINDOW = 10
+  const dotStart = Math.max(0, Math.min(cards.length - DOT_WINDOW, safeIdx - Math.floor(DOT_WINDOW / 2)))
+  const dots = cards.slice(dotStart, dotStart + DOT_WINDOW)
+
+  return (
+    <div className="relative">
+      <div className="mx-auto flex max-w-[640px] items-center gap-2 md:gap-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <button
+          type="button"
+          onClick={() => safeIdx > 0 && onIndexChange(safeIdx - 1)}
+          disabled={safeIdx === 0}
+          aria-label="Previous finding"
+          className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-ss-border-warm bg-white text-ss-text shadow-sm transition hover:bg-ss-bg disabled:cursor-not-allowed disabled:opacity-30 md:flex"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <VariantCard
+            key={`${card.rsid || card.id}-focus`}
+            card={card}
+            mode={mode}
+            otherPillarHasContent={false}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => safeIdx < cards.length - 1 && onIndexChange(safeIdx + 1)}
+          disabled={safeIdx >= cards.length - 1}
+          aria-label="Next finding"
+          className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-ss-border-warm bg-white text-ss-text shadow-sm transition hover:bg-ss-bg disabled:cursor-not-allowed disabled:opacity-30 md:flex"
+        >
+          <ArrowRight size={16} />
+        </button>
+      </div>
+
+      {/* Mobile prev/next (visible below the card on small screens) */}
+      <div className="mt-3 flex items-center justify-center gap-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => safeIdx > 0 && onIndexChange(safeIdx - 1)}
+          disabled={safeIdx === 0}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-ss-border-warm bg-white text-ss-text shadow-sm disabled:opacity-30"
+          aria-label="Previous"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <button
+          type="button"
+          onClick={() => safeIdx < cards.length - 1 && onIndexChange(safeIdx + 1)}
+          disabled={safeIdx >= cards.length - 1}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-ss-border-warm bg-white text-ss-text shadow-sm disabled:opacity-30"
+          aria-label="Next"
+        >
+          <ArrowRight size={16} />
+        </button>
+      </div>
+
+      {/* Counter + dot navigation */}
+      <div className="mt-4 flex flex-col items-center gap-2">
+        <div className="font-mono text-[10px] text-ss-muted">
+          {safeIdx + 1} of {cards.length} findings
+        </div>
+        <div className="flex items-center gap-1.5">
+          {dots.map((_, i) => {
+            const realIdx = dotStart + i
+            const active = realIdx === safeIdx
+            return (
+              <button
+                key={realIdx}
+                type="button"
+                onClick={() => onIndexChange(realIdx)}
+                aria-label={`Finding ${realIdx + 1}`}
+                className={`transition ${
+                  active ? 'h-2 w-2 rounded-full bg-ss-green' : 'h-1.5 w-1.5 rounded-full border border-ss-muted/40 hover:bg-ss-muted/60'
+                }`}
+              />
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Compact single-column list view — each card in a slim row-style
+// container. Reuses VariantCard for visual consistency.
+function ListView({ cards, mode }) {
+  return (
+    <div className="grid grid-cols-1 gap-3">
+      {cards.map((c, i) => (
+        <VariantCard
+          key={`${c.rsid || c.id}-list-${i}`}
+          card={c}
+          mode={mode}
+          otherPillarHasContent={false}
+        />
+      ))}
     </div>
   )
 }

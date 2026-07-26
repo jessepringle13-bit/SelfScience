@@ -27,6 +27,7 @@ import { useShowTechnicalTerms } from '@/lib/uiPrefs'
 import ResetGenomeButton from '@/components/ResetGenomeButton'
 import FeaturesProgressBar from '@/components/FeaturesProgressBar'
 import RealGenomeBanner from '@/components/RealGenomeBanner'
+import FocusOnThisGene from '@/components/explore/FocusOnThisGene'
 import TimeAwareBanner from '@/components/dashboard/TimeAwareBanner'
 import GeneChip from '@/components/dashboard/GeneChip'
 import { fetchMatchedResearch } from '@/lib/researchMatchedCache'
@@ -627,6 +628,11 @@ function CardRow({ items, tone }) {
               Curated for the 11 priority rsIDs, dynamic fallback for
               the rest. Local component state (not localStorage). */}
           <VariantInterpretation card={enhancedCard} />
+          {/* Focus Mode link — one-tap deep dive from any finding card
+              platform-wide (Explorer & Focus Mode Part 5). */}
+          <div className="mt-3 flex items-center justify-end border-t border-ss-border-warm/40 pt-2">
+            <FocusOnThisGene card={c} />
+          </div>
         </div>
       )})}
     </div>

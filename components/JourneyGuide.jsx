@@ -62,6 +62,7 @@ const TIER1_STEPS = [
 // the action (reading an article).
 const TIER2_STEPS = [
   { key: 'search',       Icon: Search,     label: 'Search the research for one of your genes',   hint: 'Tap a gene chip on the Search page and read a study',      href: '/search',                matchPath: () => false, tooltip: 'Read the actual published studies behind your results.' },
+  { key: 'explore',      Icon: Compass,    label: 'Explore your first gene in Focus Mode',       hint: 'Pick one gene from your Explorer list and read its full story', href: '/explore',           matchPath: (p) => /^\/explore\/[^/]+/.test(p), tooltip: 'Focus Mode isolates one finding so you can actually understand it without distraction.' },
   { key: 'scanner',      Icon: ScanLine,   label: 'Scan a food product with your camera',        hint: 'Open Nutrition Hub → Scanner tab → point at any barcode', href: '/nutrition?tab=scanner', matchPath: () => false, tooltip: 'Grade any food against your genome in real time.' },
   { key: 'drugcheck',    Icon: Pill,       label: 'Check a medication against your genome',      hint: 'Look up how your genes affect a specific drug',            href: '/drug-check',            matchPath: () => false, tooltip: 'See if your genes affect how you process common drugs.' },
   { key: 'biomarkers',   Icon: TestTube2,  label: 'Build your biomarker picture',                 hint: 'Log one blood result — HDL, Vitamin D, or HbA1c',          href: '/biomarkers',            matchPath: () => false, tooltip: 'Connect your blood work to your genetic findings.' },

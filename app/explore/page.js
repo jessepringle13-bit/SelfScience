@@ -11,12 +11,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   Compass, ChevronDown, Check, ArrowRight, Sparkles, Filter, SlidersHorizontal,
-  Dna, Star,
+  Dna, Star, Zap, Stethoscope, BookOpen, LayoutGrid,
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import {
   getFindings, impactRankedFindings, useExploredIds, markExplored, unmarkExplored,
-  CLASSIFICATION_META, hasGenomeResults, getConfidenceMeta,
+  CLASSIFICATION_META, hasGenomeResults, getConfidenceMeta, actionTypeBucket,
 } from '@/lib/explore'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 
@@ -35,6 +35,18 @@ const SORTS = [
   { key: 'az',     label: 'A to Z' },
 ]
 
+const GROUPS = [
+  { key: 'priority', label: 'By priority',    Icon: Sparkles },
+  { key: 'pillar',   label: 'By pillar',      Icon: LayoutGrid },
+  { key: 'action',   label: 'By action type', Icon: Zap },
+]
+
+const ACTION_BUCKETS = [
+  { key: 'action',  label: 'Take action today',            hint: 'Findings with immediate actionable steps (supplements, timing, or dietary changes).',   Icon: Zap,        color: '#2E7D32' },
+  { key: 'doctor',  label: 'Worth discussing with your doctor', hint: 'Findings with clinical relevance — pharmacogenomics + prescriber flags.',            Icon: Stethoscope, color: '#964219' },
+  { key: 'context', label: 'Good to know',                 hint: 'Informational context without immediate action — interesting to understand.',            Icon: BookOpen,    color: '#1B474D' },
+]
+
 export default function ExplorePage() {
   const [genomeLoaded, setGenomeLoaded] = useState(null) // null = still checking
   const [findings, setFindings] = useState([])
@@ -46,6 +58,7 @@ export default function ExplorePage() {
   const [showExplored1, setShowExplored1] = useState(false)
   const [showExplored2, setShowExplored2] = useState(false)
   const [showExplored3, setShowExplored3] = useState(false)
+  const [groupMode, setGroupMode] = useState('priority')
 
   // Hydrate genome + findings on mount / when genome changes.
   useEffect(() => {
@@ -137,6 +150,27 @@ export default function ExplorePage() {
           )}
         </div>
 
+        {/* Group mode toggle (Part 7) */}
+        {total > 0 && !allExplored && (
+          <div className="mt-6 flex flex-wrap items-center gap-1.5">
+            {GROUPS.map((g) => {
+              const active = groupMode === g.key
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => setGroupMode(g.key)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                    active ? 'bg-ss-teal text-white' : 'bg-white text-ss-muted ring-1 ring-ss-border-warm hover:text-ss-teal'
+                  }`}
+                >
+                  <g.Icon size={11} /> {g.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Filter + sort row */}
         {total > 0 && !allExplored && (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -170,7 +204,7 @@ export default function ExplorePage() {
         )}
 
         {/* Sections */}
-        {!allExplored && (
+        {!allExplored && groupMode === 'priority' && (
           <div className="mt-8 space-y-8">
             {priority.length > 0 && (
               <Section
@@ -219,7 +253,107 @@ export default function ExplorePage() {
             )}
           </div>
         )}
+
+        {!allExplored && groupMode === 'pillar' && (
+          <PillarGrouping items={sorted} exploredSet={exploredSet} />
+        )}
+
+        {!allExplored && groupMode === 'action' && (
+          <ActionGrouping items={sorted} exploredSet={exploredSet} />
+        )}
       </div>
+    </div>
+  )
+}
+
+/* --------------------- Grouping components (Part 7) ---------------- */
+
+function PillarGrouping({ items, exploredSet }) {
+  const byPillar = useMemo(() => {
+    const map = new Map()
+    for (const f of items) {
+      const p = f.pillar || 'Other'
+      if (!map.has(p)) map.set(p, [])
+      map.get(p).push(f)
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [items])
+  const [collapsed, setCollapsed] = useState({})
+  return (
+    <div className="mt-8 space-y-4">
+      {byPillar.map(([pillar, list]) => {
+        const isCollapsed = !!collapsed[pillar]
+        const explored = list.filter((f) => exploredSet.has(f.id)).length
+        return (
+          <section key={pillar}>
+            <button
+              type="button"
+              onClick={() => setCollapsed({ ...collapsed, [pillar]: !isCollapsed })}
+              className="flex w-full items-center justify-between rounded-xl border border-ss-border-warm bg-white px-4 py-3 text-left transition hover:bg-ss-bg"
+            >
+              <div>
+                <div className="text-base font-extrabold text-ss-text">{pillar}</div>
+                <div className="mt-0.5 font-mono text-[10px] text-ss-muted">{explored} of {list.length} explored</div>
+              </div>
+              <ChevronDown size={14} className={`text-ss-muted transition ${isCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+            {!isCollapsed && (
+              <ul className="mt-2 space-y-2">
+                {list.map((f) => <ExplorerRow key={f.id} finding={f} explored={exploredSet.has(f.id)} />)}
+              </ul>
+            )}
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
+function ActionGrouping({ items, exploredSet }) {
+  const buckets = useMemo(() => {
+    const out = { action: [], doctor: [], context: [] }
+    for (const f of items) {
+      const b = actionTypeBucket(f)
+      ;(out[b] || out.context).push(f)
+    }
+    return out
+  }, [items])
+  const [collapsed, setCollapsed] = useState({})
+  return (
+    <div className="mt-8 space-y-4">
+      {ACTION_BUCKETS.map((b) => {
+        const list = buckets[b.key] || []
+        if (list.length === 0) return null
+        const isCollapsed = !!collapsed[b.key]
+        const explored = list.filter((f) => exploredSet.has(f.id)).length
+        return (
+          <section key={b.key}>
+            <button
+              type="button"
+              onClick={() => setCollapsed({ ...collapsed, [b.key]: !isCollapsed })}
+              className="flex w-full items-center justify-between rounded-xl border-l-4 bg-white px-4 py-3 text-left ring-1 ring-ss-border-warm transition hover:bg-ss-bg"
+              style={{ borderLeftColor: b.color }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: b.color + '18', color: b.color }}>
+                  <b.Icon size={16} />
+                </span>
+                <div>
+                  <div className="text-base font-extrabold text-ss-text">{b.label}</div>
+                  <div className="mt-0.5 text-[11px] text-ss-muted">{b.hint}</div>
+                  <div className="mt-0.5 font-mono text-[10px] text-ss-muted">{explored} of {list.length} explored</div>
+                </div>
+              </div>
+              <ChevronDown size={14} className={`text-ss-muted transition ${isCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+            {!isCollapsed && (
+              <ul className="mt-2 space-y-2">
+                {list.map((f) => <ExplorerRow key={f.id} finding={f} explored={exploredSet.has(f.id)} />)}
+              </ul>
+            )}
+          </section>
+        )
+      })}
     </div>
   )
 }

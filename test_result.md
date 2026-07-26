@@ -8346,3 +8346,95 @@ agent_communication:
 
           Awaiting user review before starting T-2 (Parts 4\u20137).
 
+
+## 2025-06 — Gene Explorer & Focus Mode Phase T-2 — COMPLETE
+  - task: "Guide integration + Focus-link everywhere + Isolation Mode + Smart Grouping"
+    implemented: true
+    working: true
+    file: "components/JourneyGuide.jsx, components/explore/FocusOnThisGene.jsx, components/Dashboard.jsx, components/genome/GenomeSlicePage.jsx, app/explore/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: |
+          T-2 slice — Parts 4-7 shipped end-to-end.
+
+          Part 4 (Guide integration):
+            - Added new step 'explore' to TIER2_STEPS in JourneyGuide.jsx:
+              key: 'explore', label: 'Explore your first gene in Focus Mode',
+              hint: 'Pick one gene from your Explorer list and read its full story',
+              href: '/explore',
+              matchPath: /^\/explore\/[^/]+/  (any Focus Mode URL),
+              tooltip: 'Focus Mode isolates one finding so you can actually
+                        understand it without distraction.'
+            - Step auto-completes when the user visits any Focus Mode page
+              (which is exactly what the auto-mark-explored logic does on
+              mount).
+
+          Part 5 (Focus link from anywhere):
+            - Created /components/explore/FocusOnThisGene.jsx — small
+              monospace 10px link with Focus icon, derives finding ID via
+              findingIdFor(card), navigates to /explore/<id>.
+            - Injected in Dashboard.jsx Top Findings card footer
+              (below VariantInterpretation, above card border).
+            - Injected in GenomeSlicePage.jsx VariantCard footer — this
+              covers /genome/overview, /genome/strengths, /genome/findings
+              in one edit (they all share the slice component).
+            - Footer separator: mt-3 pt-2 border-top for visual polish.
+
+          Part 6 (Isolation Mode toggle):
+            - Added viewMode state (grid | list | focus) to GenomeSlicePage
+              persisted in ss_genome_view_mode.
+            - Added focusIdx state persisted in sessionStorage
+              ss_focus_view_index so returning to Focus view resumes
+              at last card.
+            - View pill above the card grid: [Grid view] [List view]
+              [Focus view] — same style as existing platform toggles.
+            - FocusViewCarousel component: single VariantCard centered
+              at max-w-[640px], prev/next 40px circle buttons on left
+              and right (desktop) + below (mobile), keyboard \u2190/\u2192
+              navigation, touch swipe (>60px dx), \"X of Y findings\"
+              counter, dot navigation (10-dot window scrolling).
+            - ListView component: single-column list of VariantCards.
+
+          Part 7 (Smart Grouping on Explorer):
+            - Added groupMode state (priority | pillar | action) to
+              /app/explore/page.js.
+            - Toggle chips above filter row with Sparkles / LayoutGrid /
+              Zap icons.
+            - PillarGrouping component: groups by finding.pillar into
+              collapsible sections with 'X of Y explored' subtitle.
+            - ActionGrouping component: uses actionTypeBucket() helper
+              from /lib/explore.js to sort into three buckets with
+              distinct colored icons + hint text + explored count:
+                \u2022 Take action today (Zap, ss-green)
+                \u2022 Worth discussing with your doctor (Stethoscope,
+                  ss-amber) \u2014 auto-includes SLCO1B1, DPYD, TPMT,
+                  CYP2C19, CYP2D6, CYP3A5, VKORC1, CYP2C9
+                \u2022 Good to know (BookOpen, ss-teal)
+            - Each bucket collapsible independently.
+
+          Verified via screenshot tool:
+            - Explore \"By priority\" (default) renders sections correctly.
+            - \"By action type\" renders all 3 buckets with correct routing:
+              MTHFR/MTNR1B/PPARGC1A/COL5A1 in \"Take action\", SLCO1B1
+              in \"Worth discussing\", FOXO3 in \"Good to know\".
+            - \"By pillar\" groups by pillar with collapsible headers.
+            - /genome/findings shows the [Grid/List/Focus view] toggle.
+              Focus view renders MTHFR centered as single card with
+              prev arrow disabled, next arrow enabled, \"1 of 5\" counter
+              and 5-dot navigation. Focus on this gene \u2192 link visible
+              at the card footer confirming Part 5 injection.
+            - `yarn build` succeeds cleanly (all 46 routes).
+
+          Notes / issues resolved during T-2:
+            - After adding FocusOnThisGene import, Next.js dev cache hit
+              MODULE_NOT_FOUND for a chunk id. Cleared /.next and
+              restarted supervisorctl \u2014 resolved cleanly.
+            - Guide step keys match convention in guideActions.js.
+
+          Full 8-part spec now shipped: T-1 (Parts 1, 2, 3, 8) + T-2
+          (Parts 4, 5, 6, 7). Ready for user acceptance testing.
+
