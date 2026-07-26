@@ -14,6 +14,7 @@ import AchievementToaster from '@/components/AchievementToaster'
 import FeaturesTracker from '@/components/FeaturesTracker'
 import JournalFloatingButton from '@/components/JournalFloatingButton'
 import AlertsInitializer from '@/components/AlertsInitializer'
+import ExplorerUnlockModal from '@/components/ExplorerUnlockModal'
 import { NO_FLASH_SCRIPT } from '@/lib/theme'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
@@ -114,6 +115,7 @@ export default function RootLayout({ children }) {
         <FeaturesTracker />
         <JournalFloatingButton />
         <AlertsInitializer />
+        <ExplorerUnlockModal />
         <Analytics />
         <ChunkReloader />
       </body>

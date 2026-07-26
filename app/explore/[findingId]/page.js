@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
+import UnknownsCard from '@/components/UnknownsCard'
 import {
   getFindings, getFindingById, impactRankedFindings, useExploredIds,
   markExplored, unmarkExplored, CLASSIFICATION_META, hasGenomeResults,
@@ -338,6 +339,14 @@ export default function FocusModePage() {
             {isExplored ? 'Explored ✓' : 'Mark this gene as explored'}
           </div>
         </section>
+      </div>
+
+      {/* Per-finding Unknowns card \u2014 Gap 3. Sits right at the end
+          of the finding page, above the platform-level explainer.
+          Renders nothing when there is no gap OR the user has
+          dismissed this finding\u2019s card. */}
+      <div className="container max-w-3xl">
+        <UnknownsCard findingId={finding?.id || finding?.rsid} variant={finding} />
       </div>
 
       {/* Explainer: helps the user understand why THIS finding was

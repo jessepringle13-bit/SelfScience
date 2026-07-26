@@ -13,11 +13,11 @@ import { ChevronDown, Check, Circle, Sparkles } from 'lucide-react'
 // Each field is a short paragraph string. If a field is missing we
 // render a placeholder that reads honestly (“not enough data yet”).
 const RUNGS = [
-  { key: 'signal',    label: 'What we saw',       hint: 'The raw observation — in your data or the literature.' },
-  { key: 'science',   label: 'What the science says', hint: 'How well-supported this signal actually is, and by whom.' },
-  { key: 'personal',  label: 'What it means for you', hint: 'How the signal maps to your specific goal, data, and context.' },
-  { key: 'tradeoffs', label: 'The trade-offs',     hint: 'What each response costs — not just what it promises.' },
-  { key: 'action',    label: 'The next step',      hint: 'The single most useful thing to do this week.' },
+  { key: 'signal',    label: 'Know now',            hint: 'What we know right now — the raw observation.' },
+  { key: 'science',   label: 'Connected concepts',  hint: 'How this ties into the broader research picture.' },
+  { key: 'personal',  label: 'Unknowns',            hint: 'What is still unclear, and what would clarify it.' },
+  { key: 'tradeoffs', label: 'Next best step',      hint: 'The single most useful thing you could do this week.' },
+  { key: 'action',    label: 'Explore deeper',      hint: 'Where to go if you want to keep pulling this thread.' },
 ]
 
 export default function InsightLadder({ title, data = {}, className = '' }) {
@@ -32,6 +32,7 @@ export default function InsightLadder({ title, data = {}, className = '' }) {
         <div>
           <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-teal"><Sparkles size={11} /> Insight ladder</div>
           {title && <h3 className="mt-1 text-xl font-extrabold text-ss-text">{title}</h3>}
+          <p className="mt-1.5 text-[13.5px] leading-relaxed text-ss-muted">From what you know now to what you should do next.</p>
         </div>
         <div className="shrink-0 text-right">
           <div className="font-mono text-[10.5px] font-bold text-ss-teal">{revealed}/{total}</div>

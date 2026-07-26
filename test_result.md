@@ -946,6 +946,103 @@ backend:
             All 12 previously-verified pages still return HTTP 200
             (checked). No regressions.
 
+  - task: "Phase U-4 — Quiz summary step + rename ladder rungs + UnknownsCard + Explorer unlock modal"
+    implemented: true
+    working: true
+    file: "/app/app/onboarding/quiz/page.js, /app/components/InsightLadder.jsx, /app/components/UnknownsCard.jsx, /app/components/ExplorerUnlockModal.jsx, /app/app/explore/[findingId]/page.js, /app/components/genome/GenomeSlicePage.jsx, /app/components/Dashboard.jsx, /app/app/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Closed the 4 outstanding brief gaps in a single pass. All
+            additive; no existing guided/explorer/module/insight/
+            graduation logic touched.
+
+            Gap 1 \u2014 Quiz summary step. Added a new step 8 to STEPS[]
+            in /onboarding/quiz. Step counter now reads "Step 8 of 8
+            \u2014 Review your path". SummaryPreview subcomponent
+            renders up to 4 numbered module cards from
+            modulePathFor(primary), with "+ N more" overflow when the
+            chain exceeds 4. Data-situation line branches on the
+            user's data answer: has_genome, no_data, and appends
+            "+ Blood data connected" when bloodwork is present.
+            Verified via Playwright: ss_user_path is null before the
+            "Start my path" button is clicked, saved after; then
+            routes to /my-path. Secondary "Change my answers" link
+            navigates back to step 7 without clearing answers.
+
+            Gap 2 \u2014 Insight ladder rung rename. RUNGS[] in
+            /components/InsightLadder.jsx relabelled to the exact
+            spec: Know now, Connected concepts, Unknowns, Next best
+            step, Explore deeper. Data keys unchanged (signal,
+            science, personal, tradeoffs, action) so the FIRST_INSIGHT
+            map in /my-insights and existing progress state are
+            unaffected. Header subtext added: "From what you know
+            now to what you should do next." All aria labels use the
+            new labels via r.label. Verified via Playwright: 5 rungs
+            report the new labels in DOM order.
+
+            Gap 3 \u2014 <UnknownsCard> per-finding component.
+            New /components/UnknownsCard.jsx exports a reusable card
+            with priority order (blood > goal > trials-placeholder;
+            we surface the first two since no in-app trial-signal
+            feed is exposed yet). Reads ss_biomarkers / ss_blood_data
+            for the blood-gap check and ss_goals for the goal-gap
+            check. Uses a gene\u2192pillar map and gene\u2192effect map to
+            keep the copy specific (e.g. MTHFR \u2192 "how your body
+            processes folate and B-vitamins", pillar "nutrients"; APOE
+            \u2192 "how your body handles LDL cholesterol", pillar
+            "longevity"). Dismiss button writes
+            ss_unknowns_dismissed_<findingId>=1 to localStorage;
+            component returns null on subsequent renders for that id.
+            Two variants: full card (compact=false) and single-line
+            strip (compact=true).
+            Injected into three surfaces:
+              (a) Focus Mode /explore/[findingId] \u2014 non-compact,
+                  right above the existing WhyYoureSeeingThis panel.
+              (b) Genome slice pages (GenomeSlicePage.jsx used by
+                  /genome/overview, /genome/findings, /genome/strengths)
+                  \u2014 compact strip, above the "Add to practitioner
+                  report" action row on each finding card.
+              (c) Dashboard "Your Top Findings" section \u2014 non-compact,
+                  one per section (representative finding =
+                  areas[0]), after the "See all" link.
+            All 3 surfaces still return HTTP 200 after injection.
+
+            Gap 4 \u2014 Explorer unlock milestone modal.
+            New /components/ExplorerUnlockModal.jsx mounted globally
+            in app/layout.js so it can appear on whatever page the
+            user is on when the threshold crosses. Uses the existing
+            useGraduation() hook (\u22652 signals). On mount, if
+            grad.ready \u2261 true and ss_explorer_unlock_shown is not
+            set, opens the modal AND writes the LS flag immediately
+            so it can never fire twice. Renders 3 concrete milestone
+            rows (module complete / gene explored / data connected)
+            with per-row \u2713 (met) or \u25CB (unmet) icons; graduation
+            can fire at 2 of 3 so the third can legitimately be shown
+            unmet. Two CTAs \u2014 primary [\u2192 Enter Explorer Mode]
+            (ss-green, 52px, calls setMode('explorer'), closes,
+            routes to /) and secondary text link [Stay in Guided
+            Mode for now] (closes, does not activate Explorer; LS
+            flag already set so modal cannot reappear). Escape key
+            acts as "Stay in Guided Mode". Backdrop click is inert
+            (no handler bound). No \u00d7 close button. Confetti: 20
+            particles (ss-teal + ss-amber + white), 2-second fall
+            animation via inline styled-jsx keyframes,
+            pointer-events-none so it never blocks the CTAs.
+            Verified via Playwright: modal renders with heading
+            "You've unlocked Explorer Mode.", 3 milestone rows all
+            met (given seeded state), ss_explorer_unlock_shown='1'
+            after open, 20 confetti particles present in DOM.
+
+            All 9 pages tested (/, /start, /onboarding/quiz,
+            /my-path, /my-insights, /learn/foundations,
+            /explore/rs1801133, /genome/overview, /genome/findings)
+            return HTTP 200. No regressions.
+
 
 frontend:
   - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"

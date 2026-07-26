@@ -43,6 +43,7 @@ import PillarIntroCard from '@/components/PillarIntroCard'
 import LearningPath from '@/components/LearningPath'
 import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
 import AlertPreview from '@/components/dashboard/AlertPreview'
+import UnknownsCard from '@/components/UnknownsCard'
 import NextGenePrompt from '@/components/dashboard/NextGenePrompt'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
@@ -364,6 +365,14 @@ export default function Dashboard() {
               href="/genome/findings"
               label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
             />
+            {/* Section-level Unknowns card (Gap 3, non-compact).
+                One per section — representative finding = areas[0]. */}
+            {areas[0] && (
+              <UnknownsCard
+                findingId={areas[0].rsid || areas[0].id}
+                variant={{ rsid: areas[0].rsid, geneSymbol: areas[0].gene || areas[0].geneSymbol }}
+              />
+            )}
           </DashSection>
         </div>
 

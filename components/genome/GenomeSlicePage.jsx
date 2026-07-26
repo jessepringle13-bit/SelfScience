@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import SiteFooter from '@/components/site-footer'
+import UnknownsCard from '@/components/UnknownsCard'
 import { getGenomeResults } from '@/lib/genomeSession'
 import { flattenReportCards } from '@/lib/supplementProtocol'
 import { normalizePillarName } from '@/lib/pillars'
@@ -228,6 +229,9 @@ function VariantCard({ card, mode, otherPillarHasContent, onCrossLinkClick }) {
           )}
         </div>
       </div>
+      {/* Per-finding data-gap strip (Gap 3, compact). Renders nothing
+          if there is no gap or the user has dismissed this finding. */}
+      <UnknownsCard findingId={card.rsid || card.id} variant={{ rsid: card.rsid, geneSymbol: card.gene }} compact />
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ss-border-warm pt-3">
         <button type="button" onClick={doSearch}
           className="inline-flex min-h-11 items-center gap-1 rounded-full border border-ss-teal px-3 text-xs font-semibold text-ss-teal hover:bg-ss-teal hover:text-white md:min-h-8">

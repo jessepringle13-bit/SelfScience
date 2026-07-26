@@ -7,9 +7,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, ArrowLeft } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Check, Clock } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
-import { GOALS, LITERACY, MOTIVATIONS, STYLES, CADENCE, savePath, setMode } from '@/lib/userPath'
+import { GOALS, LITERACY, MOTIVATIONS, STYLES, CADENCE, savePath, setMode, modulePathFor } from '@/lib/userPath'
+import { moduleById } from '@/lib/learningModules'
 
 const STEPS = [
   { key: 'primary',    q: 'What do you most want to understand about your body right now?',       help: 'Pick the one that feels closest — you can add others in a second.', type: 'single-goal' },
@@ -19,6 +20,10 @@ const STEPS = [
   { key: 'motivation', q: 'What’s your motivation?',                                          help: 'This changes how we frame what we teach.',                              type: 'single', options: MOTIVATIONS },
   { key: 'style',      q: 'How do you prefer to learn?',                                           help: 'We’ll match the module format to how you actually read.',           type: 'single', options: STYLES },
   { key: 'cadence',    q: 'How much time can you give this per week?',                             help: 'Sets your rhythm. You can always change it.',                            type: 'single', options: CADENCE },
+  // GAP 1: summary preview step — renders the generated path before
+  // committing anything to localStorage. savePath() is only called
+  // when the user clicks "Start my path" here.
+  { key: '_summary',   q: 'Here’s what we built for you.',                                    help: 'Based on your answers, this is the order we’ll take you through SelfScience. You can always change direction later.', type: 'summary' },
 ]
 
 export default function QuizPage() {
@@ -27,7 +32,9 @@ export default function QuizPage() {
   const [ans, setAns] = useState({ secondary: [], data: [] })
 
   const current = STEPS[step]
+  const isSummary = current.type === 'summary'
   const canNext = (() => {
+    if (isSummary) return true
     if (current.type === 'single' || current.type === 'single-goal') return !!ans[current.key]
     if (current.type === 'multi-goal') return (ans.secondary || []).length >= 1
     if (current.type === 'multi-data') return true // "neither yet" is a valid pass
@@ -70,7 +77,7 @@ export default function QuizPage() {
           ))}
         </div>
 
-        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-teal">Step {step + 1} of {STEPS.length}</div>
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-teal">Step {step + 1} of {STEPS.length}{isSummary ? ' — Review your path' : ''}</div>
         <h1 className="mt-3 text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">{current.q}</h1>
         <p className="mt-2 text-[14px] text-ss-muted">{current.help}</p>
 
@@ -116,7 +123,7 @@ export default function QuizPage() {
                   type="button"
                   onClick={() => {
                     setAns({ ...ans, [current.key]: o.id })
-                    setTimeout(() => (step < STEPS.length - 1 ? setStep(step + 1) : finish()), 200)
+                    setTimeout(() => setStep(step + 1), 200)
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition ${
                     ans[current.key] === o.id ? 'border-ss-teal bg-ss-teal/[0.06]' : 'border-ss-border-warm bg-white hover:border-ss-teal/60'
@@ -166,25 +173,98 @@ export default function QuizPage() {
               })}
             </div>
           )}
+
+          {/* GAP 1: Step 8 summary preview. Shows the generated
+              modulePathFor() chain + a data-availability line before
+              we commit anything to localStorage. */}
+          {isSummary && (
+            <SummaryPreview ans={ans} />
+          )}
         </div>
 
         {/* Footer */}
         <div className="mt-10 flex items-center justify-between">
           {step > 0 ? (
             <button type="button" onClick={() => setStep(step - 1)} className="inline-flex items-center gap-1 text-[13px] font-semibold text-ss-muted hover:text-ss-text">
-              <ArrowLeft size={13} /> Back
+              <ArrowLeft size={13} /> {isSummary ? 'Change my answers' : 'Back'}
             </button>
           ) : <div />}
-          <button
-            type="button"
-            onClick={next}
-            disabled={!canNext}
-            className="inline-flex items-center gap-1.5 rounded-full bg-ss-teal px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-ss-teal-dark disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {step === STEPS.length - 1 ? 'Build my path' : 'Continue'} <ArrowRight size={14} />
-          </button>
+          {isSummary ? (
+            <button
+              type="button"
+              onClick={finish}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-ss-green px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:brightness-95"
+            >
+              Start my path <ArrowRight size={14} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={next}
+              disabled={!canNext}
+              className="inline-flex items-center gap-1.5 rounded-full bg-ss-teal px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-ss-teal-dark disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {step === STEPS.length - 2 ? 'Preview my path' : 'Continue'} <ArrowRight size={14} />
+            </button>
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ----------------------------------------------------------------------
+// SummaryPreview — Step 8. View-only. Shows the ordered module
+// preview chain plus the data situation line. No localStorage writes.
+// ----------------------------------------------------------------------
+function SummaryPreview({ ans }) {
+  const chainIds = modulePathFor(ans.primary || 'genome')
+  const chain = chainIds.map((id) => moduleById(id)).filter(Boolean)
+  const shown = chain.slice(0, 4)
+  const extra = Math.max(0, chain.length - shown.length)
+
+  const dataList = ans.data || []
+  const hasGenome = dataList.includes('genome')
+  const hasBlood  = dataList.includes('bloodwork')
+  const noData    = !hasGenome && !hasBlood
+
+  let dataLine = ''
+  let dataTone = 'text-ss-teal'
+  if (hasGenome) {
+    dataLine = 'Genome file ready — your path includes genomic insights.'
+  } else if (noData) {
+    dataLine = 'No genetic data yet — your path starts with research. You can add data later.'
+    dataTone = 'text-ss-amber'
+  }
+  if (hasBlood) {
+    dataLine = (dataLine ? dataLine + ' + ' : '') + 'Blood data connected.'
+  }
+
+  return (
+    <div className="space-y-4">
+      <ol className="space-y-2">
+        {shown.map((m, i) => (
+          <li key={m.id} className="flex items-start gap-3 rounded-xl border border-ss-border-warm bg-white p-3.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ss-teal font-mono text-[12px] font-bold text-white">
+              {i + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-bold text-ss-text">{m.title}</span>
+              <span className="mt-0.5 block truncate text-[13px] text-ss-muted">{(m.hook || '').split('.')[0]}.</span>
+            </span>
+          </li>
+        ))}
+        {extra > 0 && (
+          <li className="pl-11 text-[13px] text-ss-muted">+ {extra} more module{extra === 1 ? '' : 's'}</li>
+        )}
+      </ol>
+
+      {dataLine && (
+        <div className={`flex items-center gap-2 rounded-xl border border-ss-border-warm bg-white px-4 py-3 text-[14px] ${dataTone}`}>
+          {hasGenome ? <Check size={14} /> : <Clock size={14} />}
+          <span className="text-ss-text">{dataLine}</span>
+        </div>
+      )}
     </div>
   )
 }
