@@ -570,7 +570,7 @@ function SeeAllLink({ href, label }) {
 
 function EmptyRow({ copy }) {
   return (
-    <div className="rounded-2xl border border-dashed border-ss-border-warm bg-white/40 p-6 text-center text-sm text-ss-muted">
+    <div className="rounded-2xl border border-dashed border-ss-border-warm bg-white p-6 text-center text-sm text-ss-muted">
       {copy}
     </div>
   )

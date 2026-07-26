@@ -1170,6 +1170,57 @@ backend:
               [x] Eyebrow labels use --ss-label (muted teal-gray),
                   not saturated teal.
 
+  - task: "Fix transparent overlays and cards (Welcome quiz + Dashboard cards obscuring content)"
+    implemented: true
+    working: true
+    file: "/app/components/FirstTimeWelcome.jsx, /app/components/ExplorerUnlockModal.jsx, /app/components/Dashboard.jsx, /app/components/dashboard/DiscoverFeed.jsx, /app/components/dashboard/WeeklyDigest.jsx, /app/components/dashboard/JournalWidget.jsx, /app/components/dashboard/TrackerWidget.jsx, /app/app/my-path/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            User reported the Welcome quiz overlay and the
+            dashboard cards were transparent \u2014 the page content
+            behind them was bleeding through and obscuring the
+            content the user was trying to read.
+
+            Root causes found + fixed:
+
+            1. FirstTimeWelcome overlay used bg-ss-teal/95
+               backdrop-blur-sm. Change: bg-ss-canvas (100%
+               opaque) backdrop-blur-md so the /start page can
+               no longer show through the welcome quiz.
+
+            2. ExplorerUnlockModal card used bg-ss-bg-card which
+               is NOT a defined CSS variable or tailwind colour
+               \u2014 the class was silently a no-op, leaving the
+               card fully transparent. Fix: bg-ss-surface (a
+               real token that resolves to #F9F8F5 light and
+               #16242C dark).
+
+            3. Dashboard + widget cards used bg-white/40,
+               bg-white/60, bg-white/70, bg-white/80 in various
+               spots (Dashboard empty-row, DiscoverFeed skeleton
+               and empty states, WeeklyDigest cards,
+               JournalWidget empty state, TrackerWidget empty
+               state, my-path locked-module cards). All of these
+               were bumped to bg-white (which the .dark override
+               remaps to --ss-surface). The corresponding
+               bg-ss-bg/60 and bg-ss-bg/50 patches on empty
+               states + locked modules were bumped to
+               bg-ss-surface.
+
+            Verified via Playwright:
+              - The Welcome quiz overlay renders on a fully solid
+                dark canvas \u2014 no /start bleed-through, all 8
+                learning-topic checkboxes readable.
+              - /my-path, /my-insights, /, /start still HTTP 200.
+              - No hover-state changes touched.
+
+            No logic changes. CSS-only opacity/token fixes.
+
 
 frontend:
   - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"

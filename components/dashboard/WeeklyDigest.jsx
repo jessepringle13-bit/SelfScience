@@ -179,7 +179,7 @@ function BonusSection({ topVariants }) {
   const savedDays      = oldestSaved ? Math.max(1, Math.round((Date.now() - Date.parse(oldestSaved.savedAt || 0)) / 86400000)) : 0
 
   return (
-    <div className="mt-6 rounded-2xl border border-dashed border-ss-border-warm/80 bg-ss-bg/60 p-4 md:p-5">
+    <div className="mt-6 rounded-2xl border border-dashed border-ss-border-warm/80 bg-ss-surface p-4 md:p-5">
       <div
         className="mb-1 font-mono text-[9px] font-bold uppercase text-ss-muted"
         style={{ letterSpacing: '0.14em' }}
@@ -239,7 +239,7 @@ function BonusSection({ topVariants }) {
 function BonusCard({ label, tone, children }) {
   const color = tone === 'amber' ? 'text-ss-amber' : tone === 'green' ? 'text-ss-green' : 'text-ss-teal'
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-ss-border-warm/80 bg-white/70 px-3.5 py-3">
+    <div className="flex flex-col gap-2 rounded-xl border border-ss-border-warm/80 bg-white px-3.5 py-3">
       <div className={`font-mono text-[9px] font-bold uppercase ${color}`} style={{ letterSpacing: '0.14em' }}>
         {label}
       </div>

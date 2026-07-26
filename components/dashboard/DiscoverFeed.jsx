@@ -263,7 +263,7 @@ function FeedSection({ Icon, title, subtitle, loading, items, emptyCopy, onRetry
       {loading ? (
         <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-white/60 ring-1 ring-black/5" />
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-white ring-1 ring-black/5" />
           ))}
         </div>
       ) : items.length === 0 ? (
@@ -281,7 +281,7 @@ function FeedSection({ Icon, title, subtitle, loading, items, emptyCopy, onRetry
 // muted text" empty placeholder per the Discover-Fix spec.
 function InlineEmptyState({ copy, onRetry }) {
   return (
-    <div className="mt-3 flex flex-col items-center rounded-2xl border border-dashed border-ss-border-warm bg-white/40 p-6 text-center">
+    <div className="mt-3 flex flex-col items-center rounded-2xl border border-dashed border-ss-border-warm bg-white p-6 text-center">
       <FlaskConical size={22} className="text-ss-teal" strokeWidth={1.75} />
       <p className="mt-3 max-w-sm text-sm font-semibold text-ss-teal">{copy}</p>
       {onRetry && (
@@ -424,7 +424,7 @@ function ClinicalTrialsSection({ genes }) {
         Recruiting studies related to your top genes. US-only unless location is provided.
       </p>
       {loading ? (
-        <div className="mt-3 h-24 animate-pulse rounded-2xl bg-white/60 ring-1 ring-black/5" />
+        <div className="mt-3 h-24 animate-pulse rounded-2xl bg-white ring-1 ring-black/5" />
       ) : trials.length === 0 ? (
         <InlineEmptyState copy="No open trials found for your top genes right now." />
       ) : (

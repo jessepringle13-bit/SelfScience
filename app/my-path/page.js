@@ -90,7 +90,7 @@ export default function MyPathPage() {
                     className={`flex items-center gap-4 rounded-xl border p-4 transition ${
                       done ? 'border-ss-green/40 bg-ss-green/[0.04]' :
                       isNext ? 'border-ss-teal bg-white ring-1 ring-ss-teal shadow-sm' :
-                      locked ? 'cursor-not-allowed border-ss-border-warm bg-ss-bg/50 opacity-50' :
+                      locked ? 'cursor-not-allowed border-ss-border-warm bg-ss-surface opacity-50' :
                               'border-ss-border-warm bg-white hover:border-ss-teal/60'
                     }`}
                   >

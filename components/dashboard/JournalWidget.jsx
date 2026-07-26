@@ -50,7 +50,7 @@ export default function JournalWidget() {
       </div>
 
       {recent.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-ss-border-warm bg-ss-bg/60 p-6 text-center">
+        <div className="mt-4 rounded-2xl border border-dashed border-ss-border-warm bg-ss-surface p-6 text-center">
           <BookOpen size={22} className="mx-auto text-ss-muted" />
           <p className="mt-2 text-sm text-ss-text">Your first entry starts your timeline.</p>
           <p className="mt-1 text-xs text-ss-muted">

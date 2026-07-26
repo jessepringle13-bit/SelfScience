@@ -72,7 +72,7 @@ export default function FirstTimeWelcome() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="ss-welcome-heading"
-      className="fixed inset-0 z-[70] flex items-stretch justify-center overflow-y-auto bg-ss-teal/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[70] flex items-stretch justify-center overflow-y-auto bg-ss-canvas backdrop-blur-md"
     >
       {/* Close (X) — always available */}
       <button

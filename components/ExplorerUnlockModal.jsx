@@ -125,7 +125,7 @@ export default function ExplorerUnlockModal() {
       </div>
 
       {/* Modal card */}
-      <div className="relative w-full max-w-[460px] rounded-[20px] bg-ss-bg-card p-10 shadow-[0_24px_64px_rgba(0,0,0,0.35)] md:p-9">
+      <div className="relative w-full max-w-[460px] rounded-[20px] bg-ss-surface p-10 shadow-[0_24px_64px_rgba(0,0,0,0.35)] md:p-9">
         <div className="flex flex-col items-center">
           <Compass size={48} className="text-ss-teal" />
           <div className="mt-4 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-teal">Milestone reached</div>

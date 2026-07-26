@@ -33,7 +33,7 @@ export default function TrackerWidget() {
       </div>
 
       {active.length === 0 ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-ss-border-warm bg-ss-bg/60 p-6 text-center">
+        <div className="mt-4 rounded-2xl border border-dashed border-ss-border-warm bg-ss-surface p-6 text-center">
           <ClipboardList size={22} className="mx-auto text-ss-muted" />
           <p className="mt-2 text-sm text-ss-text">No habits set up yet.</p>
           <p className="mt-1 text-xs text-ss-muted">Create habits based on your genome findings.</p>
@@ -48,7 +48,7 @@ export default function TrackerWidget() {
               const done = (h.checkIns || []).includes(today)
               const s = streakFor(h)
               return (
-                <li key={h.id} className="flex items-center gap-3 rounded-lg px-1 py-1.5 transition hover:bg-ss-bg/60">
+                <li key={h.id} className="flex items-center gap-3 rounded-lg px-1 py-1.5 transition hover:bg-ss-surface">
                   <button
                     type="button" aria-label={done ? 'Uncheck habit' : 'Check habit'} aria-pressed={done}
                     onClick={() => toggleCheckIn(h.id, today)}
