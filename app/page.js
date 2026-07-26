@@ -360,7 +360,7 @@ function DiscoverHome() {
             <a
               href="/genome"
               aria-label="Start Here — Upload Your File"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ss-green px-8 py-4 text-base font-semibold text-white shadow-lg transition hover:bg-ss-green/90 md:w-auto"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ss-orange px-8 py-4 text-base font-semibold text-white shadow-lg transition hover:bg-ss-orange-dark md:w-auto"
             >
               <Upload size={18} /> Start Here — Upload Your File
             </a>

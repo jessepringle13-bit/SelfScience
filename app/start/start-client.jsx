@@ -54,7 +54,7 @@ function ProgressBar({ activeIndex }) {
 function StepNumber({ number, label, color = 'text-ss-muted' }) {
   return (
     <div className="mb-5 flex items-center gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ss-teal text-base font-extrabold text-white">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-ss-teal bg-ss-bg text-base font-extrabold text-ss-text">
         {number}
       </div>
       <span className={`text-[11px] font-bold uppercase tracking-[0.18em] ${color}`}>{label}</span>
@@ -71,7 +71,7 @@ function NextStepButton({ href, label }) {
         e.preventDefault()
         document.querySelector(href)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }}
-      className="mt-10 inline-flex items-center gap-2 border-b-2 border-ss-teal pb-1 text-sm font-semibold text-ss-teal hover:opacity-90"
+      className="mt-10 inline-flex items-center gap-2 border-b border-ss-orange/60 pb-1 text-sm font-semibold text-ss-orange hover:border-ss-orange"
     >
       {label} <ChevronDown size={16} />
     </a>
@@ -175,10 +175,10 @@ export default function StartClient() {
 
       {/* ---------- STEP 0 — Welcome ---------- */}
       <section id="welcome" ref={setRef(0)} className="container flex min-h-[80vh] flex-col items-start justify-center py-16">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-ss-teal px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-ss-teal/40 bg-ss-teal/[0.08] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-ss-label">
           <Sparkles size={12} /> Your journey starts here
         </span>
-        <h1 className="mt-6 max-w-3xl text-4xl font-extrabold leading-[1.1] text-ss-teal md:text-5xl lg:text-[52px]">
+        <h1 className="mt-6 max-w-3xl text-4xl font-extrabold leading-[1.1] text-ss-text md:text-5xl lg:text-[52px]">
           Most people discover SelfScience because something isn't adding up.
         </h1>
         <p className="mt-6 max-w-2xl text-[17px] leading-relaxed text-ss-text md:text-lg">
@@ -222,7 +222,7 @@ export default function StartClient() {
       <section id="step-1" ref={setRef(1)} className="border-t-4 border-ss-teal bg-white">
         <div className="container py-20">
           <StepNumber number={1} label="Understand what this is" />
-          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-teal md:text-4xl">
+          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">
             SelfScience is a research discovery tool — not a diagnosis.
           </h2>
           <p className="mt-5 max-w-2xl text-[17px] leading-relaxed">
@@ -233,20 +233,20 @@ export default function StartClient() {
           </p>
 
           <div className="mt-10 grid max-w-3xl gap-4 md:grid-cols-2">
-            <div className="rounded-xl border-l-4 border-emerald-600 bg-emerald-50 p-5">
-              <p className="text-sm font-extrabold uppercase tracking-widest text-emerald-700">SelfScience IS</p>
+            <div className="rounded-xl border-l-[3px] border-ss-teal bg-ss-surface p-5">
+              <p className="text-sm font-semibold uppercase tracking-widest text-ss-label">SelfScience IS</p>
               <ul className="mt-3 space-y-1.5 text-sm text-ss-text">
                 {['A research search engine for health and genomics',
                   'An AI tool that scores study quality honestly',
                   'A way to understand what your genome means',
                   'A food scanner tied to your biology',
                   'An educational starting point for better conversations'].map((t) => (
-                  <li key={t} className="flex gap-2"><span className="font-bold text-emerald-700">✓</span>{t}</li>
+                  <li key={t} className="flex gap-2"><span className="font-bold text-ss-teal">✓</span>{t}</li>
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl border-l-4 border-ss-orange bg-ss-orange/10 p-5">
-              <p className="text-sm font-extrabold uppercase tracking-widest text-ss-orange">SelfScience is NOT</p>
+            <div className="rounded-xl border-l-[3px] border-ss-orange bg-ss-surface p-5">
+              <p className="text-sm font-semibold uppercase tracking-widest text-ss-label">SelfScience is NOT</p>
               <ul className="mt-3 space-y-1.5 text-sm text-ss-text">
                 {['A medical diagnosis tool',
                   'A replacement for your doctor',
@@ -271,7 +271,7 @@ export default function StartClient() {
       <section id="step-2" ref={setRef(2)} className="bg-ss-bg">
         <div className="container py-20">
           <StepNumber number={2} label="Your first search" />
-          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-teal md:text-4xl">
+          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">
             Start by searching something you already wonder about.
           </h2>
           <p className="mt-5 max-w-2xl text-[17px] leading-relaxed">
@@ -284,7 +284,7 @@ export default function StartClient() {
             <p className="mt-2.5 text-[11px] text-ss-muted">Opens the full search results page — you can always come back here.</p>
           </div>
 
-          <p className="mt-8 text-sm font-bold text-ss-teal">Or start with one of these:</p>
+          <p className="mt-8 text-sm font-semibold text-ss-label">Or start with one of these:</p>
           <div className="mt-4 grid max-w-3xl gap-3">
             {[
               { label: 'I have downloaded my 23andMe or AncestryDNA results',   color: 'text-ss-teal', searches: ['MTHFR methylation research', 'ACTN3 athletic performance', 'COMT dopamine processing'] },
@@ -310,7 +310,7 @@ export default function StartClient() {
             ))}
           </div>
 
-          <div className="mt-10 max-w-xl rounded-xl bg-ss-teal p-6 text-white">
+          <div className="mt-10 max-w-xl rounded-xl border-l-4 border-ss-teal bg-ss-surface p-6 text-ss-text">
             <p className="mb-3 text-sm font-bold">How to read your search results</p>
             {[
               ['Reliability score',   '1–5 rating of how strong the evidence is. A single small study scores 1–2. A large randomized trial or meta-analysis scores 4–5. Always check this before taking a result seriously.'],
@@ -333,11 +333,11 @@ export default function StartClient() {
       <section id="step-3" ref={setRef(3)} className="bg-white">
         <div className="container py-20">
           <StepNumber number={3} label="Your genome — optional but powerful" />
-          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-teal md:text-4xl">
+          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">
             If you have a 23andMe or AncestryDNA file, this is where it gets personal.
           </h2>
 
-          <div className="mt-6 max-w-xl rounded-xl border-l-4 border-emerald-600 bg-emerald-50 p-4">
+          <div className="mt-6 max-w-xl rounded-xl border-l-[3px] border-ss-teal bg-ss-surface p-4">
             <p className="flex items-center gap-2 text-sm font-bold text-emerald-700"><ShieldCheck size={16} /> Your privacy is protected</p>
             <p className="mt-1.5 text-[13px] leading-relaxed text-ss-text">
               Your genome file never leaves your device. It's read entirely in your browser. Anonymous variant calls are used to generate your results — nothing is stored or retained after you close the page. We mean this literally.
@@ -348,7 +348,7 @@ export default function StartClient() {
             Uploading your raw genome file gives SelfScience the ability to cross-reference approximately 500 specific genetic variants against peer-reviewed research. The result is not a diagnosis — it's a research starting point that's specific to your biology, not the population average.
           </p>
 
-          <p className="mt-8 text-sm font-bold text-ss-teal">Here's what people discover:</p>
+          <p className="mt-8 text-sm font-semibold text-ss-label">Here's what people discover:</p>
           <div className="mt-3 grid max-w-3xl gap-2.5">
             {[
               { g: 'MTHFR',    f: 'I can’t efficiently convert synthetic folic acid — the kind added to every bread and cereal in the US. This directly affects how I make serotonin and dopamine.', a: 'Switch from folic acid to methylfolate. Avoid fortified cereals. A starting point to discuss with your doctor.' },
@@ -365,7 +365,7 @@ export default function StartClient() {
           </div>
 
           <div className="mt-10 max-w-xl">
-            <p className="mb-3 text-sm font-bold text-ss-teal">How to get your raw genome file</p>
+            <p className="mb-3 text-sm font-semibold text-ss-label">How to get your raw genome file</p>
             {[
               ['23andMe',       'Sign in → Browse Raw Data → Download. The file is a .txt or .zip (v3, v4, or v5 all work).'],
               ['AncestryDNA',   'Settings → Privacy → Download DNA Data. Downloads as a .zip.'],
@@ -382,7 +382,7 @@ export default function StartClient() {
           </div>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/genome" className="inline-flex items-center gap-2 rounded-full bg-ss-teal px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110">
+            <Link href="/genome" className="inline-flex items-center gap-2 rounded-full bg-ss-orange px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110">
               <Dna size={14} /> Upload my genome
             </Link>
             <span className="text-xs text-ss-muted">or continue to the next step first</span>
@@ -396,7 +396,7 @@ export default function StartClient() {
       <section id="step-4" ref={setRef(4)} className="bg-ss-bg">
         <div className="container py-20">
           <StepNumber number={4} label="What you eat matters more than you think" />
-          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-teal md:text-4xl">
+          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">
             SelfScience can analyze any food or product against your genomic profile.
           </h2>
           <p className="mt-5 max-w-2xl text-[17px] leading-relaxed">
@@ -410,7 +410,7 @@ export default function StartClient() {
               { p: 'A standard salad dressing',       f: 'Soybean oil (high omega-6 — relevant for FADS1/2 reduced conversion). Contains carrageenan (gut concern for NOD2 variant).', v: 'D — Better alternatives exist', tone: 'bg-rose-600' },
             ].map((ex) => (
               <div key={ex.p} className="rounded-xl border border-ss-border-warm bg-white p-4">
-                <p className="text-sm font-bold text-ss-teal">{ex.p}</p>
+                <p className="text-sm font-semibold text-ss-label">{ex.p}</p>
                 <p className="mt-2 text-[12.5px] leading-relaxed text-ss-muted">{ex.f}</p>
                 <span className={`mt-3 inline-block rounded px-2 py-0.5 text-[11px] font-bold text-white ${ex.tone}`}>{ex.v}</span>
               </div>
@@ -431,7 +431,7 @@ export default function StartClient() {
       <section id="step-5" ref={setRef(5)} className="bg-white">
         <div className="container py-20">
           <StepNumber number={5} label="Going deeper" />
-          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-teal md:text-4xl">
+          <h2 className="max-w-3xl text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">
             When you're ready for more, the depth is here.
           </h2>
           <p className="mt-5 max-w-2xl text-[17px] leading-relaxed">
@@ -452,13 +452,13 @@ export default function StartClient() {
             ].map((p) => (
               <Link key={p.name} href={p.href} className="rounded-xl border border-ss-border-warm bg-ss-bg p-4 transition hover:border-ss-teal hover:bg-white">
                 <span className="mb-2 block text-2xl">{p.icon}</span>
-                <p className="text-sm font-bold text-ss-teal">{p.name}</p>
+                <p className="text-sm font-semibold text-ss-label">{p.name}</p>
                 <p className="mt-0.5 text-xs leading-snug text-ss-muted">{p.desc}</p>
               </Link>
             ))}
           </div>
 
-          <div className="mt-8 max-w-xl rounded-xl bg-ss-teal p-6 text-white">
+          <div className="mt-8 max-w-xl rounded-xl border-l-4 border-ss-teal bg-ss-surface p-6 text-ss-text">
             <p className="flex items-center gap-2 text-sm font-bold"><BookOpen size={15} /> The SelfScience Reading List</p>
             <p className="mt-2 text-[13.5px] leading-relaxed text-white/85">
               69 books across all nine pillars — each with honest notes on where the evidence is strong and where it's still emerging. No affiliate links. No sponsored recommendations.

@@ -162,8 +162,12 @@ export function SiteNav({ variant = 'light' }) {
   const base = isDark
     ? 'border-white/15 bg-ss-teal/85 backdrop-blur-md text-white'
     : 'border-ss-border-warm bg-white/95 backdrop-blur text-ss-text'
-  const linkBase = isDark ? 'text-white/85 hover:text-white' : 'text-ss-text hover:text-ss-teal'
-  const linkActive = isDark ? 'text-white font-semibold' : 'text-ss-teal font-semibold'
+  const linkBase = isDark ? 'text-white/85 hover:text-white' : 'text-ss-text hover:text-ss-orange'
+  // Design audit: active nav item = white/high-contrast text with a subtle
+  // orange underline. No teal in the nav to keep colour hierarchy clean.
+  const linkActive = isDark
+    ? 'text-white font-semibold border-b-2 border-ss-orange pb-0.5'
+    : 'text-ss-text font-semibold border-b-2 border-ss-orange pb-0.5'
   const wordmarkClass = isDark ? 'text-white' : 'text-ss-teal'
   const linkClass = (href) => (pathname === href ? linkActive : linkBase)
   const ABOUT_ITEMS = [
@@ -210,8 +214,10 @@ export function SiteNav({ variant = 'light' }) {
               rather than shouty. */}
           <a
             href="/start"
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-bold text-ss-orange transition hover:bg-ss-orange/10 ${
-              pathname === '/start' ? 'bg-ss-orange/10' : ''
+            className={`inline-flex items-center gap-1 px-2 py-1 font-bold transition ${
+              pathname === '/start'
+                ? 'text-ss-orange border-b-2 border-ss-orange'
+                : 'text-ss-orange/90 hover:text-ss-orange'
             }`}
           >
             Start Here
@@ -224,8 +230,8 @@ export function SiteNav({ variant = 'light' }) {
               href="/my-path"
               className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
                 pathname === '/my-path'
-                  ? 'bg-ss-teal/10 text-ss-teal'
-                  : 'text-ss-teal hover:bg-ss-teal/10'
+                  ? 'text-ss-text font-semibold border-b-2 border-ss-orange pb-0.5'
+                  : 'text-ss-text/85 hover:text-ss-text'
               }`}
             >
               <Route size={13} /> My Path
@@ -236,8 +242,8 @@ export function SiteNav({ variant = 'light' }) {
               href="/my-insights"
               className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
                 pathname === '/my-insights'
-                  ? 'bg-ss-teal/10 text-ss-teal'
-                  : 'text-ss-teal hover:bg-ss-teal/10'
+                  ? 'text-ss-text font-semibold border-b-2 border-ss-orange pb-0.5'
+                  : 'text-ss-text/85 hover:text-ss-text'
               }`}
             >
               My Insights

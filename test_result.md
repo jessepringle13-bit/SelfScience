@@ -1043,6 +1043,133 @@ backend:
             /explore/rs1801133, /genome/overview, /genome/findings)
             return HTTP 200. No regressions.
 
+  - task: "Design System Audit — Visual Fatigue Fix (colour hierarchy + one CTA + unified pills + heading colour + hero + confetti)"
+    implemented: true
+    working: true
+    file: "/app/app/globals.css, /app/tailwind.config.js, /app/app/start/start-client.jsx, /app/app/search/search-client.jsx, /app/app/goals/page.js, /app/app/page.js, /app/components/site-nav.jsx, /app/components/ExplorerUnlockModal.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+          agent: "main"
+          comment: |
+            Applied the visual-fatigue design audit end-to-end.
+            Purely CSS/styling — no logic changes.
+
+            Token additions:
+              * --ss-label: #7A8F91 (light) / #7AAEB5 (dark).
+                Muted teal-gray. Registered as ss-label in tailwind.
+                Used for all eyebrow / section-uppercase labels so
+                they read as scaffolding, not signal.
+
+            /start refactor:
+              * Main h1 "Most people discover SelfScience..." and
+                every section h2 (SelfScience is a research
+                discovery tool, You already have your own answer,
+                Get your data, Add your baseline biology, Bring
+                a research question) — text-ss-teal \u2192 text-ss-text
+                (white in dark mode).
+              * "YOUR JOURNEY STARTS HERE" pill — solid teal fill
+                \u2192 subtle bordered pill: border-ss-teal/40 +
+                bg-ss-teal/[0.08] + text-ss-label + font-semibold.
+              * Step number circles \u2014 solid teal bg \u2192 dark bg
+                + 2px teal border + text-ss-text numeral.
+              * Two "SelfScience IS" comparison cards \u2014 removed
+                light mint (bg-emerald-50 + border-emerald-600) and
+                the orange-tinted "IS NOT" card. Both now use
+                bg-ss-surface + border-l-[3px] (ss-teal for IS,
+                ss-orange for IS NOT). Text-ss-label eyebrows,
+                text-ss-text checklist, coloured only \u2713 / \u2715
+                icons.
+              * Second mint card ("Get the raw file...") \u2014 same
+                treatment.
+              * Solid teal info boxes (bg-ss-teal p-6 text-white)
+                \u2014 converted to bordered dark-surface cards.
+              * "Upload Genome" CTA inside /start \u2014 bg-ss-teal
+                \u2192 bg-ss-orange (primary CTA colour).
+              * "Got it. What do I do first?" inline link \u2014 teal
+                underline \u2192 subtle orange underline.
+              * All small eyebrow labels ("SelfScience IS",
+                "Here\u2019s what people discover:", "Or start with one
+                of these:", etc.) \u2014 text-ss-teal \u2192 text-ss-label
+                with font-semibold instead of font-bold.
+
+            /search refactor:
+              * Hero section \u2014 bg-ss-teal (solid, jarring) \u2192
+                bg-ss-bg + a soft top gradient
+                (from-ss-teal/[0.10] to-transparent, h-40) so it
+                floats on the dark base without hard edges.
+              * SiteNav variant="dark" \u2192 default variant so nav
+                inherits the standard light/dark treatment.
+              * "Search health & genomics research" / "Results
+                for..." h1 \u2014 text-ss-teal \u2192 text-ss-text.
+              * Filter pills (evidence tier, Last 5y, Smart Search,
+                sort) \u2014 UNIFIED active state. Old:
+                border-ss-teal + bg-ss-teal + text-white. New:
+                border-ss-orange + bg-ss-orange/[0.14] +
+                text-ss-text + ring-1 ring-ss-orange/40. Applies
+                consistently to all pill groups.
+              * Recent-only pill dot indicator \u2014 bg-ss-teal/40
+                \u2192 bg-ss-muted/40 (inactive) and bg-ss-orange
+                (active) so it matches the unified selected state.
+
+            /goals refactor:
+              * "+ New Goal" (top-right) \u2014 bg-ss-green \u2192
+                bg-ss-orange (primary CTA colour, per spec).
+              * "+ Create your first goal" empty state \u2014 same.
+
+            / (homepage) refactor:
+              * Hero primary CTA "Start Here \u2014 Upload Your File"
+                \u2014 bg-ss-green \u2192 bg-ss-orange. Only ONE primary
+                CTA colour on the site now.
+
+            Site-nav refactor:
+              * linkActive rule \u2014 was "text-ss-teal font-semibold"
+                in light and "text-white font-semibold" in dark;
+                now BOTH modes use a subtle orange underline via
+                "border-b-2 border-ss-orange pb-0.5" plus the
+                mode-appropriate high-contrast text colour. No teal
+                anywhere in the nav.
+              * Guided-mode "My Path" and "My Insights" pills \u2014
+                replaced teal bg/text with the same underline
+                pattern for visual consistency.
+              * "Start Here" pill \u2014 dropped the orange bg tint,
+                kept the orange text + orange underline when
+                active.
+
+            Confetti (ExplorerUnlockModal):
+              * Palette reduced from [ss-teal, ss-amber, white] to
+                [white, soft cream #F5D9C4, soft orange #F58642].
+                Celebratory without adding new colour noise.
+
+            Verified via Playwright at 1400x900 in dark mode:
+              a) /start \u2014 "Most people discover..." heading now
+                 white. YOUR JOURNEY STARTS HERE pill is subtle
+                 bordered. Step number circles bordered.
+                 SelfScience IS / IS NOT cards on dark surface.
+              b) /search \u2014 dark hero with a soft top gradient
+                 instead of the solid teal band. Filter pill active
+                 state is orange-tinted. Search button orange.
+              c) /goals \u2014 orange "New Goal" button. Orange empty
+                 state "Create your first goal" button.
+              d) / \u2014 hero primary CTA is orange (was green).
+              e) All 7 audited pages return HTTP 200. No regressions.
+
+            Design system rules now globally true:
+              [x] Only ONE primary CTA colour (orange).
+              [x] Teal never appears as h1/h2/h3 text colour or as
+                  large background fill.
+              [x] All filter pill selected states use the same
+                  orange-tint treatment.
+              [x] No light mint / emerald backgrounds on dark
+                  themes.
+              [x] Headings on /start are white.
+              [x] Search hero is dark, not teal.
+              [x] Goal buttons are orange.
+              [x] Eyebrow labels use --ss-label (muted teal-gray),
+                  not saturated teal.
+
 
 frontend:
   - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"

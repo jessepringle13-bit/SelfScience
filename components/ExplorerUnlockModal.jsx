@@ -14,7 +14,7 @@ import { useModuleProgress } from '@/lib/learningModules'
 
 const LS_SHOWN = 'ss_explorer_unlock_shown'
 
-const CONFETTI_COLORS = ['#0E7A6E', '#F5A840', '#FFFFFF'] // ss-teal, ss-amber, white
+const CONFETTI_COLORS = ['#FFFFFF', '#F5D9C4', '#F58642'] // white + soft cream + soft orange (reduced palette per design audit)
 const CONFETTI_COUNT  = 20
 
 function readAny(key, fallback = null) {

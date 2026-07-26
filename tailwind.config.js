@@ -30,6 +30,7 @@ module.exports = {
             teal: 'var(--ss-teal, #1B474D)',
             'teal-dark': 'var(--ss-teal-dark, #123539)',
             'teal-ink': 'var(--ss-teal-ink, #0F2A2E)',
+            label: 'var(--ss-label, #7A8F91)',
             orange: 'var(--ss-orange, #C45820)',
             'orange-dark': 'var(--ss-orange-dark, #A5471A)',
             green: 'var(--ss-green, #2E7D32)',

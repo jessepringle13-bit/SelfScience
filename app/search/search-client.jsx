@@ -909,9 +909,12 @@ export default function SearchClient() {
 
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
-      {/* Persistent search band */}
-      <section className="relative bg-ss-teal pb-10 pt-24 text-white">
-        <SiteNav variant="dark" />
+      {/* Persistent search band — dark surface with a very subtle
+          top gradient. The old solid teal fill was too jarring against
+          the rest of the site (see design audit). */}
+      <section className="relative bg-ss-bg pb-10 pt-24 text-ss-text">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-ss-teal/[0.10] to-transparent" aria-hidden="true" />
+        <SiteNav />
         <div className="container">
           <form onSubmit={submit} className="relative mx-auto max-w-4xl">
             <div className="flex items-center overflow-hidden rounded-full bg-white text-ss-text shadow-lg ring-1 ring-black/10">
@@ -1213,7 +1216,7 @@ export default function SearchClient() {
           ariaLabel="First visit tip on Search — dismiss"
         />
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-2xl font-extrabold text-ss-teal">
+          <h1 className="text-2xl font-extrabold text-ss-text">
             {data?.isPillarBrowse && pillar
               ? <>Latest research on <span className="text-ss-orange">{pillar}</span></>
               : data?.isTextPillar && pillar && submittedQ
@@ -1351,7 +1354,7 @@ export default function SearchClient() {
                     aria-pressed={active}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
                       active
-                        ? 'border-ss-teal bg-ss-teal text-white shadow-sm'
+                        ? 'border-ss-orange bg-ss-orange/[0.14] text-ss-text shadow-sm ring-1 ring-ss-orange/40'
                         : 'border-ss-border-warm bg-white text-ss-muted hover:border-ss-teal hover:text-ss-teal'
                     }`}
                   >
@@ -1394,14 +1397,14 @@ export default function SearchClient() {
                 onClick={() => setRecentOnly((v) => !v)}
                 className={`ml-2 inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   recentOnly
-                    ? 'border-ss-teal bg-ss-teal text-white shadow-sm'
+                    ? 'border-ss-orange bg-ss-orange/[0.14] text-ss-text shadow-sm ring-1 ring-ss-orange/40'
                     : 'border-ss-border-warm bg-white text-ss-teal hover:border-ss-teal'
                 }`}
                 title="Restrict results to the last 5 years"
               >
                 <span
                   aria-hidden="true"
-                  className={`inline-block h-2 w-2 rounded-full ${recentOnly ? 'bg-white' : 'bg-ss-teal/40'}`}
+                  className={`inline-block h-2 w-2 rounded-full ${recentOnly ? 'bg-ss-orange' : 'bg-ss-muted/40'}`}
                 />
                 Last 5y
               </button>
@@ -1528,7 +1531,7 @@ function FilterGroup({ label, options, value, onChange }) {
             onClick={() => onChange(opt.key)}
             className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
               value === opt.key
-                ? 'bg-ss-teal text-white'
+                ? 'bg-ss-orange/[0.14] text-ss-text ring-1 ring-ss-orange/40'
                 : 'bg-white text-ss-muted ring-1 ring-ss-border-warm hover:text-ss-teal hover:ring-ss-teal'
             }`}
           >

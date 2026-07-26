@@ -84,7 +84,7 @@ function GoalsPage() {
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-ss-green px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95"
+            className="inline-flex items-center gap-1.5 rounded-full bg-ss-orange px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95"
           >
             <Plus size={14} /> New Goal
           </button>
@@ -124,7 +124,7 @@ function GoalsPage() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(true)}
-                  className="mt-1 inline-flex items-center gap-1 rounded-full bg-ss-green px-4 py-2 text-sm font-bold text-white shadow-sm hover:brightness-95"
+                  className="mt-1 inline-flex items-center gap-1 rounded-full bg-ss-orange px-4 py-2 text-sm font-bold text-white shadow-sm hover:brightness-95"
                 >
                   <Plus size={12} /> Create your first goal
                 </button>

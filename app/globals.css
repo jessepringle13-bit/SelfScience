@@ -26,6 +26,7 @@
     --ss-teal: #1B474D;
     --ss-teal-dark: #123539;
     --ss-teal-ink: #0F2A2E;
+    --ss-label: #7A8F91;             /* muted teal-gray for eyebrows / section labels */
     --ss-orange: #C45820;
     --ss-orange-dark: #A5471A;
     --ss-green: #2E7D32;
@@ -76,6 +77,7 @@
     --ss-teal: #6FD3D0;            /* was #1B474D — bright teal on navy */
     --ss-teal-dark: #4FB3B0;       /* darker accent variant */
     --ss-teal-ink: #1F5A5F;        /* inky teal for surface fills */
+    --ss-label: #7AAEB5;           /* muted teal-gray for eyebrow labels — deliberately desaturated */
     --ss-orange: #F58642;          /* was #C45820 — warm bright orange */
     --ss-orange-dark: #E27235;
     --ss-green: #6FCF77;            /* was #2E7D32 — vivid mint green */
