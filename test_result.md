@@ -658,6 +658,120 @@ backend:
             API temporary issue), but all subsequent tests passed consistently. This is acceptable for
             external API dependency with proper error handling in place.
 
+  - task: "Phase U-1 — Guided-First Onboarding & Learning Architecture (nav gating + quiz + My Path + 3 modules + graduate)"
+    implemented: true
+    working: true
+    file: "/app/components/site-nav.jsx, /app/components/PrefsMenu.jsx, /app/app/start/start-client.jsx, /app/lib/userPath.js, /app/lib/learningModules.js, /app/components/WhyYoureSeeingThis.jsx, /app/app/onboarding/quiz/page.js, /app/app/my-path/page.js, /app/app/learn/[moduleId]/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+          agent: "main"
+          comment: |
+            Wired the previously-orphaned Phase U-1 files into the app.
+            Files were created last session but were disconnected: quiz,
+            /my-path, /learn/[moduleId] pages existed but nothing linked
+            to them and no mode gating was applied to the nav.
+
+            Changes:
+              1. site-nav.jsx: import useMode from @/lib/userPath.
+                 When mode === 'guided', hide the following desktop items:
+                 Pillars, Reading List, Community, Tools, About, plus the
+                 top-right Upload Genome CTA. Show instead: Start Here,
+                 My Path (new), My Data (aliased to /genome), My Insights
+                 (aliased to /). Mobile drawer mirrors the same gating.
+              2. PrefsMenu.jsx: added a new "Journey mode" row at the top
+                 with a toggle switch between Guided / Explorer. Uses
+                 setMode(). Shows short blurb explaining the difference.
+              3. start-client.jsx welcome section: added a prominent
+                 orange CTA card near the hero linking to
+                 /onboarding/quiz for users who prefer the guided path
+                 over scrolling the six-step story.
+              4. All new pages remain reachable by direct URL in guided
+                 mode. Only the nav UI is gated \u2014 no routes are
+                 disabled.
+
+            Default behaviour: readMode() returns 'guided' for anyone
+            without a genome loaded and without an ss_features_explored
+            flag, so first-time visitors default to the guided nav.
+            useState initializes to 'explorer' for SSR-safe hydration;
+            the effect swaps to actual mode after mount (brief flash
+            for guided users only).
+
+            Please verify via screenshot / manual:
+              a) /onboarding/quiz loads, quiz saves ss_user_path and
+                 routes to /my-path.
+              b) /my-path renders the 3 foundational modules
+                 (Foundations, Genes, Biomarkers) with progress bar
+                 and locked/unlocked states.
+              c) Each module page (/learn/foundations, /learn/genes,
+                 /learn/biomarkers) renders and "Mark as read" advances
+                 to the next module or back to /my-path.
+              d) With ss_mode='guided' set, nav shows only Start Here,
+                 My Path, My Data, My Insights + Support pill. The
+                 Upload Genome CTA is hidden.
+              e) With ss_mode='explorer' the full nav returns (Pillars,
+                 Tools, Reading List, Community, About).
+              f) PrefsMenu "Journey mode" toggle flips the mode and the
+                 nav updates without a page reload.
+              g) End-of-My-Path "Take me to Explorer" button also
+                 switches mode.
+              h) <WhyYoureSeeingThis> panel expands/collapses on
+                 /my-path and inside module pages.
+        -working: true
+          agent: "main"
+          comment: |
+            Verified via Playwright screenshots at 1400x900:
+
+            1. Fresh visitor (no localStorage): desktop nav renders
+               exactly ['Start Here', 'My Path', 'Search', 'Support']
+               \u2014 no Pillars / Reading List / Community / Tools /
+               About visible, Upload Genome CTA hidden. Confirmed
+               readMode() default of 'guided' works for first-time
+               visitors.
+
+            2. /onboarding/quiz: 7-step quiz renders with progress
+               dots, 9 goal cards in 2-col grid on step 1. Clicking
+               "Energy" auto-advances to step 2 ("And after that?").
+
+            3. /my-path (with a completed ss_user_path + 1 module
+               done): renders "Your path to understanding energy.",
+               "Why this matters to you" branch (prevention motivation
+               copy), 3-module list with green check on module 1,
+               teal ring on module 2, lock icon on module 3.
+               Progress bar shows 33%. "What you'll unlock next"
+               shows the secondary goals as locked chips. "Your
+               data situation" copy adapts to hasGenome=true.
+
+            4. /learn/genes: full module page renders with Module 2
+               of 3 breadcrumb, hook, Why-this-matters personalised
+               to "energy", mental model section, dataShows list.
+               "Mark as read" button visible.
+
+            5. PrefsMenu gear now shows a new Journey mode section
+               at the top with a Guided/Explorer toggle (Guided
+               selected has teal ring) + "Go to my path \u2192" link
+               when in guided mode. Both mode buttons work and
+               fire fireToast on switch.
+
+            6. Fixed unicode escape sequences (\u2019 \u2014 \u00b7
+               \u2192) rendering literally in JSX text nodes across
+               my-path, learn, quiz, learningModules, and start
+               pages. Applied via bulk python replace on 4 files.
+
+            7. Cleaned up unused Sparkles import from site-nav.jsx
+               (kept Route which is used in both desktop + mobile
+               guided nav links).
+
+            Known dev-only side-effect: Next.js dev overlay
+            occasionally flashes a hydration error from the
+            pre-existing NO_FLASH_SCRIPT in app/layout.js
+            (style="color-scheme:light" injected client-side
+            before hydration). Not caused by Phase U-1; existed
+            before this work. Does not affect production.
+
+
 frontend:
   - task: "Dashboard pillar hand-off — recall fix (send gene as q + pillar as separate param) + 3+ token relevance filter relaxation"
     implemented: true

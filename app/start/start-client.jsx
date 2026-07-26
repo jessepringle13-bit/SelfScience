@@ -190,7 +190,32 @@ export default function StartClient() {
         <p className="mt-6 max-w-xl text-sm italic text-ss-muted">
           This page walks you through exactly where to start. No account. No commitment. Just the first step.
         </p>
-        <NextStepButton href="#step-1" label="Scroll to begin" />
+
+        {/* Guided-path shortcut — prominent orange CTA card for users
+            who prefer a 3-minute quiz that builds a personalised
+            learning curriculum over scrolling the full 6-step story. */}
+        <Link
+          href="/onboarding/quiz"
+          className="mt-8 group inline-flex max-w-2xl items-center gap-4 rounded-2xl border-2 border-ss-orange bg-ss-orange/5 p-4 md:p-5 transition hover:bg-ss-orange/10"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ss-orange text-white">
+            <Sparkles size={18} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-orange">
+              Prefer a guided path?
+            </span>
+            <span className="mt-1 block text-[15px] font-bold leading-tight text-ss-text">
+              Take a 3-minute quiz → get your personalised learning path.
+            </span>
+            <span className="mt-1 block text-[12.5px] leading-relaxed text-ss-muted">
+              We’ll pick 3 foundational modules and unlock more as you go.
+            </span>
+          </span>
+          <ArrowRight size={18} className="shrink-0 text-ss-orange transition group-hover:translate-x-0.5" />
+        </Link>
+
+        <NextStepButton href="#step-1" label="Or scroll to read the story" />
       </section>
 
       {/* ---------- STEP 1 — What is this ---------- */}
@@ -326,10 +351,10 @@ export default function StartClient() {
           <p className="mt-8 text-sm font-bold text-ss-teal">Here's what people discover:</p>
           <div className="mt-3 grid max-w-3xl gap-2.5">
             {[
-              { g: 'MTHFR',    f: 'I can\u2019t efficiently convert synthetic folic acid — the kind added to every bread and cereal in the US. This directly affects how I make serotonin and dopamine.', a: 'Switch from folic acid to methylfolate. Avoid fortified cereals. A starting point to discuss with your doctor.' },
+              { g: 'MTHFR',    f: 'I can’t efficiently convert synthetic folic acid — the kind added to every bread and cereal in the US. This directly affects how I make serotonin and dopamine.', a: 'Switch from folic acid to methylfolate. Avoid fortified cereals. A starting point to discuss with your doctor.' },
               { g: 'ACTN3',    f: 'My muscle fiber genetics are built for endurance, not power. 18 years of training the wrong way for my biology.', a: 'Structure training around aerobic base building. Adaptation is fastest there.' },
               { g: 'MTNR1B',   f: 'Eating late at night activates a melatonin receptor that impairs my insulin secretion. My HbA1c makes complete sense now.', a: 'Last meal by 6:30 PM. Single behavioral change with the strongest documented metabolic impact for this genotype.' },
-              { g: 'COL5A1',   f: 'My connective tissue has structurally different collagen. The reason I keep getting injured is not bad luck — it\u2019s biology.', a: 'Collagen loading protocol before every training session. Progressive volume increases.' },
+              { g: 'COL5A1',   f: 'My connective tissue has structurally different collagen. The reason I keep getting injured is not bad luck — it’s biology.', a: 'Collagen loading protocol before every training session. Progressive volume increases.' },
             ].map((ex) => (
               <div key={ex.g} className="rounded-xl border border-ss-border-warm bg-ss-bg p-4">
                 <span className="inline-block rounded bg-ss-teal px-2 py-0.5 text-[11px] font-bold text-white">{ex.g}</span>

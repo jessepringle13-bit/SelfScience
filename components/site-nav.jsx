@@ -34,6 +34,8 @@ import PrefsMenu from '@/components/PrefsMenu'
 import AlertBell from '@/components/AlertBell'
 import ExplorerChip from '@/components/ExplorerChip'
 import { useSavedCount } from '@/lib/readingList'
+import { useMode } from '@/lib/userPath'
+import { Route } from 'lucide-react'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -55,6 +57,8 @@ export const PILLARS = [
 export function SiteNav({ variant = 'light' }) {
   const isDark = variant === 'dark'
   const pathname = usePathname() || ''
+  const mode = useMode() // 'explorer' | 'guided'
+  const guided = mode === 'guided'
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -212,6 +216,21 @@ export function SiteNav({ variant = 'light' }) {
           >
             Start Here
           </a>
+          {/* Guided mode: dedicated "My Path" pill immediately after Start Here.
+              Only shown when the user is in guided mode so it's a clear next-step
+              anchor for their curriculum. */}
+          {guided && (
+            <a
+              href="/my-path"
+              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
+                pathname === '/my-path'
+                  ? 'bg-ss-teal/10 text-ss-teal'
+                  : 'text-ss-teal hover:bg-ss-teal/10'
+              }`}
+            >
+              <Route size={13} /> My Path
+            </a>
+          )}
           {/* Dashboard \u2014 only surfaces once the user has actually loaded a
               genome. Positioned right after Start Here so the reload path
               is obvious. */}
@@ -227,6 +246,12 @@ export function SiteNav({ variant = 'light' }) {
           )}
           <a href="/search" data-tour-target="nav-search" className={linkClass('/search')}>Search</a>
 
+          {/* Guided-mode short nav ends here. The Pillars / Reading List /
+              Community / Tools / About items only surface for Explorer users
+              so the guided curriculum stays focused. All routes remain
+              directly reachable by URL in either mode. */}
+          {!guided && (
+            <div className="contents">
           {/* Pillars dropdown — click to open, click outside/Escape to close */}
           <div className="relative" ref={pillarsRef}>
             <button
@@ -364,6 +389,8 @@ export function SiteNav({ variant = 'light' }) {
               </div>
             )}
           </div>
+            </div>
+          )}
 
           <SupportLink pathname={pathname} />
         </nav>
@@ -396,7 +423,9 @@ export function SiteNav({ variant = 'light' }) {
 
           <a
             href="/genome"
-            className="hidden rounded-full bg-ss-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark md:inline-flex"
+            className={`hidden rounded-full bg-ss-orange px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark ${
+              guided ? 'md:hidden' : 'md:inline-flex'
+            }`}
           >
             Upload Genome
           </a>
@@ -438,9 +467,20 @@ export function SiteNav({ variant = 'light' }) {
                 <LayoutDashboard size={14} /> Dashboard
               </a>
             )}
+            {guided && (
+              <a
+                href="/my-path"
+                onClick={() => setMobileOpen(false)}
+                className="inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-3 py-2 font-semibold text-white hover:bg-white/25"
+              >
+                <Route size={14} /> My Path
+              </a>
+            )}
             <a href="/search" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Search</a>
-            <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">Upload Genome</a>
+            <a href="/genome" onClick={() => setMobileOpen(false)} className="hover:opacity-80">{guided ? 'My Data (upload genome)' : 'Upload Genome'}</a>
 
+            {!guided && (
+              <div className="contents">
             <a href="/genome"                      onClick={() => setMobileOpen(false)} className="hover:opacity-80">Genome (upload)</a>
             <a href="/genome/overview"             onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Overview</a>
             <a href="/genome/findings"             onClick={() => setMobileOpen(false)} className="ml-3 text-white/80 hover:opacity-80">— Findings</a>
@@ -483,6 +523,8 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/about"        onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">About</a>
             <a href="/mission"      onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">Mission</a>
             <a href="/how-it-works" onClick={() => setMobileOpen(false)} className="py-0.5 hover:opacity-80">How It Works</a>
+              </div>
+            )}
 
             <a href="/support" onClick={() => setMobileOpen(false)} className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-[#C45820] px-4 py-2 text-sm font-semibold text-white">☕ Support SelfScience</a>
           </nav>
