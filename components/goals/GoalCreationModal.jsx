@@ -22,7 +22,7 @@ const BIOMARKER_OPTIONS = [
   'HDL cholesterol', 'Triglycerides', 'Fasting glucose', 'Fasting insulin', 'TSH',
 ]
 
-export default function GoalCreationModal({ open, onClose, onCreated }) {
+export default function GoalCreationModal({ open, onClose, onCreated, initialCategory = null, initialVariant = null }) {
   const [mounted, setMounted] = useState(false)
   const [step, setStep] = useState(1)
   const [categoryId, setCategoryId] = useState(null)
@@ -37,14 +37,19 @@ export default function GoalCreationModal({ open, onClose, onCreated }) {
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Reset when modal opens.
+  // Reset when modal opens. If a category is pre-selected (deep-link
+  // from Focus Mode "Set a goal based on this finding"), skip Screen 1
+  // and open Screen 2 with the category already chosen.
   useEffect(() => {
     if (open) {
-      setStep(1); setCategoryId(null); setGoalText('')
+      const hasInitial = initialCategory && CATEGORIES.some((c) => c.id === initialCategory)
+      setStep(hasInitial ? 2 : 1)
+      setCategoryId(hasInitial ? initialCategory : null)
+      setGoalText('')
       setTargetValue(''); setTargetUnit(''); setTargetDate('')
       setMilestones([]); setLinkedHabits([]); setLinkedBiomarkers([]); setSaving(false)
     }
-  }, [open])
+  }, [open, initialCategory])
 
   useEffect(() => {
     if (!open) return
@@ -85,6 +90,10 @@ export default function GoalCreationModal({ open, onClose, onCreated }) {
   const handleSave = () => {
     if (!canSave) return
     setSaving(true)
+    // Prefer a deep-link-provided variant (from Focus Mode "Set a goal
+    // based on this finding") over the auto-detected genome context so
+    // the user's explicit intent wins.
+    const variantSource = initialVariant || genomeCtx?.variantSource || null
     const { ok, goal, error } = createGoal({
       category: categoryId,
       title: goalText.trim(),
@@ -94,7 +103,7 @@ export default function GoalCreationModal({ open, onClose, onCreated }) {
       milestones: milestones.filter((m) => (m.title || '').trim()),
       linkedHabits,
       linkedBiomarkers,
-      variantSource: genomeCtx?.variantSource || null,
+      variantSource,
     })
     if (!ok) {
       alert(error === 'max_active' ? 'You have reached the maximum of 30 active goals. Complete or pause one first.' : 'Could not save.')

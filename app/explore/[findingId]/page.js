@@ -69,13 +69,13 @@ export default function FocusModePage() {
 
   const flashMicro = (msg) => { setMicro(msg); setTimeout(() => setMicro(null), 2800) }
 
+  // No genome — redirect to /explore per spec. Must happen in an
+  // effect (not render) or Next.js warns about setState-during-render.
+  useEffect(() => {
+    if (ready && !genomeLoaded) router.replace('/explore')
+  }, [ready, genomeLoaded, router])
   if (!ready) return <div className="min-h-screen bg-ss-bg"><SiteNav /></div>
-
-  // No genome — redirect to /explore per spec.
-  if (!genomeLoaded) {
-    if (typeof window !== 'undefined') router.replace('/explore')
-    return <div className="min-h-screen bg-ss-bg"><SiteNav /></div>
-  }
+  if (!genomeLoaded) return <div className="min-h-screen bg-ss-bg"><SiteNav /></div>
 
   // Finding not found.
   if (!finding) return <NotFoundState />

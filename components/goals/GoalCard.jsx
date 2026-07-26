@@ -4,7 +4,7 @@
 // A single goal card with header, progress, milestones, target date,
 // inline progress-log panel, and overflow menu.
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   Zap, Leaf, FlaskConical, TestTube2, Heart, BookOpen, Stethoscope, CheckCircle2,
   MoreHorizontal, Calendar, Edit3, Pause, Play, CheckSquare, XCircle, Sparkles, X,
@@ -33,7 +33,10 @@ export default function GoalCard({ goal, onComplete }) {
   const [toast, setToast] = useState(null)
   const menuRef = useRef(null)
 
-  const context = goal.variantSource ? { variantSource: goal.variantSource, ...(getGenomeContext(goal.category) || {}) } : null
+  const context = useMemo(
+    () => (goal.variantSource ? { variantSource: goal.variantSource, ...(getGenomeContext(goal.category) || {}) } : null),
+    [goal.variantSource, goal.category]
+  )
 
   useEffect(() => {
     if (!openMenu) return

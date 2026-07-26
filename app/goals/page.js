@@ -28,12 +28,22 @@ function GoalsPage() {
   const [tab, setTab] = useState('active')
   const [modalOpen, setModalOpen] = useState(false)
   const [celebrateGoal, setCelebrateGoal] = useState(null)
+  const [initialCategory, setInitialCategory] = useState(null)
+  const [initialVariant, setInitialVariant]   = useState(null)
 
-  // Support ?new=1 and ?status=completed deep links.
+  // Support ?new=1, ?status=completed, ?category=<id>, ?variant=<rsid>
+  // deep links. The category + variant params come from Focus Mode's
+  // "Set a goal based on this finding" CTA and must survive into the
+  // creation modal so the goal is pre-scoped and variant-tagged.
   useEffect(() => {
-    if (params?.get('new') === '1') setModalOpen(true)
-    const s = params?.get('status')
+    if (!params) return
+    const s = params.get('status')
     if (s && TABS.some((t) => t.key === s)) setTab(s)
+    const cat = params.get('category')
+    if (cat) setInitialCategory(cat)
+    const v = params.get('variant')
+    if (v) setInitialVariant(v)
+    if (params.get('new') === '1') setModalOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -155,7 +165,12 @@ function GoalsPage() {
       </div>
 
       {/* Modals */}
-      <GoalCreationModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <GoalCreationModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        initialCategory={initialCategory}
+        initialVariant={initialVariant}
+      />
       {celebrateGoal && (
         <GoalCompletionCelebration goal={celebrateGoal} onClose={() => setCelebrateGoal(null)} />
       )}
