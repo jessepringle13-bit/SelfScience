@@ -104,7 +104,7 @@ export default function WeeklyDigest({ report }) {
   return (
     <section
       aria-labelledby="weekly-digest-heading"
-      className="rounded-[20px] bg-[#F7EFE3]/60 ring-1 ring-ss-border-warm/60 px-4 py-6 md:px-7 md:py-8"
+      className="rounded-[20px] bg-ss-surface ring-1 ring-ss-border-warm/60 px-4 py-6 md:px-7 md:py-8"
     >
       <div className="mb-1 flex items-center gap-2">
         <span

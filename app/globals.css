@@ -161,6 +161,29 @@
 .dark .bg-slate-50,
 .dark .bg-gray-50,
 .dark .bg-neutral-50     { background-color: var(--ss-surface) !important; }
+
+/* Catch-all for arbitrary hex backgrounds used in older components.
+   These light off-whites and cream/mint hex codes were hard-coded via
+   Tailwind's [#xxxxxx] escape and bypass the .bg-white override above,
+   which is why the dashboard, /supplements/*, and /content-page still
+   flashed white in dark mode. All of these should read as a dark card
+   surface under .dark. */
+.dark .bg-\[\#F8FBFB\],
+.dark .bg-\[\#EEF7F7\],
+.dark .bg-\[\#F9F8F5\],
+.dark .bg-\[\#F7EFE3\],
+.dark .bg-\[\#F7F6F2\],
+.dark .bg-\[\#FFF3EA\],
+.dark .bg-\[\#F5F5F0\],
+.dark .bg-\[\#FAFAF8\] { background-color: var(--ss-surface) !important; }
+/* Any residual /60 /70 /80 opacity variants of the same hex codes. */
+.dark [class*="bg-[#F8FBFB]/"],
+.dark [class*="bg-[#EEF7F7]/"],
+.dark [class*="bg-[#F9F8F5]/"],
+.dark [class*="bg-[#F7EFE3]/"] { background-color: var(--ss-surface) !important; }
+/* And the dark-teal fills used as heros / bands that should stay solid
+   in dark mode (they were showing through when combined with /60 /90). */
+.dark .bg-\[\#1B474D\] { background-color: var(--ss-teal-ink) !important; }
 /* Prose / body text using neutral dark shades — nudge for legibility. */
 .dark .text-black,
 .dark .text-slate-900,
