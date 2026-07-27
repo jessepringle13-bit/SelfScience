@@ -20,7 +20,7 @@ import { trackEvent, EVENTS } from '@/lib/analytics'
 import { hasGenomeResults, getGenomeResults } from '@/lib/genomeSession'
 import Dashboard from '@/components/Dashboard'
 import FirstLook from '@/components/FirstLook'
-import { useTierState } from '@/lib/tierState'
+import { useTierState, initTierStateIfNew } from '@/lib/tierState'
 import DiscoverFeed from '@/components/dashboard/DiscoverFeed'
 
 /* -------------------------------- Sample data ------------------------------ */
@@ -269,21 +269,28 @@ function App() {
 function DashboardOrFirstLook() {
   const tier = useTierState()
   const [findings, setFindings] = useState([])
+  const [loaded, setLoaded] = useState(false)
   useEffect(() => {
     try {
       const r = getGenomeResults()
-      if (!r) return
-      // Prefer classified.aware + classified.strength for the "key
-      // findings" pager. Fall back to r.findings if the classifier
-      // output isn't there. Cap at 8 so the walk-through never feels
-      // endless.
+      if (!r) { setLoaded(true); return }
       const key = []
       if (r.classified?.aware)    key.push(...r.classified.aware)
       if (r.classified?.strength) key.push(...r.classified.strength)
       if (key.length === 0 && Array.isArray(r.findings)) key.push(...r.findings)
-      setFindings(key.slice(0, 8))
-    } catch {}
+      const capped = key.slice(0, 8)
+      setFindings(capped)
+      // Initialize tier state IMMEDIATELY so the nav + gate know the
+      // user has just landed post-upload. Without this the parent
+      // would render <Dashboard /> for a beat before FirstLook takes
+      // over, defeating the whole one-at-a-time UX.
+      if (capped.length > 0) initTierStateIfNew(capped.length)
+      setLoaded(true)
+    } catch { setLoaded(true) }
   }, [])
+  // While we\u2019re still resolving findings on the client, render nothing
+  // (no Dashboard flash). Server-render outputs an empty shell too.
+  if (!loaded) return null
   if (tier.tier >= 2) return <Dashboard />
   if (findings.length === 0) return <Dashboard />
   return <FirstLook findings={findings} />
