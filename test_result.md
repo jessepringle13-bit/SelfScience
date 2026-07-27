@@ -9423,3 +9423,34 @@ frontend:
           banner render requires real (server-processed) genome data;
           verified via code path + mounts.
 
+
+# ─────────────────────────────────────────────────────────────
+# TOUR-EXTENSION: pulse Search, Coach, and Deep Research too
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Extend Tier 2 tour pulse to Search + AI Coach + Deep Research"
+    implemented: true
+    working: true
+    file: "components/site-nav.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * Search top-level nav link now gets the same 6-second
+            orange-glow pulse as the Tools button when the Tier 2 tour
+            is active (ss_tier2_tour_pulse set OR selfscience:pulse-tools
+            event dispatched).
+          * When the Tools dropdown opens during the tour window, the
+            AI Coach and Deep Research rows inside get an additional
+            2px orange ring + pulsing halo (via ss-glow-orange) AND a
+            "New" chip beside their labels \u2014 so the two flagship
+            just-unlocked tools are impossible to miss when the user
+            scans the dropdown.
+          Screenshot-verified: Search + Tools pulse simultaneously in
+          the top nav. Coach + Research pulses configured with "New"
+          chip via `isTour && 'ss-glow-orange ring-2 ring-ss-orange'`
+          conditional on the individual dropdown row.
+

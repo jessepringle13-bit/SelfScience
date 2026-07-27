@@ -335,7 +335,11 @@ export function SiteNav({ variant = 'light' }) {
               <LayoutDashboard size={14} /> Dashboard
             </a>
           )}
-          <a href="/search" data-tour-target="nav-search" className={linkClass('/search')}>Search</a>
+          <a
+            href="/search"
+            data-tour-target="nav-search"
+            className={`${linkClass('/search')} ${toolsPulse ? 'ss-glow-orange-btn rounded-full px-3 py-1' : ''}`}
+          >Search</a>
 
           {/* Guided-mode short nav ends here. The Pillars / Reading List /
               Community / Tools / About items only surface for Explorer users
@@ -427,14 +431,19 @@ export function SiteNav({ variant = 'light' }) {
                 role="menu"
                 className="absolute left-1/2 top-full z-50 mt-2 w-[420px] -translate-x-1/2 rounded-xl bg-white p-2 shadow-2xl ring-1 ring-black/10"
               >
-                {TOOL_ITEMS.map(({ href, label, Icon, blurb, pro }) => (
+                {TOOL_ITEMS.map(({ href, label, Icon, blurb, pro }) => {
+                  // During the Tier 2 tour, highlight the two "flagship"
+                  // new tools (Coach + Deep Research) so users notice
+                  // them immediately when Tools opens.
+                  const isTour = toolsPulse && (href === '/coach' || href === '/research')
+                  return (
                   <a
                     key={href}
                     href={href}
                     onClick={() => setToolsOpen(false)}
                     className={`flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg ${
                       pathname === href ? 'bg-ss-bg' : ''
-                    }`}
+                    } ${isTour ? 'ss-glow-orange ring-2 ring-ss-orange' : ''}`}
                   >
                     <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
                       pro ? 'bg-ss-orange/15 text-ss-orange' : 'bg-ss-teal/10 text-ss-teal'
@@ -449,11 +458,16 @@ export function SiteNav({ variant = 'light' }) {
                             Pro
                           </span>
                         )}
+                        {isTour && (
+                          <span className="inline-flex items-center rounded-full bg-ss-orange px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-white">
+                            New
+                          </span>
+                        )}
                       </span>
                       <span className="mt-0.5 block text-[12px] text-ss-muted">{blurb}</span>
                     </span>
                   </a>
-                ))}
+                )})}
                 {/* Pro upsell footer inside the Tools dropdown. Non-Pro
                     users see a subtle CTA linking to /pro; Pro users get a
                     quick-jump link to the Pro landing page. */}
