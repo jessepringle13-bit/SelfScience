@@ -60,12 +60,13 @@ export function SiteNav({ variant = 'light' }) {
   const pathname = usePathname() || ''
   const mode = useMode() // 'explorer' | 'guided'
   const tier = useTierState()
-  // Tier 1 = Understanding. Overrides the guided/explorer navigation
-  // to the smallest possible shape: logo, My Findings, Start Here,
-  // Upload Genome. All dropdowns hidden. Advanced tools stay
-  // URL-reachable but are gated by <TierRouteGate />.
-  const tier1 = tier.tier === 1 && !!tier.savedAt // only active once a genome has been analysed
-  const guided = tier1 || mode === 'guided'
+  // Track genome presence via sessionStorage on mount. This lets us
+  // detect Tier 1 users reliably even if initTierStateIfNew hasn't
+  // fired yet on the current route (which only happens on /). Without
+  // this the nav simplification and the search banner would silently
+  // skip for anyone landing directly on /search, /goals, etc.
+  // (See tier1 derivation below \u2014 uses the shared `genomeLoaded`
+  // useState declared a few lines further down.)
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -170,6 +171,11 @@ export function SiteNav({ variant = 'light' }) {
     ? 'border-white/15 bg-ss-teal/85 backdrop-blur-md text-white'
     : 'border-ss-border-warm bg-white/95 backdrop-blur text-ss-text'
   const linkBase = isDark ? 'text-white/85 hover:text-white' : 'text-ss-text hover:text-ss-orange'
+  // Tier 1 = Understanding. Fires the moment a genome is uploaded and
+  // tier hasn't been graduated to 2 yet. Uses the pre-existing
+  // genomeLoaded state so it's always in sync with sessionStorage.
+  const tier1 = genomeLoaded && tier.tier < 2
+  const guided = tier1 || mode === 'guided'
   // Design audit: active nav item = white/high-contrast text with a subtle
   // orange underline. No teal in the nav to keep colour hierarchy clean.
   const linkActive = isDark

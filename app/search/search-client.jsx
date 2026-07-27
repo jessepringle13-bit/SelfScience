@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import { useTierState } from '@/lib/tierState'
+import { hasGenomeResults } from '@/lib/genomeSession'
 import { ResultCard } from '@/components/result-card'
 import ClinicalTrialsSection from '@/components/search/ClinicalTrialsSection'
 import { EditorialPicks } from '@/components/editorial-picks'
@@ -1571,7 +1572,21 @@ function SkeletonList() {
 // they finish reading their genome findings. Uses only design tokens.
 function Tier1SearchBanner() {
   const tier = useTierState()
-  if (!tier || tier.tier >= 2 || !tier.savedAt) return null
+  const [hasGenome, setHasGenome] = useState(false)
+  useEffect(() => {
+    const check = () => setHasGenome(hasGenomeResults())
+    check()
+    const on = () => check()
+    window.addEventListener('selfscience:genome-results-changed', on)
+    window.addEventListener('selfscience:tier-changed', on)
+    return () => {
+      window.removeEventListener('selfscience:genome-results-changed', on)
+      window.removeEventListener('selfscience:tier-changed', on)
+    }
+  }, [])
+  // Only show while a genome has been uploaded AND the user is still
+  // in Tier 1. Prevents the banner from showing on the marketing site.
+  if (!hasGenome || tier.tier >= 2) return null
   const total = tier.findingsTotal || 0
   const read  = tier.findingsRead?.length || 0
   return (
