@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { INTERESTS, needsOnboarding, setInterests, LS_ONBOARDED } from '@/lib/interests'
+import { hasGenomeResults } from '@/lib/genomeSession'
 import { openHealthStoryQuiz, markQuizSkipped } from '@/lib/userProfile'
 
 export default function FirstTimeWelcome() {
@@ -18,12 +19,14 @@ export default function FirstTimeWelcome() {
 
   useEffect(() => {
     // Only run in the browser after mount to avoid SSR flashes.
-    if (needsOnboarding()) setOpen(true)
+    // Also: never show this pre-genome welcome once a genome has been
+    // uploaded \u2014 the Tier 1 FirstLook flow takes over there.
+    if (needsOnboarding() && !hasGenomeResults()) setOpen(true)
     if (typeof window !== 'undefined') {
       // Full "Clear & Reset" fires 'selfscience:interests-changed' after
-      // wiping ss_onboarded — re-check so we re-open immediately without
+      // wiping ss_onboarded \u2014 re-check so we re-open immediately without
       // waiting for a full page reload.
-      const onChange = () => { if (needsOnboarding()) setOpen(true) }
+      const onChange = () => { if (needsOnboarding() && !hasGenomeResults()) setOpen(true) }
       window.addEventListener('selfscience:interests-changed', onChange)
       return () => window.removeEventListener('selfscience:interests-changed', onChange)
     }

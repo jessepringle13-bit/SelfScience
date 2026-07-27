@@ -38,6 +38,7 @@ import { getEvidenceStrength } from '@/lib/evidenceStrength'
 import { getPopulationFrequency, formatFrequency } from '@/lib/populationFrequencies'
 import YourProtocolTab from '@/components/YourProtocolTab'
 import { saveGenomeResults, clearGenomeResults, notifyGenomeResultsChanged } from '@/lib/genomeSession'
+import { resetTierState } from '@/lib/tierState'
 import GenomeSupplementLinks from '@/components/genome/GenomeSupplementLinks'
 import { YOUTH_VARIANT_CROSSREFS } from '@/lib/youth-content'
 import SummaryScreen from '@/components/genome/SummaryScreen'
@@ -248,6 +249,7 @@ export default function GenomeClient() {
     setReport(null)
     try {
       clearGenomeResults()
+      resetTierState() // Tier state ties to a specific genome upload.
       notifyGenomeResultsChanged()
     } catch { /* noop */ }
     setActiveTab('overview')

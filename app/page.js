@@ -17,8 +17,10 @@ import HomeStepsExplainer from '@/components/HomeStepsExplainer'
 import { ResultCard } from '@/components/result-card'
 import { EditorialFeatured } from '@/components/editorial-featured'
 import { trackEvent, EVENTS } from '@/lib/analytics'
-import { hasGenomeResults } from '@/lib/genomeSession'
+import { hasGenomeResults, getGenomeResults } from '@/lib/genomeSession'
 import Dashboard from '@/components/Dashboard'
+import FirstLook from '@/components/FirstLook'
+import { useTierState } from '@/lib/tierState'
 import DiscoverFeed from '@/components/dashboard/DiscoverFeed'
 
 /* -------------------------------- Sample data ------------------------------ */
@@ -252,11 +254,39 @@ function App() {
         </div>
       )}
 
-      {hasGenome && view === 'dashboard' && <Dashboard />}
+      {hasGenome && view === 'dashboard' && <DashboardOrFirstLook />}
       {hasGenome && view === 'discover' && <DiscoverFeed />}
       {!hasGenome && <DiscoverHome />}
     </>
   )
+}
+
+/**
+ * Tier-gated Dashboard renderer. Tier 1 users see the FirstLook pager
+ * that walks them through their key findings one at a time. Tier 2
+ * users see the existing full Dashboard unchanged.
+ */
+function DashboardOrFirstLook() {
+  const tier = useTierState()
+  const [findings, setFindings] = useState([])
+  useEffect(() => {
+    try {
+      const r = getGenomeResults()
+      if (!r) return
+      // Prefer classified.aware + classified.strength for the "key
+      // findings" pager. Fall back to r.findings if the classifier
+      // output isn't there. Cap at 8 so the walk-through never feels
+      // endless.
+      const key = []
+      if (r.classified?.aware)    key.push(...r.classified.aware)
+      if (r.classified?.strength) key.push(...r.classified.strength)
+      if (key.length === 0 && Array.isArray(r.findings)) key.push(...r.findings)
+      setFindings(key.slice(0, 8))
+    } catch {}
+  }, [])
+  if (tier.tier >= 2) return <Dashboard />
+  if (findings.length === 0) return <Dashboard />
+  return <FirstLook findings={findings} />
 }
 
 /**
