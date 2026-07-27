@@ -36,7 +36,7 @@ import ExplorerChip from '@/components/ExplorerChip'
 import { useSavedCount } from '@/lib/readingList'
 import { useMode } from '@/lib/userPath'
 import { useTierState } from '@/lib/tierState'
-import { Route, Lock } from 'lucide-react'
+import { Route, Lock, Sparkles } from 'lucide-react'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -205,10 +205,16 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/population-compare',        label: 'Population Compare',    Icon: Globe2,    blurb: 'How your variants compare globally.' },
     { href: '/ancestry',                  label: 'Ancestry Report',       Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
     { href: '/practitioner-report',       label: 'Practitioner Report',   Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
+    { href: '/export',                    label: 'Export as PDF',         Icon: FileText,  blurb: 'Print / save any section you can see. Pro sections excluded on Explorer.' },
     { href: '/journal',                    label: 'Health Journal',        Icon: BookOpenIcon, blurb: 'Private, on-device journal & progress timeline.' },
     { href: '/tracker',                    label: 'Habit Tracker',         Icon: CheckCircleIcon, blurb: 'Genome-informed habits with streaks, heatmaps, and insights.' },
     { href: '/tools/supplements/brands',  label: 'Brand Leaderboard',     Icon: Award,     blurb: 'Every curated supplement brand ranked by transparency score.' },
     { href: '/get-started',               label: 'Get Started',           Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
+    // SelfScience Pro suite. Marked with `pro: true` so the dropdown
+    // renders an orange "PRO" chip next to the label for non-Pro users.
+    { href: '/pro/ai-coach',              label: 'AI Coach',              Icon: Brain,     blurb: 'Ask questions about your variants \u2014 with citations.',   pro: true },
+    { href: '/pro/family-compare',        label: 'Family Comparison',     Icon: Baby,      blurb: 'Side-by-side variant map for two genomes.',                 pro: true },
+    { href: '/pro/deep-research',         label: 'Deep Research Reports', Icon: FileText,  blurb: 'Long-form pillar reports tailored to your variants.',        pro: true },
   ]
   const toolsActive = TOOL_ITEMS.some((i) => i.href === pathname)
 
@@ -385,7 +391,7 @@ export function SiteNav({ variant = 'light' }) {
                 role="menu"
                 className="absolute left-1/2 top-full z-50 mt-2 w-[420px] -translate-x-1/2 rounded-xl bg-white p-2 shadow-2xl ring-1 ring-black/10"
               >
-                {TOOL_ITEMS.map(({ href, label, Icon, blurb }) => (
+                {TOOL_ITEMS.map(({ href, label, Icon, blurb, pro }) => (
                   <a
                     key={href}
                     href={href}
@@ -394,15 +400,42 @@ export function SiteNav({ variant = 'light' }) {
                       pathname === href ? 'bg-ss-bg' : ''
                     }`}
                   >
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ss-teal/10 text-ss-teal">
+                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
+                      pro ? 'bg-ss-orange/15 text-ss-orange' : 'bg-ss-teal/10 text-ss-teal'
+                    }`}>
                       <Icon size={16} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-bold text-ss-teal">{label}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-ss-teal">{label}</span>
+                        {pro && tier.tier < 3 && (
+                          <span className="inline-flex items-center rounded-full bg-ss-orange px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-white">
+                            Pro
+                          </span>
+                        )}
+                      </span>
                       <span className="mt-0.5 block text-[12px] text-ss-muted">{blurb}</span>
                     </span>
                   </a>
                 ))}
+                {/* Pro upsell footer inside the Tools dropdown. Non-Pro
+                    users see a subtle CTA linking to /pro; Pro users get a
+                    quick-jump link to the Pro landing page. */}
+                <a
+                  href="/pro"
+                  onClick={() => setToolsOpen(false)}
+                  className="mt-1 flex items-center justify-between rounded-lg border border-ss-orange/40 bg-ss-orange/[0.06] p-3 transition hover:bg-ss-orange/[0.12]"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-ss-orange/20 text-ss-orange">
+                      <Sparkles size={13} />
+                    </span>
+                    <span className="text-[13px] font-bold text-ss-orange">
+                      {tier.tier >= 3 ? 'SelfScience Pro \u2014 open' : 'Explore SelfScience Pro'}
+                    </span>
+                  </span>
+                  <ChevronDown size={12} className="-rotate-90 text-ss-orange" />
+                </a>
               </div>
             )}
           </div>
@@ -561,6 +594,13 @@ export function SiteNav({ variant = 'light' }) {
             <a href="/tracker"                     onClick={() => setMobileOpen(false)} className="hover:opacity-80">Habit Tracker</a>
             <a href="/tools/supplements/brands"    onClick={() => setMobileOpen(false)} className="hover:opacity-80">Brand Leaderboard</a>
             <a href="/get-started"                 onClick={() => setMobileOpen(false)} className="hover:opacity-80">Get Started (Kits)</a>
+            <a href="/export"                      onClick={() => setMobileOpen(false)} className="hover:opacity-80">Export as PDF</a>
+
+            <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">SelfScience Pro</div>
+            <a href="/pro"                         onClick={() => setMobileOpen(false)} className="inline-flex w-fit items-center gap-1.5 rounded-full bg-ss-orange px-3 py-1 font-bold text-white shadow-sm">✨ Open Pro</a>
+            <a href="/pro/ai-coach"                onClick={() => setMobileOpen(false)} className="ml-3 text-white/85 hover:opacity-80">— AI Coach {tier.tier < 3 && <span className="ml-1 inline-flex items-center rounded-full bg-ss-orange px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-white">Pro</span>}</a>
+            <a href="/pro/family-compare"          onClick={() => setMobileOpen(false)} className="ml-3 text-white/85 hover:opacity-80">— Family Comparison {tier.tier < 3 && <span className="ml-1 inline-flex items-center rounded-full bg-ss-orange px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-white">Pro</span>}</a>
+            <a href="/pro/deep-research"           onClick={() => setMobileOpen(false)} className="ml-3 text-white/85 hover:opacity-80">— Deep Research {tier.tier < 3 && <span className="ml-1 inline-flex items-center rounded-full bg-ss-orange px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-white">Pro</span>}</a>
 
             <div className="mt-2 border-t border-white/10 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/60">Browse</div>
             <details className="group">

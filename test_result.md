@@ -9033,3 +9033,49 @@ frontend:
           Screenshot-verified on /learn/foundations: orange ring + pulse
           animates around the "Now do this" section and Back-to-Dashboard
           link renders correctly.
+
+# ─────────────────────────────────────────────────────────────
+# P3: SelfScience Pro (Tier 3) — architecture placeholder
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "SelfScience Pro tier + gating + upgrade page + PDF export"
+    implemented: true
+    working: true
+    file: "lib/tierState.js, components/{TierRouteGate,LockedProPage,site-nav}.jsx, app/pro/**, app/export/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Full Tier 3 (SelfScience Pro) architecture placeholder shipped:
+            * Extended ss_tier_state to support tier 3 with unlockTier3(),
+              downgradeToTier(), useEntitlements() and a granular
+              entitlement map (aiCoach / familyComparison / deepResearch
+              are Pro-only; pdfExport is always available).
+            * TIER3_LOCKED_ROUTES + updated isRouteLocked() (returns
+              { locked, requiredTier }).
+            * New LockedProPage splash + TierRouteGate now picks the
+              right splash (Tier 1 vs Pro) based on requiredTier.
+            * /pro landing page — marketing hero, three Pro feature
+              cards (AI Coach, Family Comparison, Deep Research), always-
+              included list, our-promise note, and a dev tier switcher
+              (buttons for tier 1/2/3) so users/QA can preview locked
+              states without wiping progress.
+            * Three Pro placeholder pages: /pro/ai-coach,
+              /pro/family-compare, /pro/deep-research — auto-gated for
+              non-Pro users via TierRouteGate.
+            * /export PDF export center — available to every tier.
+              Section picker lists Overview/Findings/Insights/Protocol
+              as unlocked and Deep Research/Family Compare/AI Coach as
+              locked-with-Pro chip for non-Pro users. Uses window.print()
+              against an inline print stylesheet — no new deps.
+            * site-nav: added PRO chip to Pro tools in the Tools
+              dropdown + a persistent "Explore SelfScience Pro" upsell
+              footer inside the dropdown. Mobile drawer gets a
+              "SelfScience Pro" section too. Added /export to Tools.
+          Verified via screenshots: /pro landing, /pro/ai-coach as
+          Tier 2 (splash) and as Tier 3 (placeholder), /export with
+          tier=2 (three Pro rows locked) and tier=3 (all unlocked).
+
