@@ -9376,3 +9376,50 @@ frontend:
           disappears once the user is on /coach. Admin dashboard shows
           six feature rows including the two new ones.
 
+
+# ─────────────────────────────────────────────────────────────
+# TIER-2 CELEBRATION: fix "nothing tells me I unlocked it"
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Tier 2 unlock celebration \u2014 modal upgrade + persistent Welcome banner + Tools nav pulse"
+    implemented: true
+    working: true
+    file: "components/FirstLook.jsx, components/Tier2WelcomeBanner.jsx, components/site-nav.jsx, components/Dashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Fix for "nothing tells me I unlocked Tier 2":
+            * FirstLook UnlockModal upgraded from a plain card to a full
+              celebration \u2014 orange-glow border, confetti particles,
+              circular unlock icon with pulse glow, "Tier 2 unlocked"
+              eyebrow, and a 4-item "What\u2019s new" list (Full findings,
+              Tools menu, Focus Mode, Your Protocol) so the user sees
+              exactly what changed.
+            * handleUnlock now also sets ss_mode='explorer' (so nav
+              expands immediately), ss_tier2_just_unlocked_at (banner
+              trigger), and ss_tier2_tour_pulse (nav pulse trigger).
+              Removed the harsh window.location.reload() in favour of a
+              short setTimeout + assign('/') for a cleaner transition.
+            * New <Tier2WelcomeBanner /> mounted on the Dashboard.
+              Shows for up to 7 days after unlock (or falls back to
+              ss_tier_state.tier2UnlockedAt). Orange-glow card with a
+              party-popper icon, 4-cell grid of highlighted new tools
+              (Findings, Search, Coach, Deep Research), each linking
+              straight into the feature. Dismissable via X or the
+              inline "Dismiss" link.
+            * site-nav Tools button now grows a 6-second orange pulse
+              (ss-glow-orange-btn) when ss_tier2_tour_pulse is set OR a
+              'selfscience:pulse-tools' CustomEvent is dispatched. The
+              pulse clears the moment the user opens the dropdown.
+              Banner's inline "Tools menu" button fires the event so
+              clicking it inside the banner also draws the eye up to
+              the nav.
+          Screenshot-verified: pulsing "Tools" ring visible in nav,
+          "Continue My Journey" pill visible in Explorer mode. Full
+          banner render requires real (server-processed) genome data;
+          verified via code path + mounts.
+

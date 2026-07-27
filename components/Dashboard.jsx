@@ -46,6 +46,7 @@ import AlertPreview from '@/components/dashboard/AlertPreview'
 import UnknownsCard from '@/components/UnknownsCard'
 import NextGenePrompt from '@/components/dashboard/NextGenePrompt'
 import ContinueJourneyPill from '@/components/ContinueJourneyPill'
+import Tier2WelcomeBanner from '@/components/Tier2WelcomeBanner'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -317,6 +318,15 @@ export default function Dashboard() {
             the pillar chip bar per Part 3 spec. */}
         <div className="mt-6">
           <NextGenePrompt />
+        </div>
+
+        {/* Tier 2 Welcome banner \u2014 celebrates the moment users
+            graduate from First Look to Explorer. Persists for up to 7
+            days after unlock, dismissable. Renders null for anyone who
+            didn't just unlock, so it never appears for returning
+            Tier 2 users after the first week. */}
+        <div className="mt-4">
+          <Tier2WelcomeBanner />
         </div>
 
         {/* Continue My Journey banner \u2014 orange-glow card shown only to

@@ -112,10 +112,24 @@ export default function FirstLook({ findings = [] }) {
 
   const handleUnlock = () => {
     unlockTier2()
+    // Auto-switch to Explorer mode so the user immediately sees the
+    // full nav / toolkit that just came online. They can flip back to
+    // Guided (My Path) at any time via the settings dropdown or the
+    // Continue My Journey pill.
+    try {
+      window.localStorage.setItem('ss_mode', 'explorer')
+    } catch {}
+    // Stamp a "just unlocked" flag so the Dashboard can render the
+    // Tier 2 Welcome banner (persists until dismissed or ~7 days).
+    try {
+      window.localStorage.setItem('ss_tier2_just_unlocked_at', new Date().toISOString())
+      window.sessionStorage.setItem('ss_tier2_tour_pulse', '1')
+    } catch {}
     setShowUnlock(false)
-    // Full page reload so the parent picks up the tier flip and renders
-    // the existing full results view.
-    try { window.location.reload() } catch {}
+    // Give the tier state a tick to propagate, then route cleanly.
+    setTimeout(() => {
+      try { window.location.assign('/') } catch { window.location.reload() }
+    }, 60)
   }
 
   return (
@@ -240,28 +254,52 @@ export default function FirstLook({ findings = [] }) {
 
 function UnlockModal({ total, onExplore }) {
   return (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[10002] flex items-center justify-center bg-ss-canvas/95 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-[480px] rounded-2xl border border-ss-border-warm/40 bg-ss-surface p-8 shadow-2xl md:p-10">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[10002] flex items-center justify-center overflow-hidden bg-ss-canvas/95 p-4 backdrop-blur-sm">
+      {/* Confetti particles — pointer-events-none so nothing blocks the CTA. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        {Array.from({ length: 24 }).map((_, i) => {
+          const left = 10 + Math.random() * 80
+          const delay = Math.random() * 0.8
+          const rot   = Math.random() * 720 - 360
+          const size  = 5 + Math.random() * 7
+          const bg    = ['#F58642', '#F5D9C4', '#FFFFFF'][i % 3]
+          return (
+            <span
+              key={i}
+              className="ss-confetti-particle absolute top-1/3"
+              style={{ left: `${left}%`, width: `${size}px`, height: `${size}px`, background: bg, animationDelay: `${delay}s`, transform: `rotate(${rot}deg)` }}
+            />
+          )
+        })}
+      </div>
+
+      <div className="ss-glow-orange relative w-full max-w-[480px] rounded-2xl border-2 border-ss-orange bg-ss-surface p-8 shadow-2xl md:p-10">
         <div className="mb-5 flex justify-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-ss-orange/15 ring-1 ring-ss-orange/40">
-            <Unlock size={22} className="text-ss-orange" />
+          <span className="ss-glow-orange-btn flex h-16 w-16 items-center justify-center rounded-full bg-ss-orange text-white ring-4 ring-ss-orange/25">
+            <Unlock size={26} />
           </span>
         </div>
-        <h2 className="text-center text-2xl font-extrabold text-ss-text md:text-[28px]">You understand your genetics.</h2>
+        <div className="text-center font-mono text-[10.5px] font-bold uppercase tracking-[0.16em] text-ss-orange">Tier 2 unlocked</div>
+        <h2 className="mt-2 text-center text-2xl font-extrabold text-ss-text md:text-[28px]">You understand your genetics.</h2>
         <p className="mx-auto mt-3 max-w-md text-center text-[14.5px] leading-relaxed text-ss-muted">
-          You’ve read all {total} of your key findings. Your full toolkit is now available.
+          You&rsquo;ve read all {total} of your key findings. Your full Explorer toolkit is now available.
         </p>
 
-        <ul className="mt-6 space-y-2">
+        <div className="mt-6 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">What&rsquo;s new</div>
+        <ul className="mt-2 space-y-2">
           {[
-            { title: 'Full results', body: `all ${total} variants across all pillars` },
-            { title: 'Research tools', body: 'search the studies behind your findings' },
-            { title: 'Your Protocol', body: 'supplement and lifestyle recommendations' },
+            { title: 'Full findings dashboard', body: `All ${total} variants across every pillar in one view` },
+            { title: 'Tools menu unlocked',     body: 'Search, Coach, Deep Research, Protocol, Nutrition, and more' },
+            { title: 'Focus Mode',              body: 'Deep-dive any single variant with citations and reliability scores' },
+            { title: 'Your Protocol',           body: 'Supplement & lifestyle picks tied to your variants' },
           ].map((it) => (
-            <li key={it.title} className="flex items-start gap-3 rounded-lg border-l-2 border-ss-teal/60 bg-ss-canvas/40 py-2 pl-3 pr-3">
+            <li key={it.title} className="flex items-start gap-3 rounded-lg border-l-2 border-ss-orange/70 bg-ss-canvas/40 py-2 pl-3 pr-3">
+              <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-ss-orange text-white">
+                <span className="text-[9px] leading-none">✓</span>
+              </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[13.5px] font-bold text-ss-text">{it.title}</span>
-                <span className="mt-0.5 block text-[12.5px] text-ss-muted">{it.body}</span>
+                <span className="mt-0.5 block text-[12.5px] leading-snug text-ss-muted">{it.body}</span>
               </span>
             </li>
           ))}
@@ -270,12 +308,25 @@ function UnlockModal({ total, onExplore }) {
         <button
           type="button"
           onClick={onExplore}
-          className="mt-7 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-ss-orange text-[14.5px] font-bold text-white transition hover:bg-ss-orange-dark"
+          className="ss-glow-orange-btn mt-7 flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-ss-orange text-[14.5px] font-bold text-white transition hover:bg-ss-orange-dark"
         >
           Explore everything <ArrowRight size={14} />
         </button>
         <p className="mt-3 text-center text-[11.5px] text-ss-muted">Your progress is saved. Come back anytime.</p>
       </div>
+
+      <style jsx>{`
+        .ss-confetti-particle {
+          border-radius: 2px;
+          opacity: 0.95;
+          animation: ss-firstlook-confetti 2.4s ease-in forwards;
+        }
+        @keyframes ss-firstlook-confetti {
+          0%   { transform: translate3d(0, -40vh, 0) rotate(0deg);   opacity: 1; }
+          70%  {                                                     opacity: 1; }
+          100% { transform: translate3d(0,  70vh, 0) rotate(540deg); opacity: 0; }
+        }
+      `}</style>
     </div>
   )
 }

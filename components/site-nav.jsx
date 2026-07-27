@@ -72,6 +72,11 @@ export function SiteNav({ variant = 'light' }) {
   // useState declared a few lines further down.)
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  // Brief orange-glow "look here" pulse on the Tools button when the
+  // user just unlocked Tier 2 or clicked "Show me the Tools menu"
+  // inside the Tier 2 welcome banner. Auto-clears after 6s or when the
+  // user actually opens the dropdown.
+  const [toolsPulse, setToolsPulse] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   // Track whether a genome has been uploaded in this session. When true,
@@ -163,6 +168,30 @@ export function SiteNav({ variant = 'light' }) {
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [pillarsOpen, toolsOpen, aboutOpen])
+
+  // Tier 2 tour pulse: if the user just unlocked Tier 2 (Tier2WelcomeBanner
+  // set ss_tier2_tour_pulse), pulse the Tools button for 6 seconds so
+  // the user can see where their new toolkit lives. Also listens for a
+  // one-shot event dispatched by the welcome banner's "Show me the
+  // Tools menu" link.
+  useEffect(() => {
+    let timer = null
+    const trigger = () => {
+      setToolsPulse(true)
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => setToolsPulse(false), 6000)
+    }
+    try {
+      if (window.sessionStorage.getItem('ss_tier2_tour_pulse')) trigger()
+    } catch {}
+    const onEvt = () => trigger()
+    window.addEventListener('selfscience:pulse-tools', onEvt)
+    return () => {
+      if (timer) clearTimeout(timer)
+      window.removeEventListener('selfscience:pulse-tools', onEvt)
+    }
+  }, [])
+
 
   // Nav is `fixed top-0 z-50` so it stays visible while the user scrolls.
   // Previously it was `absolute` which meant it scrolled off with the hero.
@@ -384,8 +413,10 @@ export function SiteNav({ variant = 'light' }) {
                 setToolsOpen((v) => !v)
                 setPillarsOpen(false)
                 setAboutOpen(false)
+                // Clear the tour pulse once the user actually opens Tools.
+                try { window.sessionStorage.removeItem('ss_tier2_tour_pulse') } catch {}
               }}
-              className={`inline-flex items-center gap-1 ${toolsActive ? linkActive : linkBase}`}
+              className={`inline-flex items-center gap-1 ${toolsActive ? linkActive : linkBase} ${toolsPulse ? 'ss-glow-orange-btn rounded-full px-3 py-1' : ''}`}
               aria-expanded={toolsOpen}
               aria-haspopup="menu"
             >
