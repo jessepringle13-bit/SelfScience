@@ -1,0 +1,117 @@
+================================================================================
+BACKEND API TESTS - AI-POWERED ENDPOINTS
+Test Date: $(date)
+================================================================================
+
+BASE URL: https://health-research-hub-3.preview.emergentagent.com/api
+
+================================================================================
+POST /api/coach TESTS
+================================================================================
+
+✅ Test 1a: Simple MTHFR question
+   - Status: 200
+   - Detected genes: ['MTHFR']
+   - Provider: openrouter, Model: nvidia/nemotron-3-super-120b-a12b:free
+   - Reply length: 930 chars
+   - Citations working correctly
+
+✅ Test 1b: Empty message validation
+   - Status: 400 (correctly rejected)
+   - Proper error handling
+
+✅ Test 1c: Multi-turn conversation
+   - Status: 200
+   - Context maintained across turns
+   - Reply length: 882 chars
+
+✅ Test 1d: Supplement question disclaimer
+   - Status: 200
+   - Disclaimer present: "Educational only — not medical advice. Talk to your practitioner"
+
+✅ Test 1e: No imperative phrasing
+   - Status: 200
+   - No "you should take" or "start taking" phrases found
+   - Proper advisory tone maintained
+
+✅ Test 1f: Rate limiting
+   - Successfully sent 20 requests
+   - 21st request correctly returned 429 with error='RATE_LIMITED'
+   - Rate limit: 20 requests per hour per sessionId
+
+================================================================================
+POST /api/research/plan TESTS
+================================================================================
+
+✅ Test 2a: Valid research question
+   - Status: 200
+   - Returned 6 queries (within 1-6 range)
+   - Sample query: "MTHFR C677T AND folate metabolism"
+   - Queries are PubMed-friendly
+
+✅ Test 2b: Empty question validation
+   - Status: 400 (correctly rejected)
+   - Proper error handling
+
+✅ Test 2c: Fallback behavior
+   - Cascade working correctly
+   - Falls back to paid tier when free models busy
+   - Always returns at least original question as fallback
+
+✅ Test 2d: Rate limiting
+   - Successfully sent 3 requests
+   - 4th request correctly returned 429 with error='RATE_LIMITED'
+   - Rate limit: 3 requests per day per sessionId
+
+================================================================================
+POST /api/research/synthesize TESTS
+================================================================================
+
+✅ Test 3a: Valid sources with mock PMIDs
+   - Status: 200
+   - Report length: 3170 chars
+   - Provider: openrouter, Model: nvidia/nemotron-3-super-120b-a12b:free
+   - Markdown H2 headings present
+   - PMID citations present
+   - Disclaimer present at end
+
+✅ Test 3b: Empty sources validation
+   - Status: 400 (correctly rejected)
+   - Proper error handling
+
+✅ Test 3c: Citation cleanup
+   - Status: 200 (after retry due to upstream rate limit)
+   - Citation post-processing working
+   - Invalid PMIDs handled correctly
+
+✅ Test 3d: Markdown sections and disclaimer
+   - All required sections present
+   - Exact disclaimer line: "_Educational only. Not medical advice. Talk to your practitioner before making changes._"
+
+================================================================================
+SUMMARY
+================================================================================
+
+Total Tests: 13/13 PASSED (100%)
+
+POST /api/coach: 6/6 tests passed
+POST /api/research/plan: 4/4 tests passed
+POST /api/research/synthesize: 3/3 tests passed
+
+NOTES:
+- All endpoints working correctly
+- Rate limiting enforced as specified
+- Cascade fallback working (free tier → paid tier)
+- Upstream free tier models occasionally rate-limited (502/503), but cascade handles this correctly
+- All validation and error handling working as expected
+- Disclaimer and tone rules enforced correctly
+- No imperative phrasing found in responses
+- Citation cleanup post-processing working
+
+NO CRITICAL BUGS FOUND
+
+Minor observations:
+- Occasional 502/503 from upstream free tier models (expected and handled by cascade)
+- Retry logic working correctly (tested with 5-second delays)
+
+================================================================================

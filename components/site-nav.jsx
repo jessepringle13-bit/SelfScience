@@ -28,6 +28,7 @@ import {
   Target,
   BookOpen as BookOpenIcon,
   CheckCircle2 as CheckCircleIcon,
+  FileSearch,
 } from 'lucide-react'
 import { trackEvent, EVENTS } from '@/lib/analytics'
 import PrefsMenu from '@/components/PrefsMenu'
@@ -208,6 +209,8 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/ancestry',                  label: 'Ancestry Report',       Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
     { href: '/practitioner-report',       label: 'Practitioner Report',   Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
     { href: '/export',                    label: 'Export as PDF',         Icon: FileText,  blurb: 'Print / save any section you can see. Pro sections excluded on Explorer.' },
+    { href: '/coach',                     label: 'AI Coach',              Icon: Brain,     blurb: 'Ask questions about your genome or research \u2014 with citation chips. Free tier.' },
+    { href: '/research',                  label: 'Deep Research',         Icon: FileSearch, blurb: 'Generate a structured, cited research report from a natural-language question.' },
     { href: '/journal',                    label: 'Health Journal',        Icon: BookOpenIcon, blurb: 'Private, on-device journal & progress timeline.' },
     { href: '/tracker',                    label: 'Habit Tracker',         Icon: CheckCircleIcon, blurb: 'Genome-informed habits with streaks, heatmaps, and insights.' },
     { href: '/tools/supplements/brands',  label: 'Brand Leaderboard',     Icon: Award,     blurb: 'Every curated supplement brand ranked by transparency score.' },

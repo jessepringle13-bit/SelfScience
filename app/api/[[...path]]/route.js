@@ -13,8 +13,13 @@ import {
   translatePlainLanguage as callPlainLanguage,
   expandSemantic,
   rerankSemantic,
+  chatCoach,
+  planResearch,
+  synthesizeResearch,
   extractJson,
 } from '@/lib/ai'
+import { buildGroundingBlock, coachSystemPrompt } from '@/lib/ai/coachGrounding'
+import { checkCoachRate, checkResearchRate } from '@/lib/ai/rateLimit'
 import {
   buildReliabilityPrompt,
   buildPlainLanguagePrompt,
@@ -841,6 +846,153 @@ function applyStep1Overrides(response, step1ByRsid, step1Meta) {
   return response
 }
 
+// -------------------------------------------------------------------
+// AI Coach chat + Deep Research generator handlers.
+// Both are stateless, force-dynamic, no-store pass-throughs \u2014 nothing
+// user-identifying is logged or persisted server-side beyond ephemeral
+// request handling.
+// -------------------------------------------------------------------
+async function handleCoachChat(request) {
+  let body
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const message  = String(body?.message || '').trim().slice(0, 2000)
+  const history  = Array.isArray(body?.conversationHistory) ? body.conversationHistory.slice(-8) : []
+  const context  = body?.context || {}
+  const sessionId = String(body?.sessionId || 'anon').slice(0, 80)
+
+  if (!message) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
+
+  // Rate limit \u2014 per session, hourly bucket. Never keyed on IP or PII.
+  const rl = checkCoachRate(sessionId, 20, 60 * 60 * 1000)
+  if (!rl.allowed) {
+    const mins = Math.max(1, Math.round((rl.resetAt - Date.now()) / 60000))
+    return NextResponse.json({
+      error: 'RATE_LIMITED',
+      message: `You\u2019ve reached the free Coach limit for now. Try again in about ${mins} minute${mins === 1 ? '' : 's'}.`,
+      resetAt: rl.resetAt,
+    }, { status: 429 })
+  }
+
+  // Build the ground-truth block from curated catalogs + client context.
+  const grounding = buildGroundingBlock({ userText: message, context })
+  const isPersonalized = !!(context && ((context.userVariants || []).length || (context.supplements || []).length || (context.biomarkerFlags || []).length))
+
+  const messages = [
+    { role: 'system', content: coachSystemPrompt({ groundedFacts: grounding.factsBlock, activePillar: context.activePillar, isPersonalized }) },
+    ...history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) })),
+    { role: 'user', content: message },
+  ]
+
+  try {
+    const out = await chatCoach(messages)
+    return NextResponse.json({
+      reply: out.text,
+      provider: out.provider,
+      model: out.model,
+      detectedGenes: grounding.detectedGenes,
+      citations: grounding.citations,
+      rateLimit: { remaining: rl.remaining, resetAt: rl.resetAt },
+    }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (err) {
+    console.error('coach chat error:', err?.status, err?.message?.slice(0, 200))
+    return NextResponse.json({
+      error: 'COACH_FAILED',
+      message: 'All free models are busy right now. Please try again in a minute.',
+    }, { status: 503 })
+  }
+}
+
+async function handleResearchPlan(request) {
+  let body
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const question  = String(body?.question || '').trim().slice(0, 500)
+  const sessionId = String(body?.sessionId || 'anon').slice(0, 80)
+  const context   = body?.context || {}
+  if (!question) return NextResponse.json({ error: 'Empty question' }, { status: 400 })
+
+  const rl = checkResearchRate(sessionId, 3, 24 * 60 * 60 * 1000)
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'RATE_LIMITED', message: 'Daily research budget reached. Come back tomorrow.', resetAt: rl.resetAt }, { status: 429 })
+  }
+
+  const scope = context.activePillar ? ` Scope the sub-queries to ${context.activePillar}.` : ''
+  const prompt = `Break the following research question into 3-6 focused PubMed-friendly sub-queries.\nReturn a JSON array of short strings (no keys, just an array). Each sub-query should be phrased like a PubMed search: use MeSH-style terms and boolean operators when helpful, e.g. \"MTHFR AND folate metabolism AND homocysteine\".${scope}\n\nResearch question: \"${question}\"`
+
+  try {
+    let queries = []
+    try {
+      const out = await planResearch(prompt)
+      // Try JSON first.
+      let j = extractJson(out.text)
+      if (j && !Array.isArray(j)) {
+        for (const v of Object.values(j)) if (Array.isArray(v)) { j = v; break }
+      }
+      if (Array.isArray(j)) {
+        queries = j.map((q) => String(q).trim())
+      } else {
+        // Fall back: parse lines from freeform text (numbered / dashed).
+        queries = String(out.text || '')
+          .split(/\n+/)
+          .map((line) => line.replace(/^[\s>*\-\u2022]*\d*[\.\)]?\s*/, '').replace(/^"|"$/g, '').trim())
+          .filter(Boolean)
+      }
+      queries = queries.filter((q) => q.length > 3 && q.length < 200).slice(0, 6)
+    } catch (planErr) {
+      console.warn('research plan LLM failed, using raw-question fallback:', planErr?.message?.slice(0, 200))
+    }
+    // Always ensure at least one query \u2014 fall back to the raw question.
+    if (queries.length === 0) queries = [question]
+    return NextResponse.json({ queries }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (err) {
+    console.error('research plan error:', err?.status, err?.message?.slice(0, 200))
+    return NextResponse.json({ error: 'PLAN_FAILED', message: 'Planning step failed. Please try again in a minute.' }, { status: 503 })
+  }
+}
+
+async function handleResearchSynthesize(request) {
+  let body
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const question = String(body?.question || '').trim().slice(0, 500)
+  const sources  = Array.isArray(body?.sources) ? body.sources.slice(0, 20) : []
+  if (!question) return NextResponse.json({ error: 'Empty question' }, { status: 400 })
+  if (sources.length === 0) return NextResponse.json({ error: 'No sources provided' }, { status: 400 })
+
+  // Build the source list block. Each source: { pmid, title, year, journal, abstract? , reliability? }
+  const srcBlock = sources.map((s, i) => {
+    const line = [
+      `[${i + 1}] PMID:${s.pmid || 'n/a'} \u2014 ${(s.title || 'untitled').slice(0, 220)}`,
+      s.year || s.journal ? `    ${s.journal || ''}${s.year ? ' (' + s.year + ')' : ''}` : '',
+      s.reliability ? `    Reliability: ${s.reliability}` : '',
+      s.abstract ? `    Abstract: ${String(s.abstract).slice(0, 500)}` : '',
+    ].filter(Boolean).join('\n')
+    return line
+  }).join('\n')
+
+  const system = `You are a scientific research synthesiser for SelfScience. Draft a structured markdown report answering the user\u2019s research question, using ONLY the numbered sources provided below. Rules:\n\u2022 EVERY substantive factual claim MUST cite at least one source using the format (PMID:12345678). No uncited claims.\n\u2022 NEVER invent PMIDs, effect sizes, statistics, or studies not in the source list.\n\u2022 NEVER prescribe (\"take X\"), NEVER give numeric personal risk (\"X% risk\"), and end the report with the standard disclaimer.\n\u2022 Use these sections in markdown H2 headings: \"## Overview\", \"## What the research suggests\", \"## Limitations & caveats\", \"## Bottom line\", \"## Cited sources\".\n\u2022 The \"Cited sources\" section must list every PMID used, one per line, as: \"- PMID:12345678 \u2014 Title (Year)\".\n\u2022 Keep tone calm, plain-English, non-alarmist. ~400\u2013900 words total.\n\u2022 Close with: \"---\\n_Educational only. Not medical advice. Talk to your practitioner before making changes._\"`
+  const user = `Research question: ${question}\n\nSources:\n${srcBlock}`
+
+  try {
+    const out = await synthesizeResearch([
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ])
+    // Post-process: strip any (PMID:xxxx) that doesn't match a source in the list.
+    const validPmids = new Set(sources.map((s) => String(s.pmid || '').replace(/[^0-9]/g, '')).filter(Boolean))
+    const cleaned = String(out.text || '').replace(/\(PMID:\s*([0-9]{4,10})\)/g, (m, p) => validPmids.has(p) ? `(PMID:${p})` : '(citation missing)')
+
+    return NextResponse.json({
+      report: cleaned,
+      provider: out.provider,
+      model: out.model,
+      sourcesUsed: sources.length,
+    }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (err) {
+    console.error('research synthesize error:', err?.status, err?.message?.slice(0, 200))
+    return NextResponse.json({ error: 'SYNTH_FAILED', message: 'Synthesis failed. Please try again in a minute.' }, { status: 503 })
+  }
+}
+
+
 
 async function handleInterpretGenome(request) {
   let body
@@ -935,6 +1087,12 @@ export async function POST(request, { params }) {
   if (route === 'semantic-expand') return handleSemanticExpand(request)
   if (route === 'semantic-rerank') return handleSemanticRerank(request)
   if (route === 'interpret-genome') return handleInterpretGenome(request)
+
+  // AI Coach chat + Deep Research generator. Stateless, force-dynamic,
+  // no-store. See /lib/ai/coachGrounding.js for grounding + guardrails.
+  if (route === 'coach') return handleCoachChat(request)
+  if (route === 'research' && subRoute === 'plan') return handleResearchPlan(request)
+  if (route === 'research' && subRoute === 'synthesize') return handleResearchSynthesize(request)
 
   // Backward-compat aliases so existing clients keep working during migration
   if (route === 'analyze') return handleScoreReliability(request)
