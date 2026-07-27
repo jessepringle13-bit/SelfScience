@@ -292,3 +292,46 @@ html.ss-print-mode .ss-tab-hidden { display: block !important; }
     .ss-mobile-nav { display: none !important; }
   }
 }
+
+
+/* ============================================================
+ * SS Orange Glow — attention utility for "next step" affordances.
+ * Applied to the "Up next in your explorer" card on the Dashboard,
+ * the "Now do this" completion action at the end of learn modules,
+ * and the primary CTA in FirstLook. Subtle pulse so it draws the
+ * eye without becoming visual noise. Respects reduced-motion.
+ * ============================================================ */
+@keyframes ss-pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(245, 134, 66, 0.35),
+      0 0 18px 0 rgba(245, 134, 66, 0.22);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(245, 134, 66, 0.60),
+      0 0 28px 4px rgba(245, 134, 66, 0.42);
+  }
+}
+.ss-glow-orange {
+  position: relative;
+  border-color: var(--ss-orange) !important;
+  animation: ss-pulse-glow 2.4s ease-in-out infinite;
+}
+/* Softer variant for buttons (no border override, tighter halo) */
+@keyframes ss-pulse-glow-btn {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 134, 66, 0.30), 0 0 14px 0 rgba(245, 134, 66, 0.28); }
+  50%      { box-shadow: 0 0 0 4px rgba(245, 134, 66, 0.55), 0 0 22px 4px rgba(245, 134, 66, 0.50); }
+}
+.ss-glow-orange-btn {
+  animation: ss-pulse-glow-btn 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss-glow-orange,
+  .ss-glow-orange-btn {
+    animation: none;
+    box-shadow:
+      0 0 0 2px rgba(245, 134, 66, 0.45),
+      0 0 22px 4px rgba(245, 134, 66, 0.35);
+  }
+}

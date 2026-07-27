@@ -9002,3 +9002,34 @@ agent_communication:
           Full 8-part spec now shipped: T-1 (Parts 1, 2, 3, 8) + T-2
           (Parts 4, 5, 6, 7). Ready for user acceptance testing.
 
+
+
+# ─────────────────────────────────────────────────────────────
+# UX-GLOW: Attention glow for "up next" affordances
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Orange glow on 'Up next in your explorer' + Learn module 'Now do this' + FirstLook CTAs"
+    implemented: true
+    working: true
+    file: "app/globals.css, components/dashboard/NextGenePrompt.jsx, app/learn/[moduleId]/page.js, components/FirstLook.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Added `.ss-glow-orange` (card border+pulse) and `.ss-glow-orange-btn`
+          (button halo pulse) utilities to globals.css with reduced-motion
+          fallback. Applied to:
+            1) NextGenePrompt (Dashboard "Up next in your explorer" card) —
+               swapped teal border/eyebrow/icon and green CTA to Orange to
+               comply with the Visual Fatigue design rules.
+            2) Learn module Completion Action ("Now do this") — orange border
+               + pulsing glow + new "NEXT UP" chip + secondary "← Back to
+               Dashboard" link so users can always find their way home.
+            3) FirstLook Welcome + Pager primary CTAs — button-halo glow to
+               obviously indicate the next action.
+          Screenshot-verified on /learn/foundations: orange ring + pulse
+          animates around the "Now do this" section and Back-to-Dashboard
+          link renders correctly.

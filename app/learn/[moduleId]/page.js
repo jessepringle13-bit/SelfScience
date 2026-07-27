@@ -159,16 +159,32 @@ export default function ModulePage() {
             "read" never becomes the end state. */}
         {done && COMPLETION_ACTIONS[m.id] && (() => {
           const ca = COMPLETION_ACTIONS[m.id]
-          const tone = ca.tone === 'orange' ? 'border-ss-orange bg-ss-orange/[0.06]' : 'border-ss-teal bg-ss-teal/[0.06]'
-          const chip = ca.tone === 'orange' ? 'bg-ss-orange text-white' : 'bg-ss-teal text-white'
+          const chip = 'bg-ss-orange text-white'
           return (
-            <section className={`mt-6 rounded-2xl border-2 p-6 ${tone}`}>
-              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">Now do this</div>
-              <h3 className="mt-2 text-lg font-extrabold text-ss-text">{ca.title}</h3>
+            <section
+              className="ss-glow-orange mt-6 rounded-2xl border-2 border-ss-orange bg-ss-orange/[0.06] p-6"
+              role="region"
+              aria-label="Your next step"
+            >
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-6 items-center rounded-full bg-ss-orange px-2 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-white">
+                  Next up
+                </span>
+                <div className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">Now do this</div>
+              </div>
+              <h3 className="mt-3 text-lg font-extrabold text-ss-text">{ca.title}</h3>
               <p className="mt-2 text-[14.5px] leading-relaxed text-ss-text">{ca.body}</p>
-              <Link href={ca.href} className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold shadow-sm transition hover:brightness-95 ${chip}`}>
-                {ca.ctaLabel} <ArrowRight size={13} />
-              </Link>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link href={ca.href} className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold shadow-sm transition hover:brightness-95 ${chip}`}>
+                  {ca.ctaLabel} <ArrowRight size={13} />
+                </Link>
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-ss-muted underline decoration-dotted underline-offset-4 hover:text-ss-text"
+                >
+                  <ArrowLeft size={12} /> Back to Dashboard
+                </Link>
+              </div>
             </section>
           )
         })()}

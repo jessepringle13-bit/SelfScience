@@ -80,7 +80,7 @@ export default function FirstLook({ findings = [] }) {
           <button
             type="button"
             onClick={dismissWelcome}
-            className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ss-orange px-8 text-sm font-bold text-white shadow-sm transition hover:bg-ss-orange-dark"
+            className="ss-glow-orange-btn mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ss-orange px-8 text-sm font-bold text-white transition hover:bg-ss-orange-dark"
           >
             See my first finding <ArrowRight size={14} />
           </button>
@@ -204,7 +204,7 @@ export default function FirstLook({ findings = [] }) {
           <button
             type="button"
             onClick={handleUnderstand}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ss-orange px-7 text-sm font-bold text-white shadow-sm transition hover:bg-ss-orange-dark"
+            className="ss-glow-orange-btn inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-ss-orange px-7 text-sm font-bold text-white transition hover:bg-ss-orange-dark"
           >
             {isLast ? (
               <>I’ve read all my findings — show me everything <ArrowRight size={14} /></>

@@ -48,8 +48,10 @@ export default function NextGenePrompt() {
 
   return (
     <div
-      className="relative flex flex-col items-stretch gap-4 rounded-2xl border border-ss-teal bg-white p-5 shadow-sm md:flex-row md:items-center md:p-6"
-      style={{ borderLeft: '4px solid #1B474D' }}
+      className="ss-glow-orange relative flex flex-col items-stretch gap-4 rounded-2xl border-2 border-ss-orange bg-white p-5 md:flex-row md:items-center md:p-6"
+      style={{ borderLeftWidth: '4px' }}
+      role="region"
+      aria-label="Up next in your explorer"
     >
       <button
         type="button"
@@ -63,12 +65,12 @@ export default function NextGenePrompt() {
         <X size={13} />
       </button>
 
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ss-teal/10 text-ss-teal">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ss-orange/15 text-ss-orange ring-1 ring-ss-orange/40">
         <Dna size={22} strokeWidth={2} />
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-ss-teal">Up next in your explorer</div>
+        <div className="font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-ss-orange">Up next in your explorer</div>
         <div className="mt-1 flex flex-wrap items-baseline gap-2">
           <div className="text-lg font-extrabold leading-tight text-ss-text">{next.gene}</div>
           {next.rsid && <span className="font-mono text-[10px] text-ss-muted">{next.rsid}</span>}
@@ -89,7 +91,7 @@ export default function NextGenePrompt() {
       <div className="flex shrink-0 flex-col items-stretch gap-1 md:items-end">
         <Link
           href={`/explore/${next.id}`}
-          className="inline-flex items-center justify-center gap-1 rounded-full bg-ss-green px-4 py-2 text-[13px] font-bold text-white shadow-sm transition hover:brightness-95"
+          className="inline-flex items-center justify-center gap-1 rounded-full bg-ss-orange px-5 py-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-ss-orange-dark"
         >
           Explore this gene <ArrowRight size={12} />
         </Link>
