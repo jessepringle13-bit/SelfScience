@@ -9339,3 +9339,40 @@ agent_communication:
       
       The AI endpoints are production-ready. Main agent can summarize and finish.
 
+
+# ─────────────────────────────────────────────────────────────
+# AI-USAGE-DASHBOARD + COACH-LAUNCHER
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Admin dashboard byFeature breakout + floating Coach launcher"
+    implemented: true
+    working: true
+    file: "lib/ai-usage.js, app/admin/ai-usage/page.js, components/CoachLauncher.jsx, app/layout.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * lib/ai-usage.js: added prices for all new free-tier models
+            used by Coach + Deep Research (Nemotron 120B / nano, Gemma 4
+            31B/26B, gpt-oss-20b — all $0). Added a FEATURES map that
+            groups raw task names into user-facing features.
+            getUsageSnapshot() now computes a byFeature aggregation on
+            the fly so the admin dashboard can render per-feature
+            rollups without duplicating storage.
+          * /admin/ai-usage: added a new "By feature (user-facing rollup)"
+            section that surfaces calls / tokens / USD / models per
+            feature. Verified via curl + screenshot that AI Coach and
+            Deep Research now appear as distinct rows.
+          * components/CoachLauncher.jsx: persistent floating "Ask
+            Coach" pill (bottom-right, orange with pulse-glow until
+            first click). Hides on /coach, /onboarding, /admin, and
+            during Tier-1 First Look. Dismissable per-session via a
+            hover-X. Wired into app/layout.js so it renders on every
+            page.
+          Screenshot-verified: launcher pulses on the landing page and
+          disappears once the user is on /coach. Admin dashboard shows
+          six feature rows including the two new ones.
+

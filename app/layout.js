@@ -16,6 +16,7 @@ import JournalFloatingButton from '@/components/JournalFloatingButton'
 import AlertsInitializer from '@/components/AlertsInitializer'
 import ExplorerUnlockModal from '@/components/ExplorerUnlockModal'
 import TierRouteGate from '@/components/TierRouteGate'
+import CoachLauncher from '@/components/CoachLauncher'
 import { NO_FLASH_SCRIPT } from '@/lib/theme'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://selfscience.app'
@@ -118,6 +119,7 @@ export default function RootLayout({ children }) {
         <AlertsInitializer />
         <ExplorerUnlockModal />
         <TierRouteGate />
+        <CoachLauncher />
         <Analytics />
         <ChunkReloader />
       </body>

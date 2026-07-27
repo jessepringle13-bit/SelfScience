@@ -47,6 +47,7 @@ export default function AiUsagePage() {
   const totals = snap?.totals
   const byKey  = snap?.byKey || {}
   const byDay  = snap?.byDay || {}
+  const byFeature = snap?.byFeature || {}
   const ring   = snap?.ring || []
   const or     = data?.liveCredits?.openrouter
 
@@ -102,6 +103,39 @@ export default function AiUsagePage() {
             </div>
           </div>
         )}
+
+        <Section title="By feature (user-facing rollup)">
+          {Object.keys(byFeature).length === 0 ? <Empty /> : (
+            <table className="w-full border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-[#1B474D]/20 text-left text-[#7A7974]">
+                  <th className="py-1.5 pr-3">Feature</th>
+                  <th className="py-1.5 pr-3 text-right">Calls</th>
+                  <th className="py-1.5 pr-3 text-right">In tok</th>
+                  <th className="py-1.5 pr-3 text-right">Out tok</th>
+                  <th className="py-1.5 pr-3 text-right">USD</th>
+                  <th className="py-1.5 pr-3">Models</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(byFeature)
+                  .sort((a, b) => b[1].calls - a[1].calls)
+                  .map(([feature, v]) => (
+                    <tr key={feature} className="border-b border-black/5">
+                      <td className="py-1.5 pr-3 font-bold text-[#1B474D]">{feature}</td>
+                      <td className="py-1.5 pr-3 text-right">{v.calls}</td>
+                      <td className="py-1.5 pr-3 text-right">{v.inTokens.toLocaleString()}</td>
+                      <td className="py-1.5 pr-3 text-right">{v.outTokens.toLocaleString()}</td>
+                      <td className="py-1.5 pr-3 text-right">${v.usd.toFixed(4)}</td>
+                      <td className="py-1.5 pr-3 text-[10px] text-[#7A7974]">
+                        {v.models.map((m) => m.split('/').pop()).join(', ')}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
 
         <Section title="Per model / task">
           {Object.keys(byKey).length === 0 ? <Empty /> : (
