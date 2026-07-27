@@ -6,7 +6,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Check, Lock, Sparkles, Upload } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, Check, Lock, Sparkles, Upload, LogOut, X } from 'lucide-react'
 import SiteNav from '@/components/site-nav'
 import WhyYoureSeeingThis from '@/components/WhyYoureSeeingThis'
 import UnknownsPanel from '@/components/UnknownsPanel'
@@ -21,6 +22,13 @@ export default function MyPathPage() {
   const mode = useMode()
   const progress = useModuleProgress()
   const grad = useGraduation()
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+
+  const doExit = () => {
+    setMode('explorer')
+    setShowExitConfirm(false)
+    router.push('/')
+  }
 
   if (!path) {
     return (
@@ -47,10 +55,27 @@ export default function MyPathPage() {
     <div className="min-h-screen bg-ss-bg pb-24">
       <SiteNav />
       <div className="container max-w-3xl pt-24 md:pt-28">
-        {/* Header */}
-        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-teal">Your Path</div>
-        <h1 className="mt-2 text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">Your path to understanding <span className="text-ss-teal">{goalLabel(path.primary).toLowerCase()}</span>.</h1>
-        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ss-muted">A 3-module foundation, then goal-specific depth. About 2 hours across 3 weeks — taken at your pace.</p>
+        {/* Header with Exit affordance. The exit link is deliberately
+            styled as a low-key ghost button in the top-right \u2014 not a
+            primary CTA \u2014 so first-timers keep moving forward through
+            the guided experience. But it's clearly labelled and always
+            reachable so anyone who wants full Explorer mode can bail
+            out in one click. */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-orange">Your Journey</div>
+            <h1 className="mt-2 text-3xl font-extrabold leading-tight text-ss-text md:text-4xl">Your path to understanding <span className="text-ss-orange">{goalLabel(path.primary).toLowerCase()}</span>.</h1>
+            <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ss-muted">A 3-module foundation, then goal-specific depth. About 2 hours across 3 weeks &mdash; taken at your pace.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowExitConfirm(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-ss-border-warm/60 bg-ss-surface px-3 py-1.5 text-[12px] font-semibold text-ss-muted transition hover:border-ss-orange/60 hover:text-ss-text"
+            aria-label="Exit My Path and switch to Explorer mode"
+          >
+            <LogOut size={12} /> Exit My Path
+          </button>
+        </div>
 
         {/* Why this matters to you */}
         <section className="mt-8 rounded-2xl border-l-4 border-ss-teal bg-ss-teal/[0.04] p-5">
@@ -177,6 +202,47 @@ export default function MyPathPage() {
           </section>
         )}
       </div>
+
+      {/* Exit confirmation modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl border border-ss-border-warm/60 bg-ss-surface p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-orange">Switch mode</div>
+                <h3 className="mt-1 text-xl font-extrabold text-ss-text">Exit My Path?</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="rounded-full p-1 text-ss-muted hover:text-ss-text"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mt-3 text-[13.5px] leading-relaxed text-ss-text">
+              We&rsquo;ll drop you into <span className="font-bold">Explorer mode</span> &mdash; the full dashboard with every tool visible at once. Your progress stays saved. You can jump back into your Path any time from the <span className="font-bold text-ss-orange">Continue My Journey</span> button in the nav.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowExitConfirm(false)}
+                className="inline-flex items-center rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-4 py-2 text-[13px] font-semibold text-ss-text transition hover:border-ss-orange/60"
+              >
+                Stay on My Path
+              </button>
+              <button
+                type="button"
+                onClick={doExit}
+                className="inline-flex items-center gap-1.5 rounded-full bg-ss-orange px-5 py-2 text-[13px] font-bold text-white shadow-sm transition hover:bg-ss-orange-dark"
+              >
+                Exit to Explorer <ArrowRight size={12} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

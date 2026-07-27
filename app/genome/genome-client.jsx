@@ -493,7 +493,27 @@ export default function GenomeClient() {
         <SummaryScreen
           report={report}
           stats={stats}
-          onSeeDashboard={() => router.push('/')}
+          onSeeDashboard={() => {
+            // Post-upload the user should ALWAYS land on their guided
+            // curriculum first ("My Path"). This is what the platform
+            // now considers the front door \u2014 not the raw Dashboard.
+            // If they've explicitly opted out to Explorer mode before
+            // (returning user), respect it and drop them at Dashboard.
+            try {
+              const explicitMode = window.localStorage.getItem('ss_mode')
+              const hasPath      = !!window.localStorage.getItem('ss_user_path')
+              if (explicitMode === 'explorer') {
+                router.push('/')
+              } else if (hasPath) {
+                // Ensure mode is guided so nav renders the My Path pill.
+                window.localStorage.setItem('ss_mode', 'guided')
+                router.push('/my-path')
+              } else {
+                // First upload ever \u2014 send them through the intent quiz.
+                router.push('/onboarding/quiz')
+              }
+            } catch { router.push('/my-path') }
+          }}
           onSeeRoadmap={() => setStage('results')}
         />
       )}

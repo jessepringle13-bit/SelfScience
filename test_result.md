@@ -9079,3 +9079,50 @@ frontend:
           Tier 2 (splash) and as Tier 3 (placeholder), /export with
           tier=2 (three Pro rows locked) and tier=3 (all unlocked).
 
+
+# ─────────────────────────────────────────────────────────────
+# MY-PATH-FACE: My Path becomes the default front door
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "My Path as default front door + Exit + Continue My Journey"
+    implemented: true
+    working: true
+    file: "lib/userPath.js, app/genome/genome-client.jsx, app/my-path/page.js, components/{ContinueJourneyPill,site-nav,PrefsMenu,Dashboard}.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          My Path is now the platform's front door.
+            * userPath.js: default mode flipped to 'guided' (was
+              'explorer' for returning users). Only an explicit user
+              action switches to 'explorer'.
+            * genome-client.jsx: post-upload SummaryScreen now routes to
+              /onboarding/quiz (new user) or /my-path (has path) instead
+              of dropping the user on the Dashboard. If the user has
+              previously chosen Explorer, that preference is respected.
+            * /my-path: added prominent "Exit My Path" ghost button in
+              the header with a confirmation modal explaining that
+              Explorer mode is the full dashboard and that "Continue My
+              Journey" will always bring them back.
+            * ContinueJourneyPill.jsx: new component with two variants
+              \u2014 a header pill (with orange-pulse glow) for Explorer
+              users, and a wide dashboard banner for the same audience.
+              Renders null unless mode==='explorer' AND a saved path
+              exists.
+            * site-nav: added the pill to the desktop header cluster;
+              added an equivalent Continue My Journey CTA to the mobile
+              drawer for Explorer users.
+            * Dashboard: added the banner high in the layout right after
+              NextGenePrompt.
+            * PrefsMenu: renamed "Journey mode" section to "My Path /
+              Journey", swapped teal to orange to comply with the Visual
+              Fatigue rules, and elevated a big glowing "Continue My
+              Journey" CTA for Explorer users at the top of that
+              section.
+          Screenshot-verified in both Guided (My Path renders + Exit
+          button visible) and Explorer (Continue pill in nav + Continue
+          CTA highlighted in PrefsMenu) states.
+

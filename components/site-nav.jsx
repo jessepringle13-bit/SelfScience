@@ -33,8 +33,9 @@ import { trackEvent, EVENTS } from '@/lib/analytics'
 import PrefsMenu from '@/components/PrefsMenu'
 import AlertBell from '@/components/AlertBell'
 import ExplorerChip from '@/components/ExplorerChip'
+import ContinueJourneyPill from '@/components/ContinueJourneyPill'
 import { useSavedCount } from '@/lib/readingList'
-import { useMode } from '@/lib/userPath'
+import { useMode, setMode, usePath } from '@/lib/userPath'
 import { useTierState } from '@/lib/tierState'
 import { Route, Lock, Sparkles } from 'lucide-react'
 
@@ -59,6 +60,7 @@ export function SiteNav({ variant = 'light' }) {
   const isDark = variant === 'dark'
   const pathname = usePathname() || ''
   const mode = useMode() // 'explorer' | 'guided'
+  const path = usePath()
   const tier = useTierState()
   // Track genome presence via sessionStorage on mount. This lets us
   // detect Tier 1 users reliably even if initTierStateIfNew hasn't
@@ -480,6 +482,10 @@ export function SiteNav({ variant = 'light' }) {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Continue My Journey \u2014 pulsing orange pill shown to
+              Explorer users who already have a saved My Path so they
+              can jump straight back into the guided curriculum. */}
+          <ContinueJourneyPill variant="nav" />
           {/* Explorer chip — permanent header pill that replaces the
               Journey Guide once the user completes both Tier 1 and
               Tier 2. Renders null otherwise. */}
@@ -549,6 +555,18 @@ export function SiteNav({ variant = 'light' }) {
                 className="inline-flex w-fit items-center gap-2 rounded-full bg-white/10 px-3 py-2 font-semibold text-white hover:bg-white/20"
               >
                 <LayoutDashboard size={14} /> Dashboard
+              </a>
+            )}
+            {/* Continue My Journey \u2014 highlighted CTA for Explorer users
+                on mobile so they can jump back into their guided path
+                without hunting through settings. */}
+            {!guided && !!path?.primary && (
+              <a
+                href="/my-path"
+                onClick={() => { setMode('guided'); setMobileOpen(false) }}
+                className="ss-glow-orange-btn inline-flex w-fit items-center gap-1.5 rounded-full bg-ss-orange px-4 py-2 font-bold text-white shadow-sm"
+              >
+                <Sparkles size={13} /> Continue My Journey
               </a>
             )}
             {guided && (

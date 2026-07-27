@@ -67,56 +67,70 @@ export default function PrefsMenu({ isDark = false }) {
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-ss-muted">Display preferences</div>
           </div>
 
-          {/* Journey mode — the core toggle between the guided
-              curriculum and the full Explorer experience. Both stay
-              reachable by URL; this only changes which nav items
-              surface and where CTAs point by default. */}
+          {/* My Path (aka Journey) — quick access from the settings
+              dropdown. In Guided mode a small "Go to my path" link
+              takes them straight to the curriculum. In Explorer mode
+              we surface a highlighted "Continue My Journey" CTA so
+              users who exited by accident can jump back in one click,
+              plus a subtle mode toggle for anyone who wants to stay in
+              Explorer. */}
           <div className="border-b border-ss-border-warm/60 px-4 py-3">
             <div className="mb-2 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Route size={13} className="text-ss-teal" />
-                <span className="text-sm font-bold text-ss-teal">Journey mode</span>
+                <Route size={13} className="text-ss-orange" />
+                <span className="text-sm font-bold text-ss-text">My Path / Journey</span>
               </div>
-              <span className="rounded-full bg-ss-teal/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-ss-teal">
+              <span className="rounded-full bg-ss-orange/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-ss-orange">
                 {mode === 'guided' ? 'Guided' : 'Explorer'}
               </span>
             </div>
-            <div className="mt-1 grid grid-cols-2 gap-1.5">
+            {mode === 'explorer' ? (
+              <button
+                type="button"
+                onClick={() => { setMode('guided'); setOpen(false); router.push('/my-path') }}
+                className="ss-glow-orange-btn flex w-full items-center justify-between rounded-full bg-ss-orange px-4 py-2 text-[12.5px] font-bold text-white transition hover:bg-ss-orange-dark"
+              >
+                <span className="inline-flex items-center gap-1.5"><Sparkles size={11} /> Continue My Journey</span>
+                <span>→</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); router.push('/my-path') }}
+                className="flex w-full items-center justify-between rounded-lg bg-ss-orange/[0.08] px-2.5 py-1.5 text-left text-[11.5px] font-semibold text-ss-orange transition hover:bg-ss-orange/[0.15]"
+              >
+                <span>Go to My Path</span>
+                <span>→</span>
+              </button>
+            )}
+            {/* Low-key mode toggle. In Guided mode this offers an Exit
+                path; in Explorer it offers a stay-here reminder. */}
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
               <button
                 type="button"
                 onClick={() => { setMode('guided'); fireToast('Switched to Guided mode') }}
-                className={`flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition ${
+                className={`flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-1.5 text-left transition ${
                   mode === 'guided'
-                    ? 'border-ss-teal bg-ss-teal/[0.08] ring-1 ring-ss-teal'
-                    : 'border-ss-border-warm bg-white hover:border-ss-teal/60'
+                    ? 'border-ss-orange bg-ss-orange/[0.08] ring-1 ring-ss-orange'
+                    : 'border-ss-border-warm bg-white hover:border-ss-orange/60'
                 }`}
               >
-                <span className="text-[12px] font-bold text-ss-text">Guided</span>
-                <span className="text-[10px] leading-tight text-ss-muted">Curriculum · one step at a time</span>
+                <span className="text-[11.5px] font-bold text-ss-text">Guided</span>
+                <span className="text-[9.5px] leading-tight text-ss-muted">One step at a time</span>
               </button>
               <button
                 type="button"
                 onClick={() => { setMode('explorer'); fireToast('Switched to Explorer mode') }}
-                className={`flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition ${
+                className={`flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-1.5 text-left transition ${
                   mode === 'explorer'
-                    ? 'border-ss-teal bg-ss-teal/[0.08] ring-1 ring-ss-teal'
-                    : 'border-ss-border-warm bg-white hover:border-ss-teal/60'
+                    ? 'border-ss-orange bg-ss-orange/[0.08] ring-1 ring-ss-orange'
+                    : 'border-ss-border-warm bg-white hover:border-ss-orange/60'
                 }`}
               >
-                <span className="inline-flex items-center gap-1 text-[12px] font-bold text-ss-text"><Sparkles size={10} className="text-ss-orange" /> Explorer</span>
-                <span className="text-[10px] leading-tight text-ss-muted">Full nav · all tools</span>
+                <span className="text-[11.5px] font-bold text-ss-text">Explorer</span>
+                <span className="text-[9.5px] leading-tight text-ss-muted">Full nav · all tools</span>
               </button>
             </div>
-            {mode === 'guided' && (
-              <button
-                type="button"
-                onClick={() => { setOpen(false); router.push('/my-path') }}
-                className="mt-2 flex w-full items-center justify-between rounded-lg bg-ss-teal/[0.05] px-2.5 py-1.5 text-left text-[11.5px] font-semibold text-ss-teal transition hover:bg-ss-teal/10"
-              >
-                <span>Go to my path</span>
-                <span>→</span>
-              </button>
-            )}
           </div>
 
           {/* Colour theme — light / system / dark. Additive: nothing

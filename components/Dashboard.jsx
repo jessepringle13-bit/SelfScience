@@ -45,6 +45,7 @@ import CommunityOptInBanner from '@/components/community/CommunityOptInBanner'
 import AlertPreview from '@/components/dashboard/AlertPreview'
 import UnknownsCard from '@/components/UnknownsCard'
 import NextGenePrompt from '@/components/dashboard/NextGenePrompt'
+import ContinueJourneyPill from '@/components/ContinueJourneyPill'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -316,6 +317,14 @@ export default function Dashboard() {
             the pillar chip bar per Part 3 spec. */}
         <div className="mt-6">
           <NextGenePrompt />
+        </div>
+
+        {/* Continue My Journey banner \u2014 orange-glow card shown only to
+            Explorer users who already have a saved My Path. Sits high
+            up in the Dashboard so anyone who "accidentally" exited the
+            guided flow has a very visible way back in. */}
+        <div className="mt-4">
+          <ContinueJourneyPill variant="banner" />
         </div>
 
         {/* Phase D · Part 4 — journey progress bar. */}
