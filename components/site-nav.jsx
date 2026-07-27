@@ -35,7 +35,8 @@ import AlertBell from '@/components/AlertBell'
 import ExplorerChip from '@/components/ExplorerChip'
 import { useSavedCount } from '@/lib/readingList'
 import { useMode } from '@/lib/userPath'
-import { Route } from 'lucide-react'
+import { useTierState } from '@/lib/tierState'
+import { Route, Lock } from 'lucide-react'
 
 export const PILLARS = [
   { key: 'genomics',           name: 'Genomics',                        short: 'Genomics',          Icon: Dna,       description: 'Understanding your genetic variants and what current research says about them.' },
@@ -58,7 +59,13 @@ export function SiteNav({ variant = 'light' }) {
   const isDark = variant === 'dark'
   const pathname = usePathname() || ''
   const mode = useMode() // 'explorer' | 'guided'
-  const guided = mode === 'guided'
+  const tier = useTierState()
+  // Tier 1 = Understanding. Overrides the guided/explorer navigation
+  // to the smallest possible shape: logo, My Findings, Start Here,
+  // Upload Genome. All dropdowns hidden. Advanced tools stay
+  // URL-reachable but are gated by <TierRouteGate />.
+  const tier1 = tier.tier === 1 && !!tier.savedAt // only active once a genome has been analysed
+  const guided = tier1 || mode === 'guided'
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -225,7 +232,27 @@ export function SiteNav({ variant = 'light' }) {
           {/* Guided mode: dedicated "My Path" pill immediately after Start Here.
               Only shown when the user is in guided mode so it's a clear next-step
               anchor for their curriculum. */}
-          {guided && (
+          {tier1 && (
+            <a
+              href="/genome/overview"
+              className={`inline-flex items-center gap-1 px-2 py-1 font-semibold transition ${
+                pathname === '/genome/overview' || pathname === '/'
+                  ? 'text-ss-text border-b-2 border-ss-orange pb-0.5'
+                  : 'text-ss-text/85 hover:text-ss-text'
+              }`}
+            >
+              My Findings
+            </a>
+          )}
+          {tier1 && (
+            <span
+              title="Complete your findings to unlock full access"
+              className="inline-flex items-center gap-1 rounded-full border border-ss-teal/40 bg-ss-teal/[0.05] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-ss-label"
+            >
+              <Lock size={9} /> Tier 1 · Understanding
+            </span>
+          )}
+          {guided && !tier1 && (
             <a
               href="/my-path"
               className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
@@ -237,7 +264,7 @@ export function SiteNav({ variant = 'light' }) {
               <Route size={13} /> My Path
             </a>
           )}
-          {guided && (
+          {guided && !tier1 && (
             <a
               href="/my-insights"
               className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${

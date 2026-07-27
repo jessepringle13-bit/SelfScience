@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
+import { useTierState } from '@/lib/tierState'
 import { ResultCard } from '@/components/result-card'
 import ClinicalTrialsSection from '@/components/search/ClinicalTrialsSection'
 import { EditorialPicks } from '@/components/editorial-picks'
@@ -914,6 +915,7 @@ export default function SearchClient() {
           the rest of the site (see design audit). */}
       <section className="relative bg-ss-bg pb-10 pt-24 text-ss-text">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-ss-teal/[0.10] to-transparent" aria-hidden="true" />
+        <Tier1SearchBanner />
         <SiteNav />
         <div className="container">
           <form onSubmit={submit} className="relative mx-auto max-w-4xl">
@@ -1560,6 +1562,35 @@ function SkeletonList() {
           <div className="mt-2 h-3 w-9/12 rounded bg-ss-border-warm" />
         </div>
       ))}
+    </div>
+  )
+}
+
+// Tier 1 search banner — soft gate. Search still works but the user
+// sees an explicit reminder that full research access unlocks after
+// they finish reading their genome findings. Uses only design tokens.
+function Tier1SearchBanner() {
+  const tier = useTierState()
+  if (!tier || tier.tier >= 2 || !tier.savedAt) return null
+  const total = tier.findingsTotal || 0
+  const read  = tier.findingsRead?.length || 0
+  return (
+    <div className="container relative mb-6 max-w-4xl">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-ss-orange/30 bg-ss-orange/[0.06] px-4 py-3 text-[13px]">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ss-orange">
+          Tier 1 · restricted
+        </span>
+        <span className="min-w-0 flex-1 text-ss-text">
+          Full research access unlocks after you&rsquo;ve read your findings.
+          {total > 0 && <> You&rsquo;ve read <span className="font-semibold">{read}</span> of <span className="font-semibold">{total}</span>.</>}
+        </span>
+        <a
+          href="/genome/overview"
+          className="whitespace-nowrap rounded-full bg-ss-orange px-4 py-1.5 text-[12.5px] font-bold text-white shadow-sm transition hover:bg-ss-orange-dark"
+        >
+          Back to my findings →
+        </a>
+      </div>
     </div>
   )
 }
