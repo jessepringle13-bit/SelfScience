@@ -15,9 +15,37 @@
 'use client'
 
 import Link from 'next/link'
-import { Printer } from 'lucide-react'
+import { useCallback } from 'react'
+import { Printer, Download } from 'lucide-react'
+
+// File-download-friendly title used ONLY at print time so the browser's
+// "Save as PDF" dialog defaults to a clean filename. We restore the
+// original title immediately after the dialog closes so tab labels and
+// bookmarks aren't affected.
+const PDF_FILENAME_TITLE = 'SelfScience-Tour-Summary'
 
 export default function HowItWorksPrintPage() {
+  const openPrintDialog = useCallback(() => {
+    if (typeof window === 'undefined') return
+    const originalTitle = document.title
+    document.title = PDF_FILENAME_TITLE
+    // Delay restore to the next tick after print() returns so browsers
+    // that snapshot the title later still see the friendly name.
+    const restore = () => {
+      document.title = originalTitle
+      window.removeEventListener('afterprint', restore)
+    }
+    window.addEventListener('afterprint', restore)
+    try {
+      window.print()
+    } finally {
+      // Safari doesn't always fire afterprint — restore defensively.
+      setTimeout(() => {
+        if (document.title === PDF_FILENAME_TITLE) document.title = originalTitle
+      }, 3000)
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#f5f5f4] py-8 print:bg-white print:py-0" style={{ colorScheme: 'light' }}>
       {/* Print stylesheet — kept inline so the file is self-contained
@@ -44,20 +72,46 @@ export default function HowItWorksPrintPage() {
       `}</style>
 
       {/* On-screen toolbar (hidden in print). */}
-      <div className="no-print mx-auto mb-4 flex max-w-[900px] items-center justify-between gap-3 px-4">
-        <Link
-          href="/how-it-works"
-          className="text-sm font-semibold text-neutral-700 underline underline-offset-4 hover:text-neutral-900"
-        >
-          ← Back to the full tour
-        </Link>
-        <button
-          type="button"
-          onClick={() => typeof window !== 'undefined' && window.print()}
-          className="inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800"
-        >
-          <Printer size={14} /> Print or save as PDF
-        </button>
+      <div className="no-print mx-auto mb-4 flex max-w-[900px] flex-col gap-2 px-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/how-it-works"
+            className="text-sm font-semibold text-neutral-700 underline underline-offset-4 hover:text-neutral-900"
+          >
+            ← Back to the full tour
+          </Link>
+          <span className="hidden text-neutral-400 sm:inline">·</span>
+          <Link
+            href="/how-it-works/print/parent"
+            className="text-sm font-semibold text-neutral-700 underline underline-offset-4 hover:text-neutral-900"
+          >
+            Parent version →
+          </Link>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={openPrintDialog}
+            className="inline-flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800"
+          >
+            <Download size={14} /> Download as PDF
+          </button>
+          <button
+            type="button"
+            onClick={openPrintDialog}
+            className="inline-flex items-center gap-2 rounded-md border border-neutral-400 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:border-neutral-800"
+          >
+            <Printer size={14} /> Print
+          </button>
+        </div>
+      </div>
+
+      {/* Tip banner — reminds users how to get a clean A4 PDF. Hidden
+          in print via .no-print. */}
+      <div className="no-print mx-auto mb-6 max-w-[900px] px-4">
+        <div className="rounded-md border border-neutral-300 bg-neutral-100 px-3 py-2 text-[11px] text-neutral-700">
+          <strong className="font-semibold text-neutral-900">Tip:</strong> in the print dialog, choose <em>Save as PDF</em> as the destination and <em>A4</em> as the paper size for the cleanest export. The file will be named <code className="rounded bg-white px-1 py-0.5 text-neutral-900">SelfScience-Tour-Summary.pdf</code>.
+        </div>
       </div>
 
       {/* The printable sheet. Explicit inline background/color to defeat

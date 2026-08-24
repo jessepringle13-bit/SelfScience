@@ -508,6 +508,10 @@ export default function HowItWorksPage() {
           <Link href="/how-it-works/print" className="font-semibold text-ss-teal underline hover:no-underline dark:text-white">
             Print or share a one-page summary
           </Link>
+          {' '}&middot;{' '}
+          <Link href="/how-it-works/print/parent" className="font-semibold text-ss-teal underline hover:no-underline dark:text-white">
+            One-page summary for a parent
+          </Link>
           .
         </p>
       </section>

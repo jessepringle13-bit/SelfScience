@@ -9789,3 +9789,76 @@ frontend:
                 single-page output with the toolbar hidden.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# TOUR — Download-PDF button, OG images, Parent variant
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Download-as-PDF button, dynamic OG images, and parent variant for the /how-it-works print sheet"
+    implemented: true
+    working: true
+    file: "app/how-it-works/print/page.js, app/how-it-works/print/parent/page.js, app/how-it-works/opengraph-image.js, app/how-it-works/print/opengraph-image.js, app/how-it-works/page.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * Download-as-PDF button on /how-it-works/print (and the
+            parent variant) — dedicated "Download as PDF" button
+            alongside a secondary "Print" button. Both invoke
+            window.print(); the primary button also temporarily
+            renames document.title to "SelfScience-Tour-Summary" (or
+            "SelfScience-Tour-for-Parents" on the parent variant) so
+            the browser's Save-as-PDF dialog defaults to that
+            filename. Title restored via afterprint listener + a 3s
+            Safari-safety fallback. Added an on-screen tip banner
+            reminding users to pick "Save as PDF" and "A4" in the
+            print dialog (@page directive already sets A4 12mm).
+          * Dynamic OG images generated via next/og ImageResponse:
+              - /app/app/how-it-works/opengraph-image.js — 1200x630
+                dark teal gradient, orange eyebrow "SelfScience · A
+                Plain-English Tour", bold white headline
+                "Understand the science behind your health.", tool
+                tags row + URL footer. Verified: 200 image/png,
+                162 KB.
+              - /app/app/how-it-works/print/opengraph-image.js —
+                same brand language but split composition with a
+                stylised "printed sheet" mockup on the right showing
+                the actual tour content. Verified: 200 image/png,
+                82 KB.
+              - Both files are picked up by Next.js file-convention
+                metadata, so iMessage, WhatsApp, Slack, LinkedIn, X,
+                and Facebook previews all render the new cards.
+              - Fixed Satori constraint: every <div> with more than
+                one child must declare display: 'flex'. Rewrote the
+                print OG variant to add display: 'flex' on every
+                text container.
+          * Parent variant page at /how-it-works/print/parent —
+            forked from the base print sheet with identical layout
+            but parent-focused copy:
+              - Headline: "You're noticing patterns in your kid.
+                Here's how to think them through."
+              - "What this site helps you do for your child" — six
+                tools rephrased around a child.
+              - Three worries instead of three goals: "My kid can't
+                focus", "Their digestion is off", "Their sleep is
+                a mess".
+              - Tool table's "Best for" row reframed for parent use.
+              - Fit / Not-fit callouts include pediatrician-specific
+                guidance and panic-Google framing.
+              - Toolbar links: "Back to full tour · General version".
+          * Main tour footer (/how-it-works) now links to all three:
+            mechanics · one-page summary · one-page summary for a
+            parent.
+          * Verified via Playwright + curl:
+              - Print page toolbar: buttons = ['Download as PDF',
+                'Print']; links = ['← Back to the full tour',
+                'Parent version →'].
+              - Parent page renders 5 H2 sections, three worry
+                cards, and preserves ✓/✗ symbols.
+              - OG image endpoints return 200 image/png.
+              - Compile clean; no hydration errors.
+
+
