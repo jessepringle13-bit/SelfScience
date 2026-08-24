@@ -68,7 +68,7 @@ export function SiteNav({ variant = 'light' }) {
   // fired yet on the current route (which only happens on /). Without
   // this the nav simplification and the search banner would silently
   // skip for anyone landing directly on /search, /goals, etc.
-  // (See tier1 derivation below \u2014 uses the shared `genomeLoaded`
+  // (See tier1 derivation below — uses the shared `genomeLoaded`
   // useState declared a few lines further down.)
   const [pillarsOpen, setPillarsOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -123,6 +123,12 @@ export function SiteNav({ variant = 'light' }) {
   const pillarsRef = useRef(null)
   const toolsRef = useRef(null)
   const aboutRef = useRef(null)
+  // My Biology dropdown — Phase 2 UX (issue #2). Consolidates
+  // Dashboard / Genome / Ancestry / Biomarkers / PGx / Journal /
+  // Achievements / Export into one menu that only shows when the
+  // user actually has data (i.e. an uploaded genome).
+  const bioRef = useRef(null)
+  const [bioOpen, setBioOpen] = useState(false)
 
   // Close dropdowns on Escape
   useEffect(() => {
@@ -131,6 +137,7 @@ export function SiteNav({ variant = 'light' }) {
         setPillarsOpen(false)
         setToolsOpen(false)
         setAboutOpen(false)
+        setBioOpen(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -153,7 +160,7 @@ export function SiteNav({ variant = 'light' }) {
   // Fixes the previous hover-based UX where the panel would disappear whenever
   // the cursor briefly crossed the gap between the button and the menu.
   useEffect(() => {
-    if (!pillarsOpen && !toolsOpen && !aboutOpen) return
+    if (!pillarsOpen && !toolsOpen && !aboutOpen && !bioOpen) return
     const onDocClick = (e) => {
       if (pillarsOpen && pillarsRef.current && !pillarsRef.current.contains(e.target)) {
         setPillarsOpen(false)
@@ -164,10 +171,13 @@ export function SiteNav({ variant = 'light' }) {
       if (aboutOpen && aboutRef.current && !aboutRef.current.contains(e.target)) {
         setAboutOpen(false)
       }
+      if (bioOpen && bioRef.current && !bioRef.current.contains(e.target)) {
+        setBioOpen(false)
+      }
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
-  }, [pillarsOpen, toolsOpen, aboutOpen])
+  }, [pillarsOpen, toolsOpen, aboutOpen, bioOpen])
 
   // Tier 2 tour pulse: if the user just unlocked Tier 2 (Tier2WelcomeBanner
   // set ss_tier2_tour_pulse), pulse the Tools button for 6 seconds so
@@ -232,7 +242,7 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/biomarkers',                label: 'Lab Biomarkers',       Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
     { href: '/drug-check',                label: 'PGx / Drug Check',     Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
     { href: '/journal',                   label: 'Health Journal',       Icon: BookOpenIcon, blurb: 'Private, on-device journal & progress timeline.' },
-    { href: '/achievements',              label: 'Achievements',         Icon: Award,     blurb: 'Milestones you\u2019ve unlocked.' },
+    { href: '/achievements',              label: 'Achievements',         Icon: Award,     blurb: 'Milestones you’ve unlocked.' },
     { href: '/export',                    label: 'Export as PDF',        Icon: FileText,  blurb: 'Print / save any section you can see.' },
   ]
   const EXPLORE_ITEMS = [
@@ -243,7 +253,7 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/study',                     label: 'Study Guide',          Icon: BookOpenIcon, blurb: 'Foundational study material.' },
   ]
   const TOOL_ITEMS = [
-    { href: '/coach',                     label: 'AI Coach',             Icon: Brain,     blurb: 'Ask questions about your genome or research \u2014 with citation chips.' },
+    { href: '/coach',                     label: 'AI Coach',             Icon: Brain,     blurb: 'Ask questions about your genome or research — with citation chips.' },
     { href: '/research',                  label: 'Deep Research',        Icon: FileSearch, blurb: 'Generate a structured, cited research report from a natural-language question.' },
     { href: '/blueprint',                 label: 'My Health Blueprint',  Icon: Compass,   blurb: 'Unified synthesis of your genome, protocol, nutrition, and next steps.' },
     { href: '/nutrition',                 label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
@@ -261,7 +271,7 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/my-path',                   label: 'My Path',              Icon: Route,     blurb: 'Your guided curriculum.' },
     { href: '/my-insights',               label: 'My Insights',          Icon: Sparkles,  blurb: 'The 5-rung insight ladder for your findings.' },
     { href: '/goals',                     label: 'Health Goals',         Icon: Target,    blurb: 'Genome-informed goals with progress tracking.' },
-    { href: '/achievements',              label: 'Achievements',         Icon: Award,     blurb: 'Milestones you\u2019ve unlocked.' },
+    { href: '/achievements',              label: 'Achievements',         Icon: Award,     blurb: 'Milestones you’ve unlocked.' },
   ]
   const toolsActive = TOOL_ITEMS.some((i) => i.href === pathname)
 
@@ -275,7 +285,7 @@ export function SiteNav({ variant = 'light' }) {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-          {/* Start Here \u2014 first item, orange accent, drives first-time visitors
+          {/* Start Here — first item, orange accent, drives first-time visitors
               into the guided journey. Uses a subtle background so it's warm
               rather than shouty. */}
           <a
@@ -335,7 +345,7 @@ export function SiteNav({ variant = 'light' }) {
               My Insights
             </a>
           )}
-          {/* Dashboard \u2014 only surfaces once the user has actually loaded a
+          {/* Dashboard — only surfaces once the user has actually loaded a
               genome. Positioned right after Start Here so the reload path
               is obvious. */}
           {genomeLoaded && (
@@ -421,6 +431,56 @@ export function SiteNav({ variant = 'light' }) {
 
           <a href="/community" className={linkClass('/community')}>Community</a>
 
+          {/* My Biology dropdown — Phase 2 UX (issue #2). Only rendered
+              once the user actually has data on the platform (a saved
+              genome OR any completed onboarding). Consolidates every
+              "read your own data" surface so users don't hunt across
+              flat top-level links. Mirrors the site’s existing
+              dropdown pattern (setState + outer-click close). */}
+          {genomeLoaded && (
+            <div className="relative" ref={bioRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setBioOpen((v) => !v)
+                  setPillarsOpen(false)
+                  setToolsOpen(false)
+                  setAboutOpen(false)
+                }}
+                className={`inline-flex items-center gap-1 ${linkBase}`}
+                aria-expanded={bioOpen}
+                aria-haspopup="menu"
+              >
+                My Biology <ChevronDown size={14} className={`transition ${bioOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {bioOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-black/10 bg-white p-2 shadow-xl"
+                >
+                  {MY_BIOLOGY_ITEMS.map(({ href, label, Icon, blurb }) => (
+                    <a
+                      key={href}
+                      href={href}
+                      onClick={() => setBioOpen(false)}
+                      className={`flex items-start gap-3 rounded-lg p-3 transition hover:bg-ss-bg ${
+                        pathname === href ? 'bg-ss-bg' : ''
+                      }`}
+                    >
+                      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-ss-teal/10 text-ss-teal">
+                        <Icon size={16} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-ss-teal">{label}</span>
+                        <span className="mt-0.5 block text-[12px] text-ss-muted">{blurb}</span>
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tools dropdown — consolidates Biomarkers / Training / Drug Check /
               Populations / Ancestry so the desktop nav doesn't get crowded. */}
           <div className="relative" ref={toolsRef}>
@@ -494,7 +554,7 @@ export function SiteNav({ variant = 'light' }) {
                       <Sparkles size={13} />
                     </span>
                     <span className="text-[13px] font-bold text-ss-orange">
-                      {tier.tier >= 3 ? 'SelfScience Pro \u2014 open' : 'Explore SelfScience Pro'}
+                      {tier.tier >= 3 ? 'SelfScience Pro — open' : 'Explore SelfScience Pro'}
                     </span>
                   </span>
                   <ChevronDown size={12} className="-rotate-90 text-ss-orange" />
@@ -543,7 +603,7 @@ export function SiteNav({ variant = 'light' }) {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Continue My Journey \u2014 pulsing orange pill shown to
+          {/* Continue My Journey — pulsing orange pill shown to
               Explorer users who already have a saved My Path so they
               can jump straight back into the guided curriculum. */}
           <ContinueJourneyPill variant="nav" />
@@ -581,7 +641,7 @@ export function SiteNav({ variant = 'light' }) {
             Upload Genome
           </a>
 
-          {/* Mobile menu button \u2014 visible on <md. Complements the bottom
+          {/* Mobile menu button — visible on <md. Complements the bottom
               tab bar so mobile users can reach the full Tools + About +
               Pillars menu without leaving the top of the page. */}
           <button
@@ -606,7 +666,7 @@ export function SiteNav({ variant = 'light' }) {
             >
               ✨ Start Here
             </a>
-            {/* Mobile Dashboard link \u2014 top of the drawer when a genome
+            {/* Mobile Dashboard link — top of the drawer when a genome
                 is loaded so users on phones don't have to hunt for the
                 logo to get back home. */}
             {genomeLoaded && (
@@ -618,7 +678,7 @@ export function SiteNav({ variant = 'light' }) {
                 <LayoutDashboard size={14} /> Dashboard
               </a>
             )}
-            {/* Continue My Journey \u2014 highlighted CTA for Explorer users
+            {/* Continue My Journey — highlighted CTA for Explorer users
                 on mobile so they can jump back into their guided path
                 without hunting through settings. */}
             {!guided && !!path?.primary && (
