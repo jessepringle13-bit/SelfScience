@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import StartHereBanner from '@/components/StartHereBanner'
+import WelcomeBackStrip from '@/components/WelcomeBackStrip'
 import HomeStepsExplainer from '@/components/HomeStepsExplainer'
 import { ResultCard } from '@/components/result-card'
 import { EditorialFeatured } from '@/components/editorial-featured'
@@ -523,6 +524,12 @@ function DiscoverHome() {
           </a>
         </div>
       </section>
+
+      {/* Welcome-back strip — inline quick-jump tabs. Only renders
+          for returning visitors (has ss_onboarded, ss_mode,
+          ss_tier_state, or a live genome session). New visitors see
+          nothing here and continue to HomeStepsExplainer below. */}
+      <WelcomeBackStrip />
 
       {/* 3-step explainer strip (Phase A · Part 1) — placed directly under
           the hero so first-time visitors see WHY / WHAT / HOW immediately. */}

@@ -9862,3 +9862,53 @@ frontend:
               - Compile clean; no hydration errors.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# HOMEPAGE — inline WelcomeBackStrip for returning users
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Inline WelcomeBackStrip on homepage for returning users; new users keep full onboarding"
+    implemented: true
+    working: true
+    file: "components/WelcomeBackStrip.jsx, app/page.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * New client component components/WelcomeBackStrip.jsx —
+            renders a compact "Welcome back \u2014 Jump straight in"
+            band with 4 quick-jump tabs between the homepage hero and
+            HomeStepsExplainer.
+          * Detection of "returning user":
+              ss_onboarded === '1'  OR  ss_mode set  OR
+              ss_tier_state set     OR  hasGenomeResults() true
+          * Tab set adapts to journey state:
+              - No journey → [Take the quiz (primary), Explore tools,
+                Learn the tools, Read articles]
+              - With journey → [Continue my journey (primary), Retake
+                the quiz, Explore tools, Learn the tools]
+            Primary tab is orange-filled, secondary tabs are white/10
+            frosted panels on the dark canvas.
+          * Dismissal is sessionStorage-scoped (ss_welcome_back_dismissed
+            = '1') so users don't see it twice within the same tab,
+            but it re-appears on next visit \u2014 exactly matches the
+            requested "welcoming mat" behaviour.
+          * NEW USERS keep the current FirstTimeWelcome full-screen
+            onboarding quiz unchanged \u2014 they don't see the strip
+            because ss_onboarded is unset and no other signals fire.
+          * Only touches homepage; SiteNav, other routes, and the
+            FirstTimeWelcome/HealthStoryQuiz components are unchanged.
+          * Verified via Playwright (three states + dismissal):
+              NEW USER            → strip hidden, hero + quiz gate
+              RETURNING no-journey → strip visible, 4 tabs w/ primary
+                                     "Take the quiz"
+              RETURNING w/journey  → strip visible, primary
+                                     "Continue my journey" + Retake
+              DISMISS              → strip removed, sessionStorage
+                                     flag written, next tab visit
+                                     shows it again.
+
+
