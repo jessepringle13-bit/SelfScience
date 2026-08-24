@@ -1,6 +1,6 @@
 {
   "startedAt": "2026-08-24T16:01:49.190Z",
-  "lastUpdated": "2026-08-24T16:02:19.276Z",
+  "lastUpdated": "2026-08-24T16:20:00.881Z",
   "byKey": {
     "homepage-hero|quiz_secondary|a|impression": {
       "count": 10,
@@ -13,9 +13,9 @@
       "last": "2026-08-24T16:01:49.312Z"
     },
     "homepage-hero|quiz_secondary|b|impression": {
-      "count": 10,
+      "count": 17,
       "first": "2026-08-24T16:01:49.439Z",
-      "last": "2026-08-24T16:01:50.539Z"
+      "last": "2026-08-24T16:19:30.881Z"
     },
     "homepage-hero|quiz_secondary|b|click": {
       "count": 4,
@@ -36,7 +36,7 @@
   "byDay": {
     "2026-08-24|homepage-hero|quiz_secondary|a|impression": 10,
     "2026-08-24|homepage-hero|quiz_secondary|a|click": 1,
-    "2026-08-24|homepage-hero|quiz_secondary|b|impression": 10,
+    "2026-08-24|homepage-hero|quiz_secondary|b|impression": 17,
     "2026-08-24|homepage-hero|quiz_secondary|b|click": 4,
     "2026-08-24|homepage-hero|quiz_secondary|c|impression": 10,
     "2026-08-24|homepage-hero|quiz_secondary|c|click": 1
