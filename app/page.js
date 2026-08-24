@@ -288,7 +288,7 @@ function DashboardOrFirstLook() {
       setLoaded(true)
     } catch { setLoaded(true) }
   }, [])
-  // While we\u2019re still resolving findings on the client, render nothing
+  // While we’re still resolving findings on the client, render nothing
   // (no Dashboard flash). Server-render outputs an empty shell too.
   if (!loaded) return null
   if (tier.tier >= 2) return <Dashboard />
@@ -297,7 +297,7 @@ function DashboardOrFirstLook() {
 }
 
 /**
- * The existing marketing / discovery homepage \u2014 unchanged content,
+ * The existing marketing / discovery homepage — unchanged content,
  * just renamed from `App` to `DiscoverHome` so `App` can wrap it with
  * the Dashboard toggle logic.
  */
@@ -305,6 +305,37 @@ function DiscoverHome() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [activePill, setActivePill] = useState(null)
+
+  // Hero quiz CTA — three copy variants, deterministically assigned
+  // per-visitor via localStorage so the user sees the same wording on
+  // return visits. Track impressions/clicks via the existing analytics
+  // pipeline so we can compare CTRs later.
+  const [quizVariant, setQuizVariant] = useState(null)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      let v = window.localStorage.getItem('ss_hero_quiz_cta_variant')
+      if (!v || !['a', 'b', 'c'].includes(v)) {
+        v = ['a', 'b', 'c'][Math.floor(Math.random() * 3)]
+        window.localStorage.setItem('ss_hero_quiz_cta_variant', v)
+      }
+      setQuizVariant(v)
+      // Fire an impression event so the funnel dashboard can count
+      // how often each variant was actually shown.
+      try {
+        trackEvent(EVENTS.CTA_IMPRESSION || 'cta_impression', {
+          location: 'homepage-hero',
+          cta: 'quiz_secondary',
+          variant: v,
+        })
+      } catch {}
+    } catch {}
+  }, [])
+  const QUIZ_COPY = {
+    a: 'Not ready to upload DNA? Take the 2-minute quiz →',
+    b: 'Don’t have DNA data yet? Take the 2-minute quiz →',
+    c: 'Skip DNA — take the quiz →',
+  }
 
   const goSearch = (q, pillar) => {
     const term = (q ?? query).trim()
@@ -405,12 +436,24 @@ function DiscoverHome() {
           {/* Secondary CTA — surfaces the non-genetic onboarding path
               for visitors without a DNA file. Visually lower-emphasis
               (text link, not a button) so the DNA upload remains the
-              dominant action. Linked from GitHub issue #1. */}
+              dominant action. Copy is A/B-assigned per visitor via
+              ss_hero_quiz_cta_variant — impressions + clicks fire
+              through the analytics pipeline so we can compare CTRs. */}
           <a
             href="/onboarding/quiz"
+            onClick={() => {
+              try {
+                trackEvent(EVENTS.CTA_CLICKED || 'cta_clicked', {
+                  location: 'homepage-hero',
+                  cta: 'quiz_secondary',
+                  variant: quizVariant || 'a',
+                })
+              } catch {}
+            }}
+            data-cta-variant={quizVariant || 'a'}
             className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 underline decoration-white/40 underline-offset-4 hover:text-white hover:decoration-white"
           >
-            Not ready to upload DNA? Take the 2-minute quiz →
+            {QUIZ_COPY[quizVariant] || QUIZ_COPY.a}
           </a>
           <a
             href="#genome-upload"
