@@ -9912,3 +9912,63 @@ frontend:
                                      shows it again.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# WelcomeBackStrip — nickname, progress ring, pillar chips
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Personalised greeting, journey progress ring, and pillar shortcut chips on WelcomeBackStrip"
+    implemented: true
+    working: true
+    file: "components/WelcomeBackStrip.jsx, lib/userProfile.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * lib/userProfile.js — added getUserNickname(),
+            saveUserNickname(), clearUserNickname() helpers backed by
+            a new ss_nickname localStorage key. saveUserNickname also
+            falls back to a `nickname / firstName / name` field on
+            the existing ss_user_profile object so a future onboarding
+            step can co-locate the value if preferred. Dispatches
+            selfscience:nickname-changed on save so listeners refresh.
+          * WelcomeBackStrip now personalises when a nickname exists:
+              - Eyebrow: "WELCOME BACK, SAM"
+              - Heading: "Welcome back, Sam \u2014 jump straight in."
+            With no nickname it falls back to the generic
+            "Jump straight in." heading and "Welcome back" eyebrow
+            \u2014 no visible change for users who never entered one.
+          * Journey progress ring — a 40 px SVG ring surrounds the
+            icon on the "Continue my journey" tile whenever
+            ss_tier_state is present. Progress is computed as:
+              tier 3         \u2192 100 %
+              tier 2         \u2192 66 % + (findingsRead / total) * 34
+              tier 1 done    \u2192 66 %
+              tier 1 partial \u2192 (read / total) * 66 %, capped 65 %
+            The tile copy adapts to the same value:
+              "83% complete \u2014 Explorer mode.",
+              "17% complete \u2014 nice start.", etc.
+            Aria label reads "Journey NN% complete" for screen readers.
+          * Pillar shortcut chips \u2014 a second row of 10 tiny chips
+            (one per canonical pillar from components/site-nav.jsx
+            PILLARS) sits under the tab grid with an "Or by topic:"
+            eyebrow. Each chip links to
+            /search?pillar=<Encoded Pillar Name> \u2014 an existing
+            route \u2014 so no new features are introduced. Chips use
+            the pillar's own lucide icon + `short` label for a tight
+            fit, and hover into a subtle orange tint on interaction.
+          * Verified via Playwright across three scenarios:
+              TIER 2 with Sam    \u2192 heading personalised, primary
+                                   tile shows 83 % ring + "Explorer
+                                   mode." copy, all 10 pillar chips.
+              TIER 1 partial     \u2192 generic heading, primary tile
+                                   17 % ring + "nice start." copy.
+              NO JOURNEY         \u2192 no ring, primary tile falls
+                                   back to "Take the quiz", pillar
+                                   chips still render for returning
+                                   users.
+
+
