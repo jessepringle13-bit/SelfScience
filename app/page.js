@@ -382,7 +382,7 @@ function DiscoverHome() {
   return (
     <main className="min-h-screen bg-ss-bg text-ss-text">
       {/* ============================= HERO ============================= */}
-      <section className="relative flex min-h-[100vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
+      <section className="relative flex min-h-[70vh] flex-col justify-center overflow-hidden bg-ss-teal text-white">
         <SiteNav variant="dark" />
 
         {/* Horizontal DNA image band */}
@@ -516,191 +516,29 @@ function DiscoverHome() {
           the hero so first-time visitors see WHY / WHAT / HOW immediately. */}
       <HomeStepsExplainer />
 
-      {/* Start Here banner — placed directly under the hero (below the
-          "Explore ↓" prompt) so returning visitors see the full hero first,
-          and first-time visitors are met with the onboarding banner as
-          their reward for scrolling. Auto-hides via localStorage after
-          dismissal. */}
-      <StartHereBanner />
-
-      {/* ======================= GENOME UPLOAD CARD ====================== */}
-      <section id="genome-upload" className="bg-white py-20">
-        <div className="container">
-          <div
-            className="grid grid-cols-1 gap-8 rounded-2xl bg-ss-surface p-6 shadow-sm ring-1 ring-black/5 md:grid-cols-5 md:gap-10 md:p-10"
-            style={{ borderLeft: '4px solid #1B474D' }}
-          >
-            <div className="md:col-span-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-ss-privacy-tint px-3 py-1 text-xs font-semibold text-ss-teal">
-                <Dna size={14} /> Personalized · Optional
-              </div>
-              <h2 className="mt-4 text-3xl font-extrabold text-ss-teal md:text-4xl">
-                What does your DNA actually mean for how you eat, train, sleep, and respond to medications?
-              </h2>
-              <p className="mt-4 max-w-xl text-ss-text">
-                Upload your raw DNA data file from 23andMe, AncestryDNA, or a whole genome service. Get a personalized research roadmap built around your specific genetic variants. Your raw file is read entirely in your browser — only anonymous variant calls are used to generate your results, and nothing is ever stored or retained.
-              </p>
-              <p className="mt-3 max-w-xl text-xs text-ss-muted">
-                Used by 2,400+ people to interpret their 23andMe and AncestryDNA data.
-              </p>
-              <div className="mt-5 flex items-start gap-2 text-sm text-ss-muted">
-                <Lock size={16} className="mt-0.5 shrink-0 text-ss-teal" />
-                <span>
-                  <b className="text-ss-teal">Your raw file never leaves your device.</b> Anonymous variant calls are processed by AI — no raw file, no name, no identifier is ever stored.
-                </span>
-              </div>
-              <div className="mt-6 flex flex-wrap items-center gap-3">
-                <a
-                  href="/genome"
-                  className="inline-flex items-center gap-2 rounded-full bg-ss-orange px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-ss-orange-dark"
-                >
-                  <Upload size={16} /> Upload Your Genome File
-                </a>
-                <span className="text-xs text-ss-muted">
-                  Formats: <b>.txt</b> · <b>.zip</b> · <b>.vcf</b>
-                </span>
-              </div>
-              <div className="mt-3 text-xs text-ss-muted">
-                Supported: 23andMe · AncestryDNA · MyHeritage
-              </div>
-            </div>
-
-            {/* Right side illustration */}
-            <div className="relative hidden md:col-span-2 md:block">
-              <GenomeFlowIllustration />
-            </div>
-          </div>
+      {/* Phase 2 UX (issue #2) — the following sections previously
+          lived on the homepage but were moved to reduce density:
+            • StartHereBanner              → /get-started
+            • Genome-upload deep-dive card  → /get-started
+            • Featured Research carousel   → /search  (and /reading-list)
+            • Ten Pillars grid             → /pillars
+            • Reading List carousel        → /reading-list
+            • Mission blockquote band      → /about
+          Only a slim "prefer books?" text link + a one-line
+          disclaimer are kept on / to preserve discoverability
+          without adding visual noise. */}
+      <section className="bg-ss-bg py-10">
+        <div className="container flex flex-col items-center gap-2 text-center">
+          <a href="/reading-list" className="text-sm font-semibold text-ss-teal underline decoration-ss-teal/40 underline-offset-4 hover:decoration-ss-teal">
+            Prefer books? Visit the SelfScience Reading List &rarr;
+          </a>
+          <p className="text-xs text-ss-muted">
+            For educational purposes only. Not medical advice or diagnosis. <a href="/about" className="underline decoration-dotted underline-offset-4 hover:text-ss-text">Read our mission &rarr;</a>
+          </p>
         </div>
       </section>
 
-      {/* ======================= FEATURED RESEARCH ======================= */}
-      <section className="bg-ss-bg py-20">
-        <div className="container">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
-                Featured Research
-              </div>
-              <h2 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
-                Start Exploring
-              </h2>
-              <p className="mt-2 max-w-xl text-ss-muted">
-                Editor-curated studies across the ten pillars, each with an AI reliability score and plain-language summary.
-              </p>
-            </div>
-            <a
-              href="/search?q=longevity"
-              className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-ss-teal hover:underline md:inline-flex"
-            >
-              Browse all <ArrowRight size={14} />
-            </a>
-          </div>
 
-          <div className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4">
-            {/* Supabase editorial featured articles (hidden if none). Rendered
-                first so curated content leads the section. */}
-            <EditorialFeatured limit={6} />
-            {FEATURED.map((item) => (
-              <div key={item.id} className="snap-start">
-                <ResultCard item={item} variant="carousel" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================ 10 PILLARS ========================== */}
-      <section id="pillars" className="bg-white py-20">
-        <div className="container">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
-              The Ten Pillars
-            </div>
-            <h2 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
-              Explore by Topic
-            </h2>
-            <p className="mt-3 text-ss-muted">
-              Research grouped into the ten domains that shape human health and performance — from infancy through longevity.
-            </p>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {PILLARS.map(({ key, name, Icon, description }) => (
-              <div
-                key={key}
-                className="flex flex-col rounded-xl bg-ss-surface p-6 ring-1 ring-ss-border-warm/60 transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-ss-teal/10 text-ss-teal">
-                  <Icon size={22} strokeWidth={1.5} />
-                </div>
-                <h3 className="mt-4 text-lg font-bold text-ss-teal">{name}</h3>
-                <p className="mt-1.5 text-sm text-ss-muted">{description}</p>
-                <a
-                  href={`/search?pillar=${encodeURIComponent(name)}`}
-                  className="mt-6 inline-flex w-fit items-center gap-1 rounded-full border-2 border-ss-orange px-4 py-1.5 text-xs font-semibold text-ss-orange transition hover:bg-ss-orange hover:text-white"
-                >
-                  Explore <ArrowRight size={12} />
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ========================== READING LIST ========================= */}
-      <section id="reading-list" className="bg-ss-bg py-20">
-        <div className="container">
-          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-ss-orange">
-                <BookOpen size={14} /> Reading List
-              </div>
-              <h2 className="mt-2 text-3xl font-extrabold text-ss-teal md:text-4xl">
-                The SelfScience Reading List
-              </h2>
-              <p className="mt-2 max-w-xl text-ss-muted">
-                Books that connect to the research. Curated and annotated.
-              </p>
-            </div>
-            <a
-              href="/reading-list"
-              className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-ss-teal hover:underline md:inline-flex"
-            >
-              Browse all <ArrowRight size={14} />
-            </a>
-          </div>
-
-          <div className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-4">
-            {BOOKS.map((book) => (
-              <BookCard key={book.id} book={book} onSearch={goSearch} />
-            ))}
-          </div>
-
-          <div className="mt-8 flex justify-center">
-            <a
-              href="/reading-list"
-              className="inline-flex items-center gap-2 rounded-full border-2 border-ss-teal px-6 py-2.5 text-sm font-semibold text-ss-teal transition hover:bg-ss-teal hover:text-white"
-            >
-              <BookOpen size={14} /> Browse All Books
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================= MISSION STATEMENT ===================== */}
-      <section className="bg-ss-teal py-24 text-white">
-        <div className="container">
-          <blockquote className="mx-auto max-w-4xl text-center">
-            <div className="mx-auto mb-6 h-1 w-14 rounded-full bg-ss-orange" />
-            <p className="text-2xl font-medium leading-relaxed md:text-3xl md:leading-relaxed">
-              “Most people have more genetic data than they know what to do with. SelfScience turns that data into a starting point — connecting your genomic profile to the research, resources, and plain-language explanations you need to begin your wellness journey.”
-            </p>
-            <p className="mt-8 text-xs uppercase tracking-[0.2em] text-white/60">
-              For educational purposes only. Not medical advice or diagnosis.
-            </p>
-          </blockquote>
-        </div>
-      </section>
 
       {/* ============================== FOOTER =========================== */}
       <footer className="bg-[#0F2C30] py-12 text-white/80">

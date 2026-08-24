@@ -221,34 +221,47 @@ export function SiteNav({ variant = 'light' }) {
     { href: '/how-it-works',  label: 'How It Works',  blurb: 'A tour under the hood.' },
   ]
   const aboutActive = ABOUT_ITEMS.some((i) => i.href === pathname)
-  // Section 7 spec: order by most commonly used first. Nutrition Hub,
-  // Drug Check, and Supplement Discovery lead. "Supplements" was
-  // renamed to "Supplement Discovery" and "Biomarkers" to "Lab
-  // Biomarkers" to match the spec-required labels.
+  // Phase 2 UX (issue #2) — top nav collapsed from ~20 flat items
+  // into 4 categories: My Biology · Explore Research · Tools · My Path.
+  // Each category renders as its own dropdown next to Search. The old
+  // TOOL_ITEMS list is now split across the four categories below.
+  const MY_BIOLOGY_ITEMS = [
+    { href: '/',                          label: 'Dashboard',            Icon: LayoutDashboard, blurb: 'Your findings at a glance.' },
+    { href: '/genome',                    label: 'Genome',               Icon: Compass,   blurb: 'Every variant across every pillar.' },
+    { href: '/ancestry',                  label: 'Ancestry Report',      Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
+    { href: '/biomarkers',                label: 'Lab Biomarkers',       Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
+    { href: '/drug-check',                label: 'PGx / Drug Check',     Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
+    { href: '/journal',                   label: 'Health Journal',       Icon: BookOpenIcon, blurb: 'Private, on-device journal & progress timeline.' },
+    { href: '/achievements',              label: 'Achievements',         Icon: Award,     blurb: 'Milestones you\u2019ve unlocked.' },
+    { href: '/export',                    label: 'Export as PDF',        Icon: FileText,  blurb: 'Print / save any section you can see.' },
+  ]
+  const EXPLORE_ITEMS = [
+    { href: '/search',                    label: 'Search',               Icon: FileSearch, blurb: 'Query PubMed + Semantic Scholar with reliability scores.' },
+    { href: '/pillars',                   label: 'Pillars',              Icon: Compass,   blurb: 'The 10 health pillars we interpret.' },
+    { href: '/reading-list',              label: 'Reading List',         Icon: BookOpenIcon, blurb: 'Curated books + latest featured research.' },
+    { href: '/articles',                  label: 'Featured Articles',    Icon: FileText,  blurb: 'Editorial deep-dives.' },
+    { href: '/study',                     label: 'Study Guide',          Icon: BookOpenIcon, blurb: 'Foundational study material.' },
+  ]
   const TOOL_ITEMS = [
-    { href: '/blueprint',                  label: 'My Health Blueprint',   Icon: Compass,   blurb: 'Unified synthesis of your genome, protocol, nutrition, and next steps.' },
-    { href: '/explore',                    label: 'Explore Your Genes',    Icon: Compass,   blurb: 'A checklist-style deep dive \u2014 one finding at a time, at your own pace.' },
-    { href: '/goals',                      label: 'Health Goals',           Icon: Target,   blurb: 'Genome-informed goals with progress tracking, milestones, and insights.' },
-    { href: '/nutrition',                 label: 'Nutrition Hub',         Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
-    { href: '/drug-check',                label: 'Drug Check',            Icon: Pill,      blurb: 'Pharmacogenomic guidance by medication.' },
-    { href: '/tools/supplements',         label: 'Supplement Discovery',  Icon: Pill,      blurb: 'Discover supplements by ingredient form. NIH label data. Brand-direct only.' },
-    { href: '/biomarkers',                label: 'Lab Biomarkers',        Icon: TestTube2, blurb: 'Log blood work + genome correlations.' },
-    { href: '/tools/training',            label: 'Training Protocol',     Icon: Activity,  blurb: 'Genome-driven training plan for your sport.' },
-    { href: '/population-compare',        label: 'Population Compare',    Icon: Globe2,    blurb: 'How your variants compare globally.' },
-    { href: '/ancestry',                  label: 'Ancestry Report',       Icon: Compass,   blurb: 'A rough educational ancestry sketch.' },
-    { href: '/practitioner-report',       label: 'Practitioner Report',   Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
-    { href: '/export',                    label: 'Export as PDF',         Icon: FileText,  blurb: 'Print / save any section you can see. Pro sections excluded on Explorer.' },
-    { href: '/coach',                     label: 'AI Coach',              Icon: Brain,     blurb: 'Ask questions about your genome or research \u2014 with citation chips. Free tier.' },
-    { href: '/research',                  label: 'Deep Research',         Icon: FileSearch, blurb: 'Generate a structured, cited research report from a natural-language question.' },
-    { href: '/journal',                    label: 'Health Journal',        Icon: BookOpenIcon, blurb: 'Private, on-device journal & progress timeline.' },
-    { href: '/tracker',                    label: 'Habit Tracker',         Icon: CheckCircleIcon, blurb: 'Genome-informed habits with streaks, heatmaps, and insights.' },
-    { href: '/tools/supplements/brands',  label: 'Brand Leaderboard',     Icon: Award,     blurb: 'Every curated supplement brand ranked by transparency score.' },
-    { href: '/get-started',               label: 'Get Started',           Icon: Rocket,    blurb: 'Which DNA + blood kits work with SelfScience.' },
-    // SelfScience Pro suite. Marked with `pro: true` so the dropdown
-    // renders an orange "PRO" chip next to the label for non-Pro users.
-    { href: '/pro/ai-coach',              label: 'AI Coach',              Icon: Brain,     blurb: 'Ask questions about your variants \u2014 with citations.',   pro: true },
-    { href: '/pro/family-compare',        label: 'Family Comparison',     Icon: Baby,      blurb: 'Side-by-side variant map for two genomes.',                 pro: true },
-    { href: '/pro/deep-research',         label: 'Deep Research Reports', Icon: FileText,  blurb: 'Long-form pillar reports tailored to your variants.',        pro: true },
+    { href: '/coach',                     label: 'AI Coach',             Icon: Brain,     blurb: 'Ask questions about your genome or research \u2014 with citation chips.' },
+    { href: '/research',                  label: 'Deep Research',        Icon: FileSearch, blurb: 'Generate a structured, cited research report from a natural-language question.' },
+    { href: '/blueprint',                 label: 'My Health Blueprint',  Icon: Compass,   blurb: 'Unified synthesis of your genome, protocol, nutrition, and next steps.' },
+    { href: '/nutrition',                 label: 'Nutrition Hub',        Icon: Apple,     blurb: 'Genomic food, journal & product scanner.' },
+    { href: '/tools/supplements',         label: 'Supplement Discovery', Icon: Pill,      blurb: 'Discover supplements by ingredient form. NIH label data.' },
+    { href: '/tools/training',            label: 'Training Protocol',    Icon: Activity,  blurb: 'Genome-driven training plan for your sport.' },
+    { href: '/tracker',                   label: 'Habit Tracker',        Icon: CheckCircleIcon, blurb: 'Genome-informed habits with streaks and heatmaps.' },
+    { href: '/population-compare',        label: 'Population Compare',   Icon: Globe2,    blurb: 'How your variants compare globally.' },
+    { href: '/practitioner-report',       label: 'Practitioner Report',  Icon: FileText,  blurb: 'Print-ready summary for your clinician.' },
+    { href: '/tools/supplements/brands',  label: 'Brand Leaderboard',    Icon: Award,     blurb: 'Every curated supplement brand ranked by transparency score.' },
+    // SelfScience Pro suite.
+    { href: '/pro/family-compare',        label: 'Family Comparison',    Icon: Baby,      blurb: 'Side-by-side variant map for two genomes.',                 pro: true },
+  ]
+  const MY_PATH_ITEMS = [
+    { href: '/onboarding/quiz',           label: 'Onboarding Quiz',      Icon: Route,     blurb: 'Personalise your path in 2 minutes.' },
+    { href: '/my-path',                   label: 'My Path',              Icon: Route,     blurb: 'Your guided curriculum.' },
+    { href: '/my-insights',               label: 'My Insights',          Icon: Sparkles,  blurb: 'The 5-rung insight ladder for your findings.' },
+    { href: '/goals',                     label: 'Health Goals',         Icon: Target,    blurb: 'Genome-informed goals with progress tracking.' },
+    { href: '/achievements',              label: 'Achievements',         Icon: Award,     blurb: 'Milestones you\u2019ve unlocked.' },
   ]
   const toolsActive = TOOL_ITEMS.some((i) => i.href === pathname)
 
