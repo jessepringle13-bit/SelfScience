@@ -9557,3 +9557,66 @@ frontend:
             with an MTHFR + folate question; clean chunked delivery
             and the report structure was preserved.
 
+
+# ─────────────────────────────────────────────────────────────
+# COACH-SAFETY: LLM-based post-pass on top of heuristic rules
+# ─────────────────────────────────────────────────────────────
+backend:
+  - task: "AI-powered Coach reply safety post-pass"
+    implemented: true
+    working: true
+    file: "lib/ai.js, app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * MODELS.coachSafety cascade added (Gemma-4-26b free \u2192
+            Nemotron-nano-9b free \u2192 paid Llama-3.1-8b fallback \u2014
+            all small/fast so the safety pass doesn't add much latency).
+          * New checkCoachReplySafety({userMessage, assistantReply,
+            allowedPmids}) exported from /lib/ai.js. Returns
+            { flagged, severity, violations[], provider, model }.
+            Fails open (returns flagged=false) on any cascade error so
+            broken safety infrastructure never suppresses a valid
+            reply.
+          * /api/coach (non-streaming) awaits the safety check inline
+            and returns it in the JSON response under `safety`.
+          * /api/coach/stream now emits event: safety AFTER event: done
+            \u2014 the stream stays fast (safety runs async while the user
+            reads the reply), and the client attaches the verdict to
+            the message once available.
+          * Curl-tested with a prescriptive prompt ("what dose of
+            methylfolate should I take") \u2014 the Coach correctly
+            declined + the safety pass returned flagged: false because
+            the reply followed the rules.
+
+frontend:
+  - task: "Coach safety warning banner on flagged replies"
+    implemented: true
+    working: true
+    file: "app/coach/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Coach page listens for event: safety on the SSE stream and
+          attaches the verdict onto the assistant message. When
+          safety.flagged is true, an inline warning banner renders at
+          the top of the assistant bubble with:
+            \u2022 A red border/background for severity='high', amber for
+              medium/low
+            \u2022 The severity headline ("Safety review flagged this
+              reply" vs. "Safety review note")
+            \u2022 Up to 3 specific violation notes from the safety
+              model (if provided)
+            \u2022 Standard disclaimer footer
+          Because the safety pass runs AFTER the stream is displayed,
+          the reply appears instantly and the audit result appears
+          above it with a ~1-2s delay \u2014 zero perceived UI lag.
+

@@ -16,6 +16,7 @@ import {
   chatCoach,
   planResearch,
   synthesizeResearch,
+  checkCoachReplySafety,
   extractJson,
   MODELS,
 } from '@/lib/ai'
@@ -888,12 +889,21 @@ async function handleCoachChat(request) {
 
   try {
     const out = await chatCoach(messages)
+    // Fire the safety cascade in parallel-ish (we still await so the
+    // response has the flag before we return, but the check itself is
+    // a single cheap LLM call ~1-2s).
+    const safety = await checkCoachReplySafety({
+      userMessage: message,
+      assistantReply: out.text,
+      allowedPmids: [], // Coach doesn't emit PMIDs in v1; block any invented.
+    })
     return NextResponse.json({
       reply: out.text,
       provider: out.provider,
       model: out.model,
       detectedGenes: grounding.detectedGenes,
       citations: grounding.citations,
+      safety,
       rateLimit: { remaining: rl.remaining, resetAt: rl.resetAt },
     }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (err) {
@@ -943,12 +953,14 @@ async function handleCoachChatStream(request) {
   ]
 
   const encoder = new TextEncoder()
+  const userMessageForSafety = message
 
   // We build a ReadableStream that iterates through the coach cascade
   // and pipes SSE lines from the first model that begins producing
   // tokens. First chunk is a `meta` event with detectedGenes/citations
   // so the UI can render chips immediately; subsequent events are
-  // `delta` (token chunks) and finally `done`.
+  // `delta` (token chunks), then `done`, and finally an async
+  // `safety` event once the LLM safety pass finishes.
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event, data) => {
@@ -970,6 +982,9 @@ async function handleCoachChatStream(request) {
       let providerUsed = null
       let modelUsed = null
       let totalOut = 0
+      // Full reconstructed reply text \u2014 used ONLY for the async
+      // safety pass we run after `done`. Not sent back to the client.
+      let streamedReply = ''
 
       for (const step of cascade) {
         // Only OpenRouter supports SSE in our current setup. For
@@ -1031,6 +1046,7 @@ async function handleCoachChatStream(request) {
                   modelHadContent = true
                   anyTokenEmitted = true
                   totalOut += delta.length
+                  streamedReply += delta
                   send('delta', { text: delta })
                 }
               } catch { /* ignore malformed chunk */ }
@@ -1049,7 +1065,29 @@ async function handleCoachChatStream(request) {
         send('error', { message: 'The Coach is temporarily unavailable. Please try again.' })
       }
 
+      // Buffer the full streamed reply so we can safety-check it.
+      // We captured deltas above; reconstruct here from the running
+      // totals we tracked (totalOut is char count only). Simpler:
+      // just re-collect by re-emitting nothing and using the deltas
+      // we already buffered locally. Since we didn't keep the full
+      // text, do a lightweight second read \u2014 but the deltas already
+      // went to the client. Track full text via a closure variable
+      // set from the loop above.
       send('done', { provider: providerUsed, model: modelUsed, outLen: totalOut })
+
+      // Run the safety pass asynchronously and emit event: safety.
+      // Failures degrade gracefully to flagged=false.
+      if (anyTokenEmitted && streamedReply.length > 0) {
+        try {
+          const safety = await checkCoachReplySafety({
+            userMessage: userMessageForSafety,
+            assistantReply: streamedReply,
+            allowedPmids: [],
+          })
+          send('safety', safety)
+        } catch { send('safety', { flagged: false, severity: 'low', violations: [] }) }
+      }
+
       controller.close()
     },
   })

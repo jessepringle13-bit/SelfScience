@@ -1,11 +1,11 @@
 {
   "startedAt": "2026-07-10T21:19:36.562Z",
-  "lastUpdated": "2026-07-27T15:18:58.784Z",
+  "lastUpdated": "2026-08-24T16:15:49.548Z",
   "totals": {
-    "calls": 2378,
-    "inTokens": 1622869,
-    "outTokens": 392498,
-    "usd": 0.06965939000000008
+    "calls": 2382,
+    "inTokens": 1623660,
+    "outTokens": 392785,
+    "usd": 0.06966702000000008
   },
   "byKey": {
     "openrouter|meta-llama/llama-3.1-70b-instruct|reliability": {
@@ -171,13 +171,13 @@
       "last": "2026-07-27T14:42:07.154Z"
     },
     "openrouter|nvidia/nemotron-3-super-120b-a12b:free|coach": {
-      "calls": 55,
-      "inTokens": 22884,
-      "outTokens": 14922,
+      "calls": 56,
+      "inTokens": 23334,
+      "outTokens": 15182,
       "usd": 0,
       "unknownPrice": true,
       "first": "2026-07-27T14:44:18.983Z",
-      "last": "2026-07-27T15:18:07.688Z"
+      "last": "2026-08-24T16:15:19.548Z"
     },
     "openrouter|google/gemma-4-31b-it:free|research-plan": {
       "calls": 17,
@@ -214,6 +214,33 @@
       "unknownPrice": true,
       "first": "2026-07-27T15:07:11.952Z",
       "last": "2026-07-27T15:15:20.606Z"
+    },
+    "openrouter|google/gemma-4-26b-a4b-it:free|coach-safety": {
+      "calls": 1,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "unknownPrice": false,
+      "first": "2026-08-24T16:15:20.098Z",
+      "last": "2026-08-24T16:15:20.098Z"
+    },
+    "openrouter|nvidia/nemotron-nano-9b-v2:free|coach-safety": {
+      "calls": 1,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "unknownPrice": false,
+      "first": "2026-08-24T16:15:20.195Z",
+      "last": "2026-08-24T16:15:20.195Z"
+    },
+    "openrouter|meta-llama/llama-3.1-8b-instruct|coach-safety": {
+      "calls": 1,
+      "inTokens": 341,
+      "outTokens": 27,
+      "usd": 0.00000763,
+      "unknownPrice": false,
+      "first": "2026-08-24T16:15:20.997Z",
+      "last": "2026-08-24T16:15:20.997Z"
     }
   },
   "byDay": {
@@ -276,57 +303,15 @@
       "inTokens": 37730,
       "outTokens": 34735,
       "usd": 0.00033902
+    },
+    "2026-08-24": {
+      "calls": 4,
+      "inTokens": 791,
+      "outTokens": 287,
+      "usd": 0.00000763
     }
   },
   "ring": [
-    {
-      "ts": "2026-07-20T03:04:07.429Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "plain-language",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1420,
-      "outTokens": 524,
-      "usd": 0.000044120000000000004,
-      "latencyMs": 48806
-    },
-    {
-      "ts": "2026-07-20T03:04:14.218Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.1-8b-instruct",
-      "task": "plain-language",
-      "status": "ok",
-      "httpStatus": 200,
-      "inTokens": 1346,
-      "outTokens": 448,
-      "usd": 0.00004036,
-      "latencyMs": 38138
-    },
-    {
-      "ts": "2026-07-20T11:58:58.531Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "reliability",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 107
-    },
-    {
-      "ts": "2026-07-20T11:58:58.531Z",
-      "provider": "openrouter",
-      "model": "meta-llama/llama-3.3-70b-instruct:free",
-      "task": "reliability",
-      "status": "fail",
-      "httpStatus": 404,
-      "inTokens": 0,
-      "outTokens": 0,
-      "usd": 0,
-      "latencyMs": 100
-    },
     {
       "ts": "2026-07-20T11:58:58.535Z",
       "provider": "openrouter",
@@ -2678,6 +2663,54 @@
       "outTokens": 25,
       "usd": 0.00000269,
       "latencyMs": 2924
+    },
+    {
+      "ts": "2026-08-24T16:15:19.548Z",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-super-120b-a12b:free",
+      "task": "coach",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 450,
+      "outTokens": 260,
+      "usd": 0,
+      "latencyMs": 6988
+    },
+    {
+      "ts": "2026-08-24T16:15:20.098Z",
+      "provider": "openrouter",
+      "model": "google/gemma-4-26b-a4b-it:free",
+      "task": "coach-safety",
+      "status": "fail",
+      "httpStatus": 429,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 552
+    },
+    {
+      "ts": "2026-08-24T16:15:20.195Z",
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-nano-9b-v2:free",
+      "task": "coach-safety",
+      "status": "fail",
+      "httpStatus": 404,
+      "inTokens": 0,
+      "outTokens": 0,
+      "usd": 0,
+      "latencyMs": 98
+    },
+    {
+      "ts": "2026-08-24T16:15:20.997Z",
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "task": "coach-safety",
+      "status": "ok",
+      "httpStatus": 200,
+      "inTokens": 341,
+      "outTokens": 27,
+      "usd": 0.00000763,
+      "latencyMs": 803
     }
   ]
 }

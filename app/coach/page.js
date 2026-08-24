@@ -145,11 +145,11 @@ export default function CoachPage() {
           sessionId: ensureSessionId(),
         }),
       })
-      // 429 comes back as JSON (not SSE) \u2014 handle it.
+      // 429 comes back as JSON (not SSE) — handle it.
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}))
         setRateReset(data.resetAt || null)
-        setError(data.message || 'You\u2019ve reached the free Coach limit for now.')
+        setError(data.message || 'You’ve reached the free Coach limit for now.')
         // Roll back the placeholder assistant message.
         setHistory(nextHistory)
         saveHistory(nextHistory)
@@ -206,6 +206,18 @@ export default function CoachPage() {
           } else if (eventName === 'done') {
             acc.provider = payload.provider || null
             acc.model    = payload.model || null
+          } else if (eventName === 'safety') {
+            // Attach the safety verdict onto the assistant message.
+            // Runs asynchronously AFTER the stream is displayed, so
+            // the warning banner appears with a small delay — that's
+            // fine: users see the reply immediately, then the audit
+            // result appears above it once ready.
+            setHistory((prev) => {
+              const copy = prev.slice()
+              if (copy[assistantIdx]) copy[assistantIdx] = { ...copy[assistantIdx], safety: payload }
+              saveHistory(copy)
+              return copy
+            })
           }
         }
       }
@@ -220,7 +232,7 @@ export default function CoachPage() {
         return copy
       })
     } catch (streamErr) {
-      // Streaming failed before any token \u2014 fall back to non-streaming.
+      // Streaming failed before any token — fall back to non-streaming.
       try {
         const res = await fetch('/api/coach', {
           method: 'POST',
@@ -236,7 +248,7 @@ export default function CoachPage() {
         if (!res.ok) {
           if (res.status === 429) {
             setRateReset(data.resetAt || null)
-            setError(data.message || 'You\u2019ve reached the free Coach limit for now.')
+            setError(data.message || 'You’ve reached the free Coach limit for now.')
           } else {
             setError(data.message || bailoutMsg || 'The Coach is temporarily unavailable. Please try again.')
           }
@@ -244,7 +256,7 @@ export default function CoachPage() {
           saveHistory(nextHistory)
           return
         }
-        const finalReply = { role: 'assistant', content: data.reply || '', detectedGenes: data.detectedGenes || [], citations: data.citations || [], provider: data.provider, model: data.model, at: Date.now(), streaming: false }
+        const finalReply = { role: 'assistant', content: data.reply || '', detectedGenes: data.detectedGenes || [], citations: data.citations || [], safety: data.safety || null, provider: data.provider, model: data.model, at: Date.now(), streaming: false }
         const finalHistory = [...nextHistory, finalReply]
         setHistory(finalHistory)
         saveHistory(finalHistory)
@@ -336,6 +348,28 @@ export default function CoachPage() {
                   ? 'bg-ss-orange text-white'
                   : 'bg-ss-canvas/40 text-ss-text ring-1 ring-ss-border-warm/60'
               }`}>
+                {m.role === 'assistant' && m.safety?.flagged && (
+                  <div className={`-mx-1 mb-2 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-[12px] ${
+                    m.safety.severity === 'high'
+                      ? 'border-red-500/40 bg-red-500/[0.08] text-red-400'
+                      : 'border-amber-500/40 bg-amber-500/[0.08] text-amber-400'
+                  }`}>
+                    <AlertCircle size={13} className="mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold uppercase tracking-wide">
+                        {m.safety.severity === 'high' ? 'Safety review flagged this reply' : 'Safety review note'}
+                      </div>
+                      {Array.isArray(m.safety.violations) && m.safety.violations.length > 0 && (
+                        <ul className="mt-1 list-inside list-disc space-y-0.5 text-[11.5px] opacity-90">
+                          {m.safety.violations.slice(0, 3).map((v, vi) => <li key={vi}>{v}</li>)}
+                        </ul>
+                      )}
+                      <div className="mt-1 text-[11px] opacity-80">
+                        This is a research assistant, not a clinician. Educational only — talk to your practitioner before acting on anything above.
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="whitespace-pre-wrap">
                   {m.content}
                   {m.role === 'assistant' && m.streaming && (
