@@ -9620,3 +9620,56 @@ frontend:
           the reply appears instantly and the audit result appears
           above it with a ~1-2s delay \u2014 zero perceived UI lag.
 
+
+
+# ─────────────────────────────────────────────────────────────
+# PHASE 3 UX: Explorer Dashboard Slimming (accordion launchpad)
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Phase 3 UX — Explorer Dashboard slimming into 1 hero + 3 accordions"
+    implemented: true
+    working: true
+    file: "components/Dashboard.jsx, components/DashboardAccordion.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * New helper: components/DashboardAccordion.jsx — lightweight
+            <details>/<summary> based collapsible section with dark card
+            styling, teal heading, orange badge slot, chevron rotates on
+            open. defaultOpen prop controls initial state.
+          * Dashboard.jsx now reads ss_mode from localStorage after
+            mount, listening to both storage and
+            'selfscience:mode-changed' events. When ss_mode ==='explorer'
+            the dashboard renders as a slimmed launchpad:
+              - HERO ROW: Welcome header + action buttons, AlertPreview,
+                RealGenomeBanner, CommunityOptInBanner, NextGenePrompt,
+                Tier2WelcomeBanner, ContinueJourneyPill. FeaturesProgress
+                Bar and PillarChipBar removed from the hero (folded into
+                accordions below).
+              - SECTION 1 "Your Findings" (defaultOpen): PillarChipBar +
+                PillarIntroCard + Top Findings + Strengths + Pillar Grid
+                + WeeklyDigest + ResearchMatched
+              - SECTION 2 "Your Protocol & Nutrition" (collapsed):
+                LearningPath (folded in) + Protocol Preview +
+                StackQualityWidget + Deep-Dive Tools
+              - SECTION 3 "Progress & Activity" (collapsed):
+                FeaturesProgressBar + JournalWidget + TrackerWidget +
+                GoalsWidget
+          * Guided-mode users (ss_mode !== 'explorer', including
+            unresolved/null state) keep the original flat layout
+            verbatim so the guided experience is untouched.
+          * Verified via Playwright + DOM inspection:
+              - details count: 3
+              - accordion h2 titles: ['Your Findings',
+                'Your Protocol & Nutrition', 'Progress & Activity']
+              - ss_mode = 'explorer', hero shows NextGenePrompt +
+                Tier2WelcomeBanner side-by-side above the fold.
+          * No changes to Tier-1 First Look, /my-path, coach, research,
+            or any child component. Nothing quietly deleted — every
+            widget from the old flat dashboard is still reachable
+            inside one of the 3 accordions or in the hero row.
+

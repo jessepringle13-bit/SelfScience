@@ -47,6 +47,7 @@ import UnknownsCard from '@/components/UnknownsCard'
 import NextGenePrompt from '@/components/dashboard/NextGenePrompt'
 import ContinueJourneyPill from '@/components/ContinueJourneyPill'
 import Tier2WelcomeBanner from '@/components/Tier2WelcomeBanner'
+import DashboardAccordion from '@/components/DashboardAccordion'
 
 // localStorage keys \u2014 must stay ss_-namespaced per global rules.
 const LS_DASH_PILLAR = 'ss_dashboard_pillar_filter'
@@ -55,8 +56,36 @@ const LS_LAST_VISIT = 'ss_last_visit'
 export default function Dashboard() {
   const [report, setReport] = useState(null)
   const [orientationDone, setOrientationDone] = useState(false)
+  const [ssMode, setSsMode] = useState(null) // 'guided' | 'explorer' | null (loading)
   const { pillar: activePillar, setPillar, clear: clearPillar, isFiltering } = usePillarFilter()
   const topFindingsRef = useRef(null)
+
+  // Phase 3 UX: read ss_mode from localStorage after mount so we can
+  // render the slimmed accordion layout for Explorer users while
+  // leaving Guided-mode users on the original flat dashboard (they
+  // are typically routed to /my-path anyway). Falls back to the
+  // original layout if the key is unset or the storage read throws.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = window.localStorage.getItem('ss_mode')
+      setSsMode(stored === 'explorer' ? 'explorer' : 'guided')
+    } catch {
+      setSsMode('guided')
+    }
+    const onModeChange = () => {
+      try {
+        const v = window.localStorage.getItem('ss_mode')
+        setSsMode(v === 'explorer' ? 'explorer' : 'guided')
+      } catch {}
+    }
+    window.addEventListener('storage', onModeChange)
+    window.addEventListener('selfscience:mode-changed', onModeChange)
+    return () => {
+      window.removeEventListener('storage', onModeChange)
+      window.removeEventListener('selfscience:mode-changed', onModeChange)
+    }
+  }, [])
 
   // Consult the same LS key the orientation component uses so we don't
   // even mount the interstitial after it's been dismissed.
@@ -337,222 +366,407 @@ export default function Dashboard() {
           <ContinueJourneyPill variant="banner" />
         </div>
 
-        {/* Phase D · Part 4 — journey progress bar. */}
-        <FeaturesProgressBar />
+        {/* Phase D · Part 4 — journey progress bar. In Explorer mode
+            (Phase 3 UX) this moves into the "Progress & Activity"
+            accordion below to declutter the launchpad. */}
+        {ssMode !== 'explorer' && <FeaturesProgressBar />}
 
         {/* Horizontal, scrollable pillar chip bar. Replaces the older
             dropdown filter per Section 2 spec. Persisted to both the URL
-            (?pillar=) and localStorage (ss_dashboard_pillar_filter). */}
-        <div className="mt-6">
-          <PillarChipBar value={activePillar} onChange={setPillar} />
-        </div>
+            (?pillar=) and localStorage (ss_dashboard_pillar_filter).
+            In Explorer mode the chip bar folds into the "Your Findings"
+            accordion so the hero stays a scannable launchpad. */}
+        {ssMode !== 'explorer' && (
+          <div className="mt-6">
+            <PillarChipBar value={activePillar} onChange={setPillar} />
+          </div>
+        )}
       </div>
 
-      <div ref={topFindingsRef} className="container mt-10 space-y-14">
-        {/* Learning Path (Phase J) — three-step guided journey per
-            pillar. Renders ONLY when a specific pillar is active;
-            hidden for "All Pillars". Placed above PillarIntroCard so
-            users see the guided path first, then the pillar overview. */}
-        {activePillar && (
-          <LearningPath
-            pillarName={activePillar}
-            genomeReport={report}
-            findingsAnchorId="pillar-findings"
-          />
-        )}
+      {/* Phase 3 UX — Explorer users get a slimmed "1 hero + 3 accordion"
+          launchpad. Guided users keep the original flat layout (they're
+          usually routed to /my-path anyway; this is a safe fallback).
+          Rendering is deferred until ssMode is resolved to avoid SSR/CSR
+          mismatch flicker. */}
+      {ssMode === 'explorer' ? (
+        <div ref={topFindingsRef} className="container mt-10 space-y-4">
+          {/* --- SECTION 1: Your Findings (open by default) --- */}
+          <DashboardAccordion
+            title="Your Findings"
+            subtitle="Top findings, strengths, and pillars for your genome."
+            defaultOpen
+            id="dash-findings"
+          >
+            {/* Pillar chip strip — folded in from the hero */}
+            <PillarChipBar value={activePillar} onChange={setPillar} />
 
-        {/* Pillar intro card (Phase I) — additive. Renders as the
-            topmost item in the filtered content, once per pillar, the
-            first time a user activates that pillar. Never appears for
-            "All Pillars". Handles its own dismissal + animation. */}
-        <PillarIntroCard pillarName={activePillar} genomeReport={report} />
+            {/* Pillar intro card (only for active pillar) */}
+            <PillarIntroCard pillarName={activePillar} genomeReport={report} />
 
-        {/* Anchor target for Learning Path's Step 2 "See my findings"
-            scroll — kept invisible + zero-height so it doesn't shift
-            any existing layout. */}
-        <div id="pillar-findings" aria-hidden="true" className="scroll-mt-24" />
+            {/* Anchor target for Learning Path's "See my findings" scroll */}
+            <div id="pillar-findings" aria-hidden="true" className="scroll-mt-24" />
 
-        {/* 1. TOP FINDINGS (Be Aware) */}
-        <div data-tour-target="top-findings">
-          <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">
-            {areas.length === 0 ? (
-              <EmptyRow copy="No awareness findings surfaced — every recognized variant is in favorable or neutral range." />
-            ) : (
-              <CardRow items={areas} tone="aware" />
-            )}
-            <SeeAllLink
-              href="/genome/findings"
-              label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
-            />
-            {/* Section-level Unknowns card (Gap 3, non-compact).
-                One per section — representative finding = areas[0]. */}
-            {areas[0] && (
-              <UnknownsCard
-                findingId={areas[0].rsid || areas[0].id}
-                variant={{ rsid: areas[0].rsid, geneSymbol: areas[0].gene || areas[0].geneSymbol }}
+            {/* TOP FINDINGS (Be Aware) */}
+            <div data-tour-target="top-findings">
+              <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">
+                {areas.length === 0 ? (
+                  <EmptyRow copy="No awareness findings surfaced — every recognized variant is in favorable or neutral range." />
+                ) : (
+                  <CardRow items={areas} tone="aware" />
+                )}
+                <SeeAllLink
+                  href="/genome/findings"
+                  label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
+                />
+                {areas[0] && (
+                  <UnknownsCard
+                    findingId={areas[0].rsid || areas[0].id}
+                    variant={{ rsid: areas[0].rsid, geneSymbol: areas[0].gene || areas[0].geneSymbol }}
+                  />
+                )}
+              </DashSection>
+            </div>
+
+            {/* STRENGTHS */}
+            <div data-tour-target="strengths">
+              <DashSection title="Your Strengths" subtitle="Your top favorable variants." toneClass="text-ss-green">
+                {strengths.length === 0 ? (
+                  <EmptyRow copy="No positive findings surfaced yet — explore your full report for the complete picture." />
+                ) : (
+                  <CardRow items={strengths} tone="strength" />
+                )}
+                <SeeAllLink
+                  href="/genome/strengths"
+                  label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
+                />
+              </DashSection>
+            </div>
+
+            {/* PILLAR GRID */}
+            <div data-tour-target="pillar-grid">
+              <DashSection title="Explore Your Pillars" subtitle="Tap any pillar to search the research with your matched genes." toneClass="text-ss-teal">
+                <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" /> Benefit
+                  </span>
+                  <span className="text-ss-border-warm">·</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full bg-ss-amber" aria-hidden="true" /> Aware
+                  </span>
+                  <span className="text-ss-border-warm">·</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-2 w-2 rounded-full bg-ss-border-warm" aria-hidden="true" /> Neutral
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {PILLARS.map((p) => (
+                    <PillarCard
+                      key={p.key}
+                      pillar={p}
+                      summary={pillarSummary[p.name]}
+                      genes={pillarGenes[p.name] || []}
+                    />
+                  ))}
+                </div>
+              </DashSection>
+            </div>
+
+            {/* WEEKLY DIGEST */}
+            <div data-tour-target="weekly-digest">
+              <WeeklyDigest report={report} />
+            </div>
+
+            {/* RESEARCH MATCHED TO YOU */}
+            <ResearchMatched genes={topGenes} prevVisitISO={prevVisitISO} />
+          </DashboardAccordion>
+
+          {/* --- SECTION 2: Your Protocol & Nutrition (collapsed) --- */}
+          <DashboardAccordion
+            title="Your Protocol & Nutrition"
+            subtitle="Personalized recommendations, stack quality, and your study path."
+            id="dash-protocol"
+          >
+            {/* LEARNING PATH — folded in per Phase 3 spec. Only renders
+                when a pillar is active. */}
+            {activePillar && (
+              <LearningPath
+                pillarName={activePillar}
+                genomeReport={report}
+                findingsAnchorId="pillar-findings"
               />
             )}
-          </DashSection>
-        </div>
 
-        {/* 2. STRENGTHS */}
-        <div data-tour-target="strengths">
-          <DashSection title="Your Strengths" subtitle="Your top favorable variants." toneClass="text-ss-green">
-            {strengths.length === 0 ? (
-              <EmptyRow copy="No positive findings surfaced yet — explore your full report for the complete picture." />
-            ) : (
-              <CardRow items={strengths} tone="strength" />
-            )}
-            <SeeAllLink
-              href="/genome/strengths"
-              label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
-            />
-          </DashSection>
-        </div>
+            {/* PROTOCOL PREVIEW */}
+            <DashSection title="Your Protocol Preview" subtitle="First 3 variant-driven recommendations. Full protocol is in the Genome tab." toneClass="text-ss-teal">
+              {protocolPreview.length === 0 ? (
+                <EmptyRow copy="No protocol matches yet — more findings unlock more recommendations." />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-3">
+                  {protocolPreview.map((entry) => (
+                    <ProtocolPreviewCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              )}
+              <SeeAllLink href="/genome/protocol" label="See your full protocol" />
+            </DashSection>
 
-        {/* 2.5 THIS WEEK FOR YOUR GENOME — additive weekly digest with
-             three cards (New Research · Did You Know · Clinical Trial).
-             Renders below Top Findings + Strengths and above the
-             pillar grid, per product spec. Fully client-side; no
-             existing dashboard content is changed. */}
-        <div data-tour-target="weekly-digest">
-          <WeeklyDigest report={report} />
-        </div>
+            {/* STACK QUALITY */}
+            <StackQualityWidget />
 
-        {/* Personal Health Journal — recent entries + quick add.
-             Placed below Weekly Digest per product spec. Additive: does
-             not affect any other dashboard section. */}
-        <div data-tour-target="journal-widget">
-          <JournalWidget />
-        </div>
-
-        {/* Habit & Lifestyle Tracker widget — appears directly below
-             the Journal widget per product spec. Additive; hidden
-             gracefully by its own empty state. */}
-        <div data-tour-target="tracker-widget">
-          <TrackerWidget />
-        </div>
-
-        {/* Goals widget — sits directly below the Habit Tracker widget
-             per product spec. Silent when empty; shows top 3 active
-             goals with progress bars + on-track count. */}
-        <div data-tour-target="goals-widget">
-          <GoalsWidget />
-        </div>
-
-        {/* 3. YOUR PILLARS (merged: was "Pillar Score Overview" + "Explore Your Pillars")
-             Every card shows icon + name + description + colored progress bar
-             + Benefit/Aware/Neutral counts + your matched gene chips, and
-             navigates to /search?pillar=X&genes=A,B,C so the search page
-             immediately fans out on arrival. In-page pillar filtering is
-             handled exclusively by the horizontal chip bar above. */}
-        <div data-tour-target="pillar-grid">
-          <DashSection title="Explore Your Pillars" subtitle="Tap any pillar to search the research with your matched genes." toneClass="text-ss-teal">
-            {/* Legend */}
-            <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" /> Benefit
-              </span>
-              <span className="text-ss-border-warm">·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full bg-ss-amber" aria-hidden="true" /> Aware
-              </span>
-              <span className="text-ss-border-warm">·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block h-2 w-2 rounded-full bg-ss-border-warm" aria-hidden="true" /> Neutral
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {PILLARS.map((p) => (
-                <PillarCard
-                  key={p.key}
-                  pillar={p}
-                  summary={pillarSummary[p.name]}
-                  genes={pillarGenes[p.name] || []}
+            {/* DEEP-DIVE TOOLS */}
+            <DashSection
+              title="Deep-Dive Tools"
+              subtitle="Explore what your genome means in specific contexts — labs, training, medications, and global populations."
+              toneClass="text-ss-teal"
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <ToolCard
+                  href="/biomarkers"
+                  Icon={TestTube2}
+                  title="Lab Biomarkers"
+                  blurb="Log blood work and see how it correlates with your genome findings."
                 />
-              ))}
+                <ToolCard
+                  href="/training"
+                  Icon={Activity}
+                  title="Training Protocol"
+                  blurb="Personalized zone-based training + sport affinity based on your variants."
+                />
+                <ToolCard
+                  href="/drug-check"
+                  Icon={Pill}
+                  title="Drug Check"
+                  blurb="Look up a medication and see estimated pharmacogenomic guidance."
+                />
+                <ToolCard
+                  href="/population-compare"
+                  Icon={Globe2}
+                  title="Population Compare"
+                  blurb="See how rare your genotype is and where in the world it&rsquo;s most common."
+                />
+                <ToolCard
+                  href="/ancestry"
+                  Icon={Compass}
+                  title="Ancestry Report"
+                  blurb="A rough educational ancestry sketch from your geographically stratified variants."
+                />
+                <ToolCard
+                  href="/practitioner-report"
+                  Icon={FileText}
+                  title="Practitioner Report"
+                  blurb="Clinician-facing single-page summary, ready to print or save as PDF."
+                />
+              </div>
+            </DashSection>
+          </DashboardAccordion>
+
+          {/* --- SECTION 3: Progress & Activity (collapsed) --- */}
+          <DashboardAccordion
+            title="Progress & Activity"
+            subtitle="Your journey progress, journal, habits, and goals."
+            id="dash-progress"
+          >
+            <FeaturesProgressBar />
+            <div data-tour-target="journal-widget">
+              <JournalWidget />
+            </div>
+            <div data-tour-target="tracker-widget">
+              <TrackerWidget />
+            </div>
+            <div data-tour-target="goals-widget">
+              <GoalsWidget />
+            </div>
+          </DashboardAccordion>
+
+          {/* Educational disclaimer footer */}
+          <div className="mt-6 rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
+            <div className="flex items-start gap-3">
+              <ShieldAlert size={18} className="mt-0.5 flex-shrink-0 text-ss-amber" />
+              <p className="text-sm text-ss-text">
+                <span className="font-semibold">Educational only.</span> This dashboard summarizes research associations, not medical predictions. Talk to a qualified clinician before making health decisions from this information.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div ref={topFindingsRef} className="container mt-10 space-y-14">
+          {/* --- ORIGINAL FLAT LAYOUT (guided mode fallback) --- */}
+          {activePillar && (
+            <LearningPath
+              pillarName={activePillar}
+              genomeReport={report}
+              findingsAnchorId="pillar-findings"
+            />
+          )}
+
+          <PillarIntroCard pillarName={activePillar} genomeReport={report} />
+
+          <div id="pillar-findings" aria-hidden="true" className="scroll-mt-24" />
+
+          {/* 1. TOP FINDINGS (Be Aware) */}
+          <div data-tour-target="top-findings">
+            <DashSection title="Your Top Findings" subtitle="The most notable Be Aware findings from your genome." toneClass="text-ss-amber">
+              {areas.length === 0 ? (
+                <EmptyRow copy="No awareness findings surfaced — every recognized variant is in favorable or neutral range." />
+              ) : (
+                <CardRow items={areas} tone="aware" />
+              )}
+              <SeeAllLink
+                href="/genome/findings"
+                label={`See all ${allAreas.length} awareness finding${allAreas.length === 1 ? '' : 's'}`}
+              />
+              {areas[0] && (
+                <UnknownsCard
+                  findingId={areas[0].rsid || areas[0].id}
+                  variant={{ rsid: areas[0].rsid, geneSymbol: areas[0].gene || areas[0].geneSymbol }}
+                />
+              )}
+            </DashSection>
+          </div>
+
+          {/* 2. STRENGTHS */}
+          <div data-tour-target="strengths">
+            <DashSection title="Your Strengths" subtitle="Your top favorable variants." toneClass="text-ss-green">
+              {strengths.length === 0 ? (
+                <EmptyRow copy="No positive findings surfaced yet — explore your full report for the complete picture." />
+              ) : (
+                <CardRow items={strengths} tone="strength" />
+              )}
+              <SeeAllLink
+                href="/genome/strengths"
+                label={`See all ${allStrengths.length} strength${allStrengths.length === 1 ? '' : 's'}`}
+              />
+            </DashSection>
+          </div>
+
+          {/* 2.5 WEEKLY DIGEST */}
+          <div data-tour-target="weekly-digest">
+            <WeeklyDigest report={report} />
+          </div>
+
+          {/* JOURNAL */}
+          <div data-tour-target="journal-widget">
+            <JournalWidget />
+          </div>
+
+          {/* TRACKER */}
+          <div data-tour-target="tracker-widget">
+            <TrackerWidget />
+          </div>
+
+          {/* GOALS */}
+          <div data-tour-target="goals-widget">
+            <GoalsWidget />
+          </div>
+
+          {/* 3. PILLAR GRID */}
+          <div data-tour-target="pillar-grid">
+            <DashSection title="Explore Your Pillars" subtitle="Tap any pillar to search the research with your matched genes." toneClass="text-ss-teal">
+              <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-ss-muted">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-ss-green" aria-hidden="true" /> Benefit
+                </span>
+                <span className="text-ss-border-warm">·</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-ss-amber" aria-hidden="true" /> Aware
+                </span>
+                <span className="text-ss-border-warm">·</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 rounded-full bg-ss-border-warm" aria-hidden="true" /> Neutral
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {PILLARS.map((p) => (
+                  <PillarCard
+                    key={p.key}
+                    pillar={p}
+                    summary={pillarSummary[p.name]}
+                    genes={pillarGenes[p.name] || []}
+                  />
+                ))}
+              </div>
+            </DashSection>
+          </div>
+
+          {/* 4. RESEARCH MATCHED */}
+          <ResearchMatched genes={topGenes} prevVisitISO={prevVisitISO} />
+
+          {/* STACK QUALITY */}
+          <div className="mt-8">
+            <StackQualityWidget />
+          </div>
+
+          {/* 5. PROTOCOL PREVIEW */}
+          <DashSection title="Your Protocol Preview" subtitle="First 3 variant-driven recommendations. Full protocol is in the Genome tab." toneClass="text-ss-teal">
+            {protocolPreview.length === 0 ? (
+              <EmptyRow copy="No protocol matches yet — more findings unlock more recommendations." />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-3">
+                {protocolPreview.map((entry) => (
+                  <ProtocolPreviewCard key={entry.id} entry={entry} />
+                ))}
+              </div>
+            )}
+            <SeeAllLink href="/genome/protocol" label="See your full protocol" />
+          </DashSection>
+
+          {/* 6. DEEP-DIVE TOOLS */}
+          <DashSection
+            title="Deep-Dive Tools"
+            subtitle="Explore what your genome means in specific contexts — labs, training, medications, and global populations."
+            toneClass="text-ss-teal"
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <ToolCard
+                href="/biomarkers"
+                Icon={TestTube2}
+                title="Lab Biomarkers"
+                blurb="Log blood work and see how it correlates with your genome findings."
+              />
+              <ToolCard
+                href="/training"
+                Icon={Activity}
+                title="Training Protocol"
+                blurb="Personalized zone-based training + sport affinity based on your variants."
+              />
+              <ToolCard
+                href="/drug-check"
+                Icon={Pill}
+                title="Drug Check"
+                blurb="Look up a medication and see estimated pharmacogenomic guidance."
+              />
+              <ToolCard
+                href="/population-compare"
+                Icon={Globe2}
+                title="Population Compare"
+                blurb="See how rare your genotype is and where in the world it&rsquo;s most common."
+              />
+              <ToolCard
+                href="/ancestry"
+                Icon={Compass}
+                title="Ancestry Report"
+                blurb="A rough educational ancestry sketch from your geographically stratified variants."
+              />
+              <ToolCard
+                href="/practitioner-report"
+                Icon={FileText}
+                title="Practitioner Report"
+                blurb="Clinician-facing single-page summary, ready to print or save as PDF."
+              />
             </div>
           </DashSection>
-        </div>
 
-        {/* 4. RESEARCH MATCHED TO YOU */}
-        <ResearchMatched genes={topGenes} prevVisitISO={prevVisitISO} />
-
-        {/* Stack Quality Widget */}
-        <div className="mt-8">
-          <StackQualityWidget />
-        </div>
-
-        {/* 5. YOUR PROTOCOL PREVIEW */}
-        <DashSection title="Your Protocol Preview" subtitle="First 3 variant-driven recommendations. Full protocol is in the Genome tab." toneClass="text-ss-teal">
-          {protocolPreview.length === 0 ? (
-            <EmptyRow copy="No protocol matches yet — more findings unlock more recommendations." />
-          ) : (
-            <div className="grid gap-4 md:grid-cols-3">
-              {protocolPreview.map((entry) => (
-                <ProtocolPreviewCard key={entry.id} entry={entry} />
-              ))}
+          {/* Educational disclaimer footer */}
+          <div className="rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
+            <div className="flex items-start gap-3">
+              <ShieldAlert size={18} className="mt-0.5 flex-shrink-0 text-ss-amber" />
+              <p className="text-sm text-ss-text">
+                <span className="font-semibold">Educational only.</span> This dashboard summarizes research associations, not medical predictions. Talk to a qualified clinician before making health decisions from this information.
+              </p>
             </div>
-          )}
-          <SeeAllLink href="/genome/protocol" label="See your full protocol" />
-        </DashSection>
-
-        {/* 6. DEEP-DIVE TOOLS */}
-        <DashSection
-          title="Deep-Dive Tools"
-          subtitle="Explore what your genome means in specific contexts — labs, training, medications, and global populations."
-          toneClass="text-ss-teal"
-        >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <ToolCard
-              href="/biomarkers"
-              Icon={TestTube2}
-              title="Lab Biomarkers"
-              blurb="Log blood work and see how it correlates with your genome findings."
-            />
-            <ToolCard
-              href="/training"
-              Icon={Activity}
-              title="Training Protocol"
-              blurb="Personalized zone-based training + sport affinity based on your variants."
-            />
-            <ToolCard
-              href="/drug-check"
-              Icon={Pill}
-              title="Drug Check"
-              blurb="Look up a medication and see estimated pharmacogenomic guidance."
-            />
-            <ToolCard
-              href="/population-compare"
-              Icon={Globe2}
-              title="Population Compare"
-              blurb="See how rare your genotype is and where in the world it&rsquo;s most common."
-            />
-            <ToolCard
-              href="/ancestry"
-              Icon={Compass}
-              title="Ancestry Report"
-              blurb="A rough educational ancestry sketch from your geographically stratified variants."
-            />
-            <ToolCard
-              href="/practitioner-report"
-              Icon={FileText}
-              title="Practitioner Report"
-              blurb="Clinician-facing single-page summary, ready to print or save as PDF."
-            />
-          </div>
-        </DashSection>
-
-        {/* Educational disclaimer footer */}
-        <div className="rounded-2xl border-l-4 border-ss-amber bg-ss-amber/10 p-4">
-          <div className="flex items-start gap-3">
-            <ShieldAlert size={18} className="mt-0.5 flex-shrink-0 text-ss-amber" />
-            <p className="text-sm text-ss-text">
-              <span className="font-semibold">Educational only.</span> This dashboard summarizes research associations, not medical predictions. Talk to a qualified clinician before making health decisions from this information.
-            </p>
           </div>
         </div>
-      </div>
+      )}
       {/* Slice 4A: first-time tooltip tour. Only renders when the
           ss_onboarding_complete flag is falsy. Safe to mount always —
           the component short-circuits internally. */}
