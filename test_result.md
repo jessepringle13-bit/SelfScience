@@ -9972,3 +9972,52 @@ frontend:
                                    users.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# WelcomeBackStrip — compact mobile scroll layout
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Compact horizontal-scroll layout on phones for WelcomeBackStrip tabs and pillar chips"
+    implemented: true
+    working: true
+    file: "components/WelcomeBackStrip.jsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * Phones now see the tab row as a single horizontal snap-x
+            scroll band instead of a 2\u00d72 grid \u2014 the whole strip
+            stays one visible above-the-fold band while remaining
+            fully browsable via swipe.
+          * Container classes:
+              flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2
+              [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+              md:grid md:grid-cols-4 md:overflow-visible md:pb-0
+            Scrollbars are visually hidden on Firefox and WebKit for
+            a clean band; keyboard tab navigation still works.
+          * QuickTab tiles get `w-56 shrink-0 snap-start` on phones
+            so each tile lands cleanly under a swipe, and revert to
+            `md:w-auto md:shrink md:snap-align-none` so the tablet+
+            4-column grid behaves exactly as before.
+          * Pillar shortcut chips get the same treatment:
+              flex items-center gap-1.5 overflow-x-auto pb-1
+              [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+              md:flex-wrap md:justify-center md:overflow-visible md:pb-0
+            Chips are marked shrink-0 so they can't collapse under the
+            scroll container.
+          * Verified via Playwright:
+              MOBILE (375 w):
+                tabs \u2192 scrollWidth 932 / clientWidth 311, scrollable,
+                       all 4 tabs on the same row, first tile 224 px.
+                chips \u2192 scrollWidth 1165 / clientWidth 311, scrollable.
+                Scroll-left 300 px reveals the next tile smoothly.
+              DESKTOP (1440 w):
+                tabs \u2192 display: grid, not scrollable, 4 tabs same row,
+                       chips wrap centred as before.
+          * Zero regression on desktop and no behavioural change for
+            the personalised greeting, progress ring, or dismissal.
+
+

@@ -159,9 +159,13 @@ export default function WelcomeBackStrip() {
           </p>
         </div>
 
-        {/* 4-tab grid. Primary tab (orange) adapts to whether the user
-            has a saved journey (guided/tier state) or not. */}
-        <div className="mx-auto mt-6 grid max-w-4xl grid-cols-2 gap-3 md:grid-cols-4">
+        {/* 4-tab grid on tablet+; on phones we swap to a horizontally
+            scrollable single-row band so the whole strip stays one
+            visible band above the fold. Snap points make each tile
+            settle cleanly under a swipe. */}
+        <div
+          className="mx-auto mt-6 flex max-w-4xl snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-4 md:overflow-visible md:pb-0"
+        >
           {hasJourney ? (
             <QuickTab
               href="/my-path"
@@ -215,18 +219,18 @@ export default function WelcomeBackStrip() {
         </div>
 
         {/* Pillar shortcuts — second row of chips lets returning users
-            jump straight into a topic they already care about. Uses
-            /search?pillar=X because Search is the one route that
-            already fans out with per-pillar filtering. */}
-        <div className="mx-auto mt-5 flex max-w-4xl flex-wrap items-center justify-center gap-1.5">
-          <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-white/50">
+            jump straight into a topic they already care about. Same
+            treatment as the tab row: horizontally scrollable on
+            phones, natural wrap centered on tablet+. */}
+        <div className="mx-auto mt-5 flex max-w-4xl items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:justify-center md:overflow-visible md:pb-0">
+          <span className="shrink-0 text-[10.5px] font-extrabold uppercase tracking-widest text-white/50">
             Or by topic:
           </span>
           {PILLARS.map((p) => (
             <Link
               key={p.key}
               href={`/search?pillar=${encodeURIComponent(p.name)}`}
-              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/85 transition hover:border-ss-orange/40 hover:bg-ss-orange/10 hover:text-white"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/85 transition hover:border-ss-orange/40 hover:bg-ss-orange/10 hover:text-white"
             >
               <p.Icon size={11} strokeWidth={1.75} />
               <span>{p.short || p.name}</span>
@@ -252,8 +256,11 @@ function progressCopy(progress) {
 }
 
 function QuickTab({ href, Icon, label, copy, emphasize, progress }) {
+  // On phones the tab lives inside a horizontal scroll row and needs
+  // a fixed width + snap-start so swipes settle cleanly. On tablet+
+  // it drops back into the 4-column grid and stretches naturally.
   const base =
-    'group flex h-full flex-col items-start justify-between gap-2 rounded-2xl p-4 text-left transition hover:-translate-y-0.5'
+    'group flex h-full w-56 shrink-0 snap-start flex-col items-start justify-between gap-2 rounded-2xl p-4 text-left transition hover:-translate-y-0.5 md:w-auto md:shrink md:snap-align-none'
   const scheme = emphasize
     ? 'bg-ss-orange text-white shadow-lg hover:bg-ss-orange-dark'
     : 'bg-white/5 text-white ring-1 ring-white/15 hover:bg-white/10'
