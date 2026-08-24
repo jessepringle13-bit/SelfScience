@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ChevronRight,
   BookOpen,
+  Sparkles,
 } from 'lucide-react'
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import StartHereBanner from '@/components/StartHereBanner'
@@ -478,6 +479,17 @@ function DiscoverHome() {
             className="mt-2 text-xs text-white/70 underline decoration-white/30 underline-offset-4 hover:text-white"
           >
             Don&apos;t have a file yet? See which test to get →
+          </a>
+
+          {/* Orientation pill — low-emphasis link to /how-it-works for
+              first-time visitors who need to understand what this site
+              is and who it's for BEFORE they upload anything. Kept
+              smaller than the primary CTA so it doesn't compete. */}
+          <a
+            href="/how-it-works"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur transition hover:border-white/50 hover:bg-white/10"
+          >
+            <Sparkles size={12} className="text-ss-orange" /> New here? Take a 2-minute tour →
           </a>
 
           {/* Secondary — small search link for returning visitors. Visually

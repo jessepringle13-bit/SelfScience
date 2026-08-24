@@ -9673,3 +9673,65 @@ frontend:
             widget from the old flat dashboard is still reachable
             inside one of the 3 accordions or in the hero row.
 
+
+# ─────────────────────────────────────────────────────────────
+# ORIENTATION / TOUR page — /how-it-works
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "New orientation page at /how-it-works with hero, outcomes grid, goal→tool flows, converging-lanes diagram, tool specs, fit callouts, and final CTA doors"
+    implemented: true
+    working: true
+    file: "app/how-it-works/page.js, app/how-it-works/mechanics/page.js, app/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * Built brand-new orientation tour at /how-it-works aimed at
+            curious/overwhelmed visitors (parents, 23andMe holders,
+            generic-advice-fatigued adults). Second-person copy, dark
+            cards, orange CTAs, white headings, teal accents — no new
+            features invented.
+          * Sections (7 H2 blocks, ~7500px):
+              1. Hero — "You're here because something about your body
+                 doesn't add up." with positioning statement and two
+                 CTAs (guided path + skip-to-tools).
+              2. What you can do here — 6-tile outcome grid (Genome,
+                 Biomarkers, Search, Nutrition, Quiz, Coach).
+              3. Goal → tool flows — 3 numbered journeys with an
+                 "This is for you if" gate, per-step "Why this matters"
+                 line, and an optional deeper tool at the end.
+              4. How it fits together — 3 entry lanes (A, B, C)
+                 converging on a 4-step loop (Findings → Research →
+                 Path → Tools) rendered entirely in typography.
+              5. Tools, explained — 6 spec cards with Inputs / Outputs
+                 / Best for / Time rows.
+              6. Who this is for / not for — CheckCircle / XCircle
+                 columns + amber "educational only" callout.
+              7. Final CTA — 3 doors (quiz / genome-upload emphasized /
+                 search) + privacy footer.
+          * Preserved old "How SelfScience Works" mechanics content at
+            /how-it-works/mechanics — the new orientation page links
+            to it in the footer for users who want technical depth.
+          * Nav wiring:
+              - About dropdown already contained
+                { href: '/how-it-works', label: 'How It Works',
+                  blurb: 'A tour under the hood.' } — no site-nav
+                changes needed.
+              - Homepage hero (app/page.js) gained a small "New here?
+                Take a 2-minute tour →" pill under the "Don't have a
+                file yet?" link. Deliberately smaller than the primary
+                DNA-upload CTA so it doesn't compete for conversion.
+          * Verified via Playwright:
+              - Page compiles clean, no hydration errors.
+              - document.querySelector('h1').innerText renders as
+                "You're here because something about your body
+                 doesn't add up." exactly.
+              - 7 H2 sections present.
+              - Total scrollHeight 7554px, no layout errors.
+          * User asked to STOP after code + copy so they can iterate on
+            wording. Not requesting frontend test agent this round.
+
+
