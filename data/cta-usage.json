@@ -1,0 +1,44 @@
+{
+  "startedAt": "2026-08-24T16:01:49.190Z",
+  "lastUpdated": "2026-08-24T16:02:19.276Z",
+  "byKey": {
+    "homepage-hero|quiz_secondary|a|impression": {
+      "count": 10,
+      "first": "2026-08-24T16:01:49.274Z",
+      "last": "2026-08-24T16:01:50.239Z"
+    },
+    "homepage-hero|quiz_secondary|a|click": {
+      "count": 1,
+      "first": "2026-08-24T16:01:49.312Z",
+      "last": "2026-08-24T16:01:49.312Z"
+    },
+    "homepage-hero|quiz_secondary|b|impression": {
+      "count": 10,
+      "first": "2026-08-24T16:01:49.439Z",
+      "last": "2026-08-24T16:01:50.539Z"
+    },
+    "homepage-hero|quiz_secondary|b|click": {
+      "count": 4,
+      "first": "2026-08-24T16:01:49.635Z",
+      "last": "2026-08-24T16:01:49.853Z"
+    },
+    "homepage-hero|quiz_secondary|c|impression": {
+      "count": 10,
+      "first": "2026-08-24T16:01:49.677Z",
+      "last": "2026-08-24T16:01:50.891Z"
+    },
+    "homepage-hero|quiz_secondary|c|click": {
+      "count": 1,
+      "first": "2026-08-24T16:01:49.723Z",
+      "last": "2026-08-24T16:01:49.723Z"
+    }
+  },
+  "byDay": {
+    "2026-08-24|homepage-hero|quiz_secondary|a|impression": 10,
+    "2026-08-24|homepage-hero|quiz_secondary|a|click": 1,
+    "2026-08-24|homepage-hero|quiz_secondary|b|impression": 10,
+    "2026-08-24|homepage-hero|quiz_secondary|b|click": 4,
+    "2026-08-24|homepage-hero|quiz_secondary|c|impression": 10,
+    "2026-08-24|homepage-hero|quiz_secondary|c|click": 1
+  }
+}

@@ -123,8 +123,19 @@ export default function CoachPage() {
     setHistory(nextHistory)
     saveHistory(nextHistory)
     setSending(true)
+
+    // Placeholder assistant message that gets appended token-by-token
+    // as the stream arrives. Falls back to /api/coach non-streaming if
+    // the SSE endpoint errors before emitting any tokens.
+    const assistantIdx = nextHistory.length
+    const assistant = { role: 'assistant', content: '', detectedGenes: [], citations: [], provider: null, model: null, at: Date.now(), streaming: true }
+    setHistory([...nextHistory, assistant])
+
+    let gotAnyTokens = false
+    let bailoutMsg = null
+
     try {
-      const res = await fetch('/api/coach', {
+      const res = await fetch('/api/coach/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,23 +145,115 @@ export default function CoachPage() {
           sessionId: ensureSessionId(),
         }),
       })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        if (res.status === 429) {
-          setRateReset(data.resetAt || null)
-          setError(data.message || 'You’ve reached the free Coach limit for now.')
-        } else {
-          setError(data.message || 'The Coach is temporarily unavailable. Please try again.')
-        }
+      // 429 comes back as JSON (not SSE) \u2014 handle it.
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({}))
+        setRateReset(data.resetAt || null)
+        setError(data.message || 'You\u2019ve reached the free Coach limit for now.')
+        // Roll back the placeholder assistant message.
+        setHistory(nextHistory)
+        saveHistory(nextHistory)
         return
       }
-      const reply = { role: 'assistant', content: data.reply || '', detectedGenes: data.detectedGenes || [], citations: data.citations || [], provider: data.provider, model: data.model, at: Date.now() }
-      const finalHistory = [...nextHistory, reply]
-      setHistory(finalHistory)
-      saveHistory(finalHistory)
-      if (data.rateLimit?.resetAt) setRateReset(data.rateLimit.resetAt)
-    } catch (e) {
-      setError('Network error. Please try again.')
+      if (!res.ok || !res.body) throw new Error('stream not ok')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      let acc = { content: '', detectedGenes: [], citations: [], provider: null, model: null }
+
+      // Local mutable copy so state updates coalesce cheaply.
+      const flush = () => {
+        setHistory((prev) => {
+          const copy = prev.slice()
+          copy[assistantIdx] = { ...copy[assistantIdx], ...acc, streaming: true }
+          return copy
+        })
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        // SSE events end at "\n\n". Process complete events only; keep
+        // any partial trailing event in the buffer for the next iter.
+        let ev
+        while ((ev = buf.indexOf('\n\n')) >= 0) {
+          const chunk = buf.slice(0, ev)
+          buf = buf.slice(ev + 2)
+          const lines = chunk.split('\n')
+          let eventName = 'message'
+          let dataStr = ''
+          for (const ln of lines) {
+            if (ln.startsWith('event:')) eventName = ln.slice(6).trim()
+            else if (ln.startsWith('data:')) dataStr += ln.slice(5).trim()
+          }
+          if (!dataStr) continue
+          let payload = {}
+          try { payload = JSON.parse(dataStr) } catch { continue }
+
+          if (eventName === 'meta') {
+            acc.detectedGenes = payload.detectedGenes || []
+            acc.citations    = payload.citations || []
+            if (payload.rateLimit?.resetAt) setRateReset(payload.rateLimit.resetAt)
+            flush()
+          } else if (eventName === 'delta') {
+            gotAnyTokens = true
+            acc.content += payload.text || ''
+            flush()
+          } else if (eventName === 'error') {
+            bailoutMsg = payload.message || 'The Coach failed. Please try again.'
+          } else if (eventName === 'done') {
+            acc.provider = payload.provider || null
+            acc.model    = payload.model || null
+          }
+        }
+      }
+
+      if (!gotAnyTokens) throw new Error(bailoutMsg || 'no tokens')
+
+      // Mark stream complete and persist final history.
+      setHistory((prev) => {
+        const copy = prev.slice()
+        copy[assistantIdx] = { ...copy[assistantIdx], ...acc, streaming: false }
+        saveHistory(copy)
+        return copy
+      })
+    } catch (streamErr) {
+      // Streaming failed before any token \u2014 fall back to non-streaming.
+      try {
+        const res = await fetch('/api/coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: msg,
+            conversationHistory: nextHistory.slice(-8).map((m) => ({ role: m.role, content: m.content })),
+            context: buildContext(null),
+            sessionId: ensureSessionId(),
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          if (res.status === 429) {
+            setRateReset(data.resetAt || null)
+            setError(data.message || 'You\u2019ve reached the free Coach limit for now.')
+          } else {
+            setError(data.message || bailoutMsg || 'The Coach is temporarily unavailable. Please try again.')
+          }
+          setHistory(nextHistory)
+          saveHistory(nextHistory)
+          return
+        }
+        const finalReply = { role: 'assistant', content: data.reply || '', detectedGenes: data.detectedGenes || [], citations: data.citations || [], provider: data.provider, model: data.model, at: Date.now(), streaming: false }
+        const finalHistory = [...nextHistory, finalReply]
+        setHistory(finalHistory)
+        saveHistory(finalHistory)
+        if (data.rateLimit?.resetAt) setRateReset(data.rateLimit.resetAt)
+      } catch {
+        setError('Network error. Please try again.')
+        setHistory(nextHistory)
+        saveHistory(nextHistory)
+      }
     } finally {
       setSending(false)
     }
@@ -233,7 +336,12 @@ export default function CoachPage() {
                   ? 'bg-ss-orange text-white'
                   : 'bg-ss-canvas/40 text-ss-text ring-1 ring-ss-border-warm/60'
               }`}>
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                <div className="whitespace-pre-wrap">
+                  {m.content}
+                  {m.role === 'assistant' && m.streaming && (
+                    <span className="ml-0.5 inline-block h-3.5 w-[6px] translate-y-0.5 animate-pulse rounded-sm bg-ss-orange align-baseline" aria-hidden="true" />
+                  )}
+                </div>
                 {m.role === 'assistant' && (m.detectedGenes?.length || m.citations?.length) ? (
                   <div className="mt-2 flex flex-wrap gap-1.5 border-t border-ss-border-warm/50 pt-2">
                     {(m.detectedGenes || []).map((g) => (
@@ -256,7 +364,7 @@ export default function CoachPage() {
             </div>
           ))}
 
-          {sending && (
+          {sending && !history[history.length - 1]?.streaming && (
             <div className="flex justify-start">
               <div className="rounded-2xl bg-ss-canvas/40 px-4 py-3 text-[13px] text-ss-muted ring-1 ring-ss-border-warm/60">
                 <span className="inline-flex items-center gap-2">

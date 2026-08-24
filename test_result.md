@@ -9454,3 +9454,66 @@ frontend:
           chip via `isTour && 'ss-glow-orange ring-2 ring-ss-orange'`
           conditional on the individual dropdown row.
 
+
+# ─────────────────────────────────────────────────────────────
+# FUNNEL-VIEW + COACH-STREAMING
+# ─────────────────────────────────────────────────────────────
+backend:
+  - task: "CTA tracking + Coach SSE streaming endpoints"
+    implemented: true
+    working: true
+    file: "app/api/[[...path]]/route.js, lib/cta-usage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Two new endpoints shipped:
+            * POST /api/cta-track \u2014 public write-only. Accepts single
+              event or { events: [...] } batch. Persists via new
+              /lib/cta-usage.js (30s debounced flush to
+              /app/data/cta-usage.json). Always returns 200 to avoid
+              breaking the UI on network glitches.
+            * GET /api/admin/hero-cta-stats?token=<ADMIN_TOKEN> \u2014 admin
+              snapshot; returns { snapshot: { byKey, byDay, ... } }.
+            * POST /api/coach/stream \u2014 Server-Sent Events. Iterates the
+              coach cascade (openrouter free tiers), forwards SSE
+              tokens from the first model that begins producing text,
+              emits event: meta (detectedGenes/citations) first, then
+              event: delta (token chunks), then event: done. Same
+              grounding + guardrails as /api/coach. Rate-limit shared
+              (20/session/hour). Curl-tested with MTHFR + CYP1A2
+              queries \u2014 clean chunked delivery, disclaimer preserved.
+frontend:
+  - task: "Hero A/B copy funnel dashboard + Coach streaming UI"
+    implemented: true
+    working: true
+    file: "app/admin/hero-cta/page.js, app/coach/page.js, app/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * /admin/hero-cta \u2014 dashboard with total impressions / clicks
+            / overall CTR at the top, per-variant table with the actual
+            copy shown, dual-bar visualisation (teal impressions +
+            orange clicks overlaid), and a "Leader" chip that only
+            fires when a variant has \u226520 impressions AND the top CTR.
+            Auth via ?token=. Seeded + screenshot-verified with 30/6
+            events (variant B leading with 40% CTR).
+          * Homepage hero now POSTs impression + click events to
+            /api/cta-track alongside the existing GA4 trackEvent \u2014
+            keepalive:true so navigations don't drop the click event.
+          * /coach \u2014 rewrote send() to stream via /api/coach/stream.
+            Placeholder assistant message renders immediately with an
+            orange caret cursor; tokens append as they arrive. On
+            first-token success the caret keeps blinking until the
+            done event, then disappears. If streaming errors before
+            any token, transparently falls back to POST /api/coach so
+            users still get a reply. Screenshot-verified end-to-end
+            with real OpenRouter free-tier stream.
+

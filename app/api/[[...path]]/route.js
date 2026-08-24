@@ -17,9 +17,11 @@ import {
   planResearch,
   synthesizeResearch,
   extractJson,
+  MODELS,
 } from '@/lib/ai'
 import { buildGroundingBlock, coachSystemPrompt } from '@/lib/ai/coachGrounding'
 import { checkCoachRate, checkResearchRate } from '@/lib/ai/rateLimit'
+import { recordCtaEvent, getCtaSnapshot } from '@/lib/cta-usage'
 import {
   buildReliabilityPrompt,
   buildPlainLanguagePrompt,
@@ -439,6 +441,7 @@ export async function GET(request, { params }) {
   if (route === 'search') return handleSearch(request)
   if (route === 'autocomplete') return handleAutocomplete(request)
   if (route === 'admin' && subRoute === 'ai-usage') return handleAdminAiUsage(request)
+  if (route === 'admin' && subRoute === 'hero-cta-stats') return handleAdminHeroCtaStats(request)
   if (route === 'admin' && subRoute === 'me') return handleAdminMe(request)
   if (route === 'admin' && subRoute === 'articles') {
     if (!thirdRoute) return handleAdminListArticles(request)
@@ -902,6 +905,201 @@ async function handleCoachChat(request) {
   }
 }
 
+// -------------------------------------------------------------------
+// AI Coach STREAMING variant. Proxies OpenRouter SSE straight through
+// to the browser so the UI can render tokens as they arrive. Uses the
+// same grounding + system prompt as /api/coach and iterates through
+// the coach cascade until one model starts producing tokens; falls
+// back to a single error line if all tiers fail.
+// -------------------------------------------------------------------
+async function handleCoachChatStream(request) {
+  let body
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const message   = String(body?.message || '').trim().slice(0, 2000)
+  const history   = Array.isArray(body?.conversationHistory) ? body.conversationHistory.slice(-8) : []
+  const context   = body?.context || {}
+  const sessionId = String(body?.sessionId || 'anon').slice(0, 80)
+  if (!message) return NextResponse.json({ error: 'Empty message' }, { status: 400 })
+
+  const rl = checkCoachRate(sessionId, 20, 60 * 60 * 1000)
+  if (!rl.allowed) {
+    const mins = Math.max(1, Math.round((rl.resetAt - Date.now()) / 60000))
+    return NextResponse.json({
+      error: 'RATE_LIMITED',
+      message: `You\u2019ve reached the free Coach limit for now. Try again in about ${mins} minute${mins === 1 ? '' : 's'}.`,
+      resetAt: rl.resetAt,
+    }, { status: 429 })
+  }
+
+  const grounding = buildGroundingBlock({ userText: message, context })
+  const isPersonalized = !!(context && ((context.userVariants || []).length || (context.supplements || []).length || (context.biomarkerFlags || []).length))
+
+  const messages = [
+    { role: 'system', content: coachSystemPrompt({ groundedFacts: grounding.factsBlock, activePillar: context.activePillar, isPersonalized }) },
+    ...history.filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) })),
+    { role: 'user', content: message },
+  ]
+
+  const encoder = new TextEncoder()
+
+  // We build a ReadableStream that iterates through the coach cascade
+  // and pipes SSE lines from the first model that begins producing
+  // tokens. First chunk is a `meta` event with detectedGenes/citations
+  // so the UI can render chips immediately; subsequent events are
+  // `delta` (token chunks) and finally `done`.
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event, data) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+      }
+
+      send('meta', {
+        detectedGenes: grounding.detectedGenes,
+        citations:     grounding.citations,
+        rateLimit:     { remaining: rl.remaining, resetAt: rl.resetAt },
+      })
+
+      const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || ''
+      const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+      const cascade = MODELS?.coach?.cascade || []
+      const maxTokens = MODELS?.coach?.maxTokens || 900
+
+      let anyTokenEmitted = false
+      let providerUsed = null
+      let modelUsed = null
+      let totalOut = 0
+
+      for (const step of cascade) {
+        // Only OpenRouter supports SSE in our current setup. For
+        // together-provider steps we skip streaming and fall through
+        // to a non-streaming completion at the end if nothing streamed.
+        if (step.provider !== 'openrouter') continue
+        if (!OPENROUTER_KEY) break
+
+        let upstream
+        try {
+          upstream = await fetch(OPENROUTER_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${OPENROUTER_KEY}`,
+              'HTTP-Referer':  'https://selfscience.io',
+              'X-Title':       'SelfScience',
+            },
+            body: JSON.stringify({
+              model: step.model,
+              messages,
+              temperature: 0.4,
+              max_tokens: maxTokens,
+              stream: true,
+            }),
+          })
+        } catch (err) {
+          continue
+        }
+
+        if (!upstream.ok || !upstream.body) continue
+
+        providerUsed = 'openrouter'
+        modelUsed = step.model
+
+        // Parse the SSE stream from OpenRouter and forward `delta`
+        // events to the client. OpenRouter uses the OpenAI SSE format:
+        //   data: {...}\n\n   ... eventually   data: [DONE]\n\n
+        const reader = upstream.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let modelHadContent = false
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            let idx
+            while ((idx = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, idx).replace(/\r$/, '')
+              buffer = buffer.slice(idx + 1)
+              if (!line.startsWith('data:')) continue
+              const payload = line.slice(5).trim()
+              if (!payload || payload === '[DONE]') continue
+              try {
+                const j = JSON.parse(payload)
+                const delta = j?.choices?.[0]?.delta?.content
+                if (typeof delta === 'string' && delta.length > 0) {
+                  modelHadContent = true
+                  anyTokenEmitted = true
+                  totalOut += delta.length
+                  send('delta', { text: delta })
+                }
+              } catch { /* ignore malformed chunk */ }
+            }
+          }
+        } catch {
+          // Upstream connection died mid-stream. If we already emitted
+          // tokens, we call it a partial success. Otherwise try next.
+        }
+
+        if (modelHadContent) break
+        // If this model emitted zero content, try the next one.
+      }
+
+      if (!anyTokenEmitted) {
+        send('error', { message: 'The Coach is temporarily unavailable. Please try again.' })
+      }
+
+      send('done', { provider: providerUsed, model: modelUsed, outLen: totalOut })
+      controller.close()
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type':      'text/event-stream; charset=utf-8',
+      'Cache-Control':     'no-store, no-transform',
+      'Connection':        'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
+}
+
+
+
+// -------------------------------------------------------------------
+// CTA A/B tracking. Public POST endpoint used by the homepage-hero
+// quiz CTA to log { impression | click } events per variant. Data is
+// aggregated in-memory + flushed to /app/data/cta-usage.json.
+// -------------------------------------------------------------------
+async function handleCtaTrack(request) {
+  let body
+  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const events = Array.isArray(body?.events) ? body.events.slice(0, 20) : [body]
+  try {
+    for (const e of events) {
+      if (!e || typeof e !== 'object') continue
+      await recordCtaEvent(e)
+    }
+  } catch (err) {
+    console.warn('cta-track error:', err?.message)
+  }
+  // Always respond 200 \u2014 analytics must never break the app.
+  return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
+}
+
+// Admin-only GET returning the CTA snapshot. Auth via ?token=<ADMIN_TOKEN>.
+async function handleAdminHeroCtaStats(request) {
+  const url = new URL(request.url)
+  const token = url.searchParams.get('token') || ''
+  if (!process.env.ADMIN_TOKEN || token !== process.env.ADMIN_TOKEN) {
+    return NextResponse.json({ error: 'unauthorised' }, { status: 401 })
+  }
+  const snapshot = await getCtaSnapshot()
+  return NextResponse.json({ snapshot }, { headers: { 'Cache-Control': 'no-store' } })
+}
+
+
+
 async function handleResearchPlan(request) {
   let body
   try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
@@ -1090,7 +1288,9 @@ export async function POST(request, { params }) {
 
   // AI Coach chat + Deep Research generator. Stateless, force-dynamic,
   // no-store. See /lib/ai/coachGrounding.js for grounding + guardrails.
+  if (route === 'coach' && subRoute === 'stream') return handleCoachChatStream(request)
   if (route === 'coach') return handleCoachChat(request)
+  if (route === 'cta-track') return handleCtaTrack(request)
   if (route === 'research' && subRoute === 'plan') return handleResearchPlan(request)
   if (route === 'research' && subRoute === 'synthesize') return handleResearchSynthesize(request)
 

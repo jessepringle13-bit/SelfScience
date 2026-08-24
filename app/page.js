@@ -329,6 +329,16 @@ function DiscoverHome() {
           variant: v,
         })
       } catch {}
+      // Also POST to /api/cta-track so the /admin/hero-cta dashboard
+      // has aggregated counts even without GA4 configured.
+      try {
+        fetch('/api/cta-track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location: 'homepage-hero', cta: 'quiz_secondary', variant: v, kind: 'impression' }),
+          keepalive: true,
+        }).catch(() => {})
+      } catch {}
     } catch {}
   }, [])
   const QUIZ_COPY = {
@@ -448,6 +458,14 @@ function DiscoverHome() {
                   cta: 'quiz_secondary',
                   variant: quizVariant || 'a',
                 })
+              } catch {}
+              try {
+                fetch('/api/cta-track', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ location: 'homepage-hero', cta: 'quiz_secondary', variant: quizVariant || 'a', kind: 'click' }),
+                  keepalive: true,
+                }).catch(() => {})
               } catch {}
             }}
             data-cta-variant={quizVariant || 'a'}
