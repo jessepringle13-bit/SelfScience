@@ -11,14 +11,19 @@ const STEPS = [
   {
     n: 1,
     Icon: Dna,
-    title: 'Upload your file',
-    body:  'Takes 30 seconds. Your data never leaves your device.',
+    // Reworded per GitHub issue #1 — DNA upload is the fastest path
+    // to personalised answers, but not the only way to start. Mirrors
+    // the "You don’t need your genome to use SelfScience" tone
+    // already used on /start and now surfaced from the hero via the
+    // "Take the 2-minute quiz" secondary CTA.
+    title: 'Start your way',
+    body:  'Upload a 23andMe or AncestryDNA file for the deepest personalisation — or take the 2-minute quiz if you don’t have one yet.',
   },
   {
     n: 2,
     Icon: Search,
     title: 'We read your variants',
-    body:  'We check 300+ genetic markers across 9 health areas.',
+    body:  'We check 300+ genetic markers across 9 health areas (or curate research to your quiz answers).',
   },
   {
     n: 3,

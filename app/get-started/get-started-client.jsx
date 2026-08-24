@@ -69,6 +69,31 @@ function Hero() {
             <TestTube2 size={14} /> Blood Test Options <ArrowDown size={14} />
           </a>
         </div>
+
+        {/* No-kit callout — surfaces the non-genetic onboarding path
+            for visitors who landed here without a DNA kit yet.
+            Requested in GitHub issue #1 so the quiz is discoverable
+            even from the kit-shopping page. Kept visually secondary
+            to the kit CTAs above. */}
+        <div className="mt-6 flex flex-wrap items-start gap-3 rounded-xl border border-white/25 bg-white/[0.06] p-4">
+          <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ss-orange/25 text-white ring-1 ring-white/30">
+            <Sparkles size={15} />
+          </span>
+          <div className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-white/90">
+            <div className="font-bold text-white">No kit yet? You can still get started.</div>
+            <p className="mt-1 text-white/80">
+              You don&rsquo;t need your genome to use SelfScience. Take the 2-minute quiz and
+              we&rsquo;ll curate a personalised research path around your goals — add your DNA
+              file whenever you&rsquo;re ready.
+            </p>
+            <Link
+              href="/onboarding/quiz"
+              className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/15 px-3.5 py-1.5 text-[12.5px] font-bold text-white transition hover:bg-white/25"
+            >
+              Take the 2-minute quiz →
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   )

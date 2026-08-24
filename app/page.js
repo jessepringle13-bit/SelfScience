@@ -402,9 +402,19 @@ function DiscoverHome() {
               <Upload size={18} /> Start Here — Upload Your File
             </a>
           </div>
+          {/* Secondary CTA — surfaces the non-genetic onboarding path
+              for visitors without a DNA file. Visually lower-emphasis
+              (text link, not a button) so the DNA upload remains the
+              dominant action. Linked from GitHub issue #1. */}
+          <a
+            href="/onboarding/quiz"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-white/90 underline decoration-white/40 underline-offset-4 hover:text-white hover:decoration-white"
+          >
+            Not ready to upload DNA? Take the 2-minute quiz →
+          </a>
           <a
             href="#genome-upload"
-            className="mt-4 text-sm text-white/75 underline decoration-white/30 underline-offset-4 hover:text-white"
+            className="mt-2 text-xs text-white/70 underline decoration-white/30 underline-offset-4 hover:text-white"
           >
             Don&apos;t have a file yet? See which test to get →
           </a>
