@@ -9735,3 +9735,57 @@ frontend:
             wording. Not requesting frontend test agent this round.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# ORIENTATION TOUR — one-page printable summary
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "One-page print-friendly summary of the /how-it-works tour at /how-it-works/print"
+    implemented: true
+    working: true
+    file: "app/how-it-works/print/page.js, app/how-it-works/page.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * New minimal route at /how-it-works/print — a compressed
+            single-page (A4/letter) summary of the existing orientation
+            tour. No new content; only tightens and re-lays existing
+            sections for print/PDF export.
+          * Layout: two-column body (left = What you can do here +
+            three goal flows; right = How it fits together diagram +
+            tools quick-spec table + Who this is for). Monochrome
+            palette (neutral-900 on white) with light-grey borders,
+            no shadows in print.
+          * Inline print stylesheet enforces A4 12mm margins,
+            !important white background/black text, hides the on-screen
+            toolbar ("Back to full tour" + "Print or save as PDF"
+            button), removes shadows/borders on the sheet, and adds
+            page-break-inside: avoid to each section so no card splits
+            across pages.
+          * Diagrams are pure typography — numbered circles for goal
+            flow steps, A/B/C entry lanes on top row, 4-step Findings→
+            Research→Path→Tools loop underneath, plus a 6-row tool
+            spec table.
+          * Fixed the recurring unicode-in-JSX bug: symbol="\u2713" in a
+            JSX string attribute was rendering literally as the 6-char
+            string "\u2713" instead of a checkmark. Replaced with
+            actual characters ✓ and ✗, and "5\u201310 min" replaced
+            with "5–10 min".
+          * Defended against the app's dark mode by setting explicit
+            inline style={{ background: '#ffffff', color: '#171717' }}
+            on the article and colorScheme:'light' on the wrapper.
+          * Wired an entry point on the main tour footer:
+            "Print or share a one-page summary" link next to the
+            existing "How SelfScience Works Under the Hood" link.
+          * Verified via Playwright:
+              - 5 H2 sections, 6 tool table rows.
+              - Fit column symbols render as ✓ and ✗ (not literals).
+              - Time cell "2 + 5–10 min each" renders with en-dash.
+              - Print media emulation produces clean black-on-white
+                single-page output with the toolbar hidden.
+
+

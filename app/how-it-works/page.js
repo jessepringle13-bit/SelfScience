@@ -504,6 +504,10 @@ export default function HowItWorksPage() {
           <Link href="/how-it-works/mechanics" className="font-semibold text-ss-teal underline hover:no-underline dark:text-white">
             How SelfScience Works Under the Hood
           </Link>
+          {' '}&middot;{' '}
+          <Link href="/how-it-works/print" className="font-semibold text-ss-teal underline hover:no-underline dark:text-white">
+            Print or share a one-page summary
+          </Link>
           .
         </p>
       </section>
