@@ -59,6 +59,32 @@ export default function HeroCtaAdmin() {
     }, { impressions: 0, clicks: 0 })
   }, [rows])
 
+  // Build a 14-day trend series from snapshot.byDay. Each entry in
+  // byDay is keyed "YYYY-MM-DD|location|cta|variant|kind"; we sum
+  // across variants for the hero quiz CTA only.
+  const trend = useMemo(() => {
+    const byDay = data?.snapshot?.byDay || {}
+    const N = 14
+    const days = []
+    for (let i = N - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      days.push(d.toISOString().slice(0, 10))
+    }
+    const out = days.map((day) => ({ day, impressions: 0, clicks: 0 }))
+    for (const [key, count] of Object.entries(byDay)) {
+      const [d, location, cta] = key.split('|')
+      if (location !== 'homepage-hero' || cta !== 'quiz_secondary') continue
+      const kind = key.split('|')[4]
+      const row = out.find((r) => r.day === d)
+      if (!row) continue
+      if (kind === 'click')      row.clicks      += count || 0
+      else if (kind === 'impression') row.impressions += count || 0
+    }
+    return out
+  }, [data])
+
+  const maxTrend = Math.max(1, ...trend.map((t) => t.impressions))
+
   const maxImp = Math.max(1, ...rows.map((r) => r.impressions))
 
   const COPY = {
@@ -93,6 +119,14 @@ export default function HeroCtaAdmin() {
               <StatBox label="Total clicks"      value={totals.clicks.toLocaleString()} />
               <StatBox label="Overall CTR"       value={totals.impressions > 0 ? `${(totals.clicks / totals.impressions * 100).toFixed(2)}%` : '—'} />
             </div>
+
+            <section className="mt-8 rounded-lg border border-black/10 bg-white p-4">
+              <div className="mb-3 flex items-baseline justify-between gap-2">
+                <h2 className="text-sm font-bold text-[#1B474D]">Last 14 days</h2>
+                <div className="text-[10px] text-[#7A7974]">Teal bars = impressions · Orange line = clicks</div>
+              </div>
+              <TrendChart trend={trend} maxTrend={maxTrend} />
+            </section>
 
             <section className="mt-8 rounded-lg border border-black/10 bg-white p-4">
               <h2 className="mb-4 text-sm font-bold text-[#1B474D]">By variant</h2>
@@ -151,6 +185,62 @@ function StatBox({ label, value }) {
     <div className="rounded-lg border border-black/10 bg-white p-3">
       <div className="text-[10px] font-bold uppercase tracking-wider text-[#7A7974]">{label}</div>
       <div className="mt-1 text-xl font-extrabold text-[#1B474D]">{value}</div>
+    </div>
+  )
+}
+
+// Compact 14-day trend chart. Renders teal impression bars with an
+// orange click polyline overlaid; SVG is intentionally simple so we
+// don't pull in a chart library for one dashboard.
+function TrendChart({ trend, maxTrend }) {
+  const width = 720
+  const height = 160
+  const padL = 28
+  const padR = 8
+  const padT = 8
+  const padB = 24
+  const inner = { w: width - padL - padR, h: height - padT - padB }
+  const barW = inner.w / trend.length - 4
+  const maxClicks = Math.max(1, ...trend.map((t) => t.clicks))
+  const clickPoints = trend.map((t, i) => {
+    const x = padL + i * (inner.w / trend.length) + (inner.w / trend.length) / 2
+    const y = padT + inner.h - (t.clicks / maxClicks) * inner.h
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[560px]" role="img" aria-label="14-day trend of impressions and clicks">
+        {/* Impression bars */}
+        {trend.map((t, i) => {
+          const barX = padL + i * (inner.w / trend.length) + 2
+          const barH = (t.impressions / maxTrend) * inner.h
+          const barY = padT + inner.h - barH
+          return (
+            <g key={t.day}>
+              <rect x={barX} y={barY} width={barW} height={barH} fill="#1B474D" opacity="0.25" rx="2">
+                <title>{`${t.day}: ${t.impressions} impressions, ${t.clicks} clicks`}</title>
+              </rect>
+              {/* Day label every 2nd day to avoid crowding */}
+              {i % 2 === 1 && (
+                <text x={barX + barW / 2} y={height - 6} textAnchor="middle" fontSize="9" fill="#7A7974">
+                  {t.day.slice(5)}
+                </text>
+              )}
+            </g>
+          )
+        })}
+        {/* Click polyline (right-axis scale) */}
+        <polyline points={clickPoints} fill="none" stroke="#F58642" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {trend.map((t, i) => {
+          if (t.clicks === 0) return null
+          const cx = padL + i * (inner.w / trend.length) + (inner.w / trend.length) / 2
+          const cy = padT + inner.h - (t.clicks / maxClicks) * inner.h
+          return <circle key={t.day + 'p'} cx={cx} cy={cy} r="3" fill="#F58642"><title>{`${t.day}: ${t.clicks} clicks`}</title></circle>
+        })}
+        {/* Left axis label (impressions max) */}
+        <text x={4} y={padT + 6} fontSize="9" fill="#7A7974">{maxTrend}</text>
+        <text x={4} y={padT + inner.h} fontSize="9" fill="#7A7974">0</text>
+      </svg>
     </div>
   )
 }

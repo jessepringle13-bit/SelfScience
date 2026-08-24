@@ -82,6 +82,53 @@ async function runSynth(question, sources) {
   return data
 }
 
+// Streaming variant of runSynth. Yields deltas via onDelta(chunk) so
+// the UI can render the report progressively; returns the final
+// cleaned report + provider/model on `done`. Throws on error so the
+// caller can fall back to runSynth.
+async function runSynthStream(question, sources, onDelta) {
+  const res = await fetch('/api/research/synthesize/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, sources }),
+  })
+  if (!res.ok || !res.body) throw new Error(`stream failed: HTTP ${res.status}`)
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  let final = { report: '', provider: null, model: null }
+  let sawAnyDelta = false
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    let ev
+    while ((ev = buf.indexOf('\n\n')) >= 0) {
+      const chunk = buf.slice(0, ev)
+      buf = buf.slice(ev + 2)
+      const lines = chunk.split('\n')
+      let eventName = 'message', dataStr = ''
+      for (const ln of lines) {
+        if (ln.startsWith('event:')) eventName = ln.slice(6).trim()
+        else if (ln.startsWith('data:')) dataStr += ln.slice(5).trim()
+      }
+      if (!dataStr) continue
+      let payload = {}
+      try { payload = JSON.parse(dataStr) } catch { continue }
+      if (eventName === 'delta') {
+        sawAnyDelta = true
+        if (typeof payload.text === 'string') onDelta?.(payload.text)
+      } else if (eventName === 'done') {
+        final = { report: payload.report || '', provider: payload.provider, model: payload.model }
+      } else if (eventName === 'error') {
+        throw new Error(payload.message || 'stream error')
+      }
+    }
+  }
+  if (!sawAnyDelta && !final.report) throw new Error('no synthesis tokens')
+  return final
+}
+
 export default function ResearchPage() {
   const [question, setQuestion] = useState('')
   const [useGenomeContext, setUseGenomeContext] = useState(true)
@@ -172,10 +219,24 @@ export default function ResearchPage() {
       }
       setSources(scored)
 
-      // Step 4: synthesize
+      // Step 4: synthesize (streaming with graceful fallback)
       setStage('synth')
-      const out = await runSynth(question2, scored)
-      setReport(out.report || '')
+      let synthOut
+      try {
+        setReport('')
+        synthOut = await runSynthStream(question2, scored, (delta) => {
+          // Append tokens as they arrive so the user sees the report
+          // build up in real time.
+          setReport((prev) => (prev || '') + delta)
+        })
+        // Replace the streamed text with the cleaned (citation-scrubbed)
+        // final report so any hallucinated PMIDs are stripped.
+        if (synthOut.report) setReport(synthOut.report)
+      } catch {
+        // Streaming failed \u2014 fall back to the non-streaming synth.
+        synthOut = await runSynth(question2, scored)
+        setReport(synthOut.report || '')
+      }
       setStage('done')
     } catch (e) {
       setError(String(e?.message || e))
@@ -310,23 +371,30 @@ export default function ResearchPage() {
         )}
 
         {/* Report */}
-        {stage === 'done' && report && (
+        {/* Report — visible during streaming synth and when done. */}
+        {(stage === 'synth' || stage === 'done') && report && (
           <section className="mt-6 rounded-2xl border border-ss-border-warm/60 bg-ss-surface p-5 ss-print-area">
             <div className="ss-hide-in-print mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-orange">
-                <CheckCircle2 size={11} className="mr-1 inline text-ss-green" /> Report ready
+                {stage === 'done' ? (
+                  <><CheckCircle2 size={11} className="mr-1 inline text-ss-green" /> Report ready</>
+                ) : (
+                  <><Loader2 size={11} className="mr-1 inline animate-spin" /> Writing report&hellip;</>
+                )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={copyMd} className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-3 py-1 text-[11.5px] font-semibold text-ss-muted hover:text-ss-text"><Copy size={11} /> Copy</button>
-                <button type="button" onClick={downloadMd} className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-3 py-1 text-[11.5px] font-semibold text-ss-muted hover:text-ss-text"><Download size={11} /> .md</button>
-                <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-3 py-1 text-[11.5px] font-semibold text-ss-muted hover:text-ss-text"><Printer size={11} /> Print / PDF</button>
-                <button type="button" onClick={() => { setStage('idle'); setReport(''); setSources([]) }} className="inline-flex items-center gap-1 rounded-full bg-ss-orange px-3 py-1 text-[11.5px] font-bold text-white">New report</button>
-              </div>
+              {stage === 'done' && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button type="button" onClick={copyMd} className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-3 py-1 text-[11.5px] font-semibold text-ss-muted hover:text-ss-text"><Copy size={11} /> Copy</button>
+                  <button type="button" onClick={downloadMd} className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-3 py-1 text-[11.5px] font-semibold text-ss-muted hover:text-ss-text"><Download size={11} /> .md</button>
+                  <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1 rounded-full border border-ss-border-warm/60 bg-ss-canvas/40 px-3 py-1 text-[11.5px] font-semibold text-ss-muted hover:text-ss-text"><Printer size={11} /> Print / PDF</button>
+                  <button type="button" onClick={() => { setStage('idle'); setReport(''); setSources([]) }} className="inline-flex items-center gap-1 rounded-full bg-ss-orange px-3 py-1 text-[11.5px] font-bold text-white">New report</button>
+                </div>
+              )}
             </div>
 
             <MarkdownReport md={report} />
 
-            {sources.length > 0 && (
+            {stage === 'done' && sources.length > 0 && (
               <div className="mt-6 border-t border-ss-border-warm/50 pt-4">
                 <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-ss-orange">Sources used</div>
                 <ul className="mt-2 space-y-1.5 text-[12.5px] text-ss-text">

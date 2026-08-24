@@ -9517,3 +9517,43 @@ frontend:
             users still get a reply. Screenshot-verified end-to-end
             with real OpenRouter free-tier stream.
 
+
+# ─────────────────────────────────────────────────────────────
+# FUNNEL-TREND + RESEARCH-STREAMING
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "14-day trend chart on /admin/hero-cta + Deep Research SSE streaming"
+    implemented: true
+    working: true
+    file: "app/admin/hero-cta/page.js, app/research/page.js, app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          * /admin/hero-cta \u2014 added a "Last 14 days" section with an
+            inline SVG chart. Teal bars = daily impressions, orange
+            polyline + dots = daily clicks (dual-axis: bars scale to
+            max impressions, line scales to max clicks). Hover tooltips
+            via <title> on each rect/circle. Every-other-day X-axis
+            labels to avoid crowding. Verified with seeded 30/6 events
+            all landing on today's column.
+          * POST /api/research/synthesize/stream \u2014 SSE variant of the
+            synthesis endpoint. Cascades free-tier OpenRouter models,
+            emits event: delta (token chunks) and event: done (with
+            the cleaned final report + provider/model). Applies the
+            same PMID-scrub post-processing as the non-streaming
+            version.
+          * /research page: new runSynthStream() helper reads the SSE
+            stream; the Deep Research generator now streams the report
+            as it's being written (users see the markdown build up in
+            real time). Toolbar (Copy / .md / Print / New report)
+            gated on stage === 'done'; the header shows a spinning
+            "Writing report\u2026" indicator during streaming. If the
+            stream errors before any token, transparently falls back
+            to POST /api/research/synthesize. Curl-tested end-to-end
+            with an MTHFR + folate question; clean chunked delivery
+            and the report structure was preserved.
+

@@ -1191,6 +1191,136 @@ async function handleResearchSynthesize(request) {
 }
 
 
+// -------------------------------------------------------------------
+// Deep Research synthesis STREAMING variant. Same guardrails + citation
+// post-processing as the non-streaming version, but proxies OpenRouter
+// SSE tokens straight through so the UI can render the report as it's
+// written. Emits event: delta (token chunks) and event: done (with the
+// cleaned final report + provider/model).
+// -------------------------------------------------------------------
+async function handleResearchSynthesizeStream(request) {
+  let body
+  try { body = await request.json() } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const question = String(body?.question || '').trim().slice(0, 500)
+  const sources  = Array.isArray(body?.sources) ? body.sources.slice(0, 20) : []
+  if (!question) return NextResponse.json({ error: 'Empty question' }, { status: 400 })
+  if (sources.length === 0) return NextResponse.json({ error: 'No sources provided' }, { status: 400 })
+
+  const srcBlock = sources.map((s, i) => {
+    const line = [
+      `[${i + 1}] PMID:${s.pmid || 'n/a'} \u2014 ${(s.title || 'untitled').slice(0, 220)}`,
+      s.year || s.journal ? `    ${s.journal || ''}${s.year ? ' (' + s.year + ')' : ''}` : '',
+      s.reliability ? `    Reliability: ${s.reliability}` : '',
+      s.abstract ? `    Abstract: ${String(s.abstract).slice(0, 500)}` : '',
+    ].filter(Boolean).join('\n')
+    return line
+  }).join('\n')
+
+  const system = `You are a scientific research synthesiser for SelfScience. Draft a structured markdown report answering the user\u2019s research question, using ONLY the numbered sources provided below. Rules:\n\u2022 EVERY substantive factual claim MUST cite at least one source using the format (PMID:12345678). No uncited claims.\n\u2022 NEVER invent PMIDs, effect sizes, statistics, or studies not in the source list.\n\u2022 NEVER prescribe (\"take X\"), NEVER give numeric personal risk (\"X% risk\"), and end the report with the standard disclaimer.\n\u2022 Use these sections in markdown H2 headings: \"## Overview\", \"## What the research suggests\", \"## Limitations & caveats\", \"## Bottom line\", \"## Cited sources\".\n\u2022 The \"Cited sources\" section must list every PMID used, one per line, as: \"- PMID:12345678 \u2014 Title (Year)\".\n\u2022 Keep tone calm, plain-English, non-alarmist. ~400\u2013900 words total.\n\u2022 Close with: \"---\\n_Educational only. Not medical advice. Talk to your practitioner before making changes._\"`
+  const user = `Research question: ${question}\n\nSources:\n${srcBlock}`
+  const messages = [
+    { role: 'system', content: system },
+    { role: 'user',   content: user },
+  ]
+
+  const validPmids = new Set(sources.map((s) => String(s.pmid || '').replace(/[^0-9]/g, '')).filter(Boolean))
+  const encoder = new TextEncoder()
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event, data) => {
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+      }
+
+      const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || ''
+      const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+      const cascade = MODELS?.researchSynthesize?.cascade || []
+      const maxTokens = MODELS?.researchSynthesize?.maxTokens || 2400
+
+      let full = ''
+      let providerUsed = null
+      let modelUsed    = null
+
+      for (const step of cascade) {
+        if (step.provider !== 'openrouter') continue
+        if (!OPENROUTER_KEY) break
+        let upstream
+        try {
+          upstream = await fetch(OPENROUTER_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'Authorization': `Bearer ${OPENROUTER_KEY}`,
+              'HTTP-Referer':  'https://selfscience.io',
+              'X-Title':       'SelfScience',
+            },
+            body: JSON.stringify({ model: step.model, messages, temperature: 0.25, max_tokens: maxTokens, stream: true }),
+          })
+        } catch { continue }
+        if (!upstream.ok || !upstream.body) continue
+
+        providerUsed = 'openrouter'; modelUsed = step.model
+        const reader = upstream.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let modelHadContent = false
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            let idx
+            while ((idx = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, idx).replace(/\r$/, '')
+              buffer = buffer.slice(idx + 1)
+              if (!line.startsWith('data:')) continue
+              const payload = line.slice(5).trim()
+              if (!payload || payload === '[DONE]') continue
+              try {
+                const j = JSON.parse(payload)
+                const delta = j?.choices?.[0]?.delta?.content
+                if (typeof delta === 'string' && delta.length > 0) {
+                  modelHadContent = true
+                  full += delta
+                  send('delta', { text: delta })
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+        if (modelHadContent) break
+      }
+
+      if (!full) {
+        send('error', { message: 'Synthesis failed. Please try again in a minute.' })
+        send('done', { provider: null, model: null, report: '' })
+        controller.close()
+        return
+      }
+
+      // Post-process: strip any (PMID:xxxx) that doesn't match a
+      // source in the list. Same rule as the non-streaming version.
+      const cleaned = full.replace(/\(PMID:\s*([0-9]{4,10})\)/g, (m, p) => validPmids.has(p) ? `(PMID:${p})` : '(citation missing)')
+
+      send('done', { provider: providerUsed, model: modelUsed, report: cleaned, sourcesUsed: sources.length })
+      controller.close()
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type':      'text/event-stream; charset=utf-8',
+      'Cache-Control':     'no-store, no-transform',
+      'Connection':        'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
+}
+
+
+
 
 async function handleInterpretGenome(request) {
   let body
@@ -1292,6 +1422,7 @@ export async function POST(request, { params }) {
   if (route === 'coach') return handleCoachChat(request)
   if (route === 'cta-track') return handleCtaTrack(request)
   if (route === 'research' && subRoute === 'plan') return handleResearchPlan(request)
+  if (route === 'research' && subRoute === 'synthesize' && thirdRoute === 'stream') return handleResearchSynthesizeStream(request)
   if (route === 'research' && subRoute === 'synthesize') return handleResearchSynthesize(request)
 
   // Backward-compat aliases so existing clients keep working during migration
