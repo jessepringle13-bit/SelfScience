@@ -10130,3 +10130,91 @@ frontend:
           agent cannot open PRs directly.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# Phase 4 UX (Issue #3) — 3 follow-ups on the pillar-first model
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Slim pillar landings + homepage CTA tracking + latent personalised order"
+    implemented: true
+    working: true
+    file: "components/PillarLandingTemplate.jsx, app/pillars/{mental-health,environment,longevity,wellness}/{page.js,layout.js}, components/HomePillarGrid.jsx, components/site-nav.jsx, app/pillars/environment/page.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Three follow-ups to /pillars (Issue #3):
+
+          1. Slim pillar landings \u2014 NEW template + 4 new routes.
+             \u2022 components/PillarLandingTemplate.jsx is a reusable
+               client-component layout mirroring /pillars/youth:
+               hero (pillar name + Icon + headline + lede),
+               "What this pillar covers" bullets,
+               "Tools & content inside" 2-col grid,
+               "Before you explore" educational callout, and
+               related-pillar chips at the bottom.
+             \u2022 New routes with a thin page.js + layout.js each:
+                 /pillars/mental-health (Brain icon)
+                 /pillars/environment   (Leaf icon)
+                 /pillars/longevity     (Hourglass icon)
+                 /pillars/wellness      (Heart icon)
+               Every tool href points at an existing route
+               (/journal, /goals, /tracker, /biomarkers, /reading-
+               list, /coach, /nutrition, /search?pillar=...).
+               metadata lives in each folder's layout.js so the page
+               itself can stay a Client Component (needed to import
+               the shared template).
+             \u2022 Wired site-nav.jsx PILLARS array with `route`
+               fields for the 4 new landings so the nav dropdown,
+               /pillars explainer, and HomePillarGrid all link to
+               these instead of a raw search feed.
+
+          2. CTA tracking on the homepage pillar tiles.
+             \u2022 HomePillarGrid's PillarTile now POSTs to
+               /api/cta-track on click via keepalive fetch with
+               {location:'homepage-pillar-grid', cta:<pillar.key>,
+                variant:'a', kind:'click'}.
+             \u2022 Verified with Playwright network interception:
+               clicking the Mental Health tile fires exactly one
+               POST with the expected payload; navigation still
+               proceeds normally (keepalive:true survives the
+               transition).
+
+          3. Personalised pillar ordering when a genome is loaded.
+             \u2022 HomePillarGrid now imports normalizePillarName +
+               getGenomeResults, mirrors the exact counter used by
+               site-nav.jsx (Section 5) so numbers agree across the
+               nav dropdown and the homepage grid, then sorts
+               PILLARS by (count desc, canonical index asc) when a
+               genome is present. Eyebrow copy adapts: "Sorted by
+               your variants" vs "Start with a topic". Per-tile
+               chip shows the recognised-variant count in orange
+               when > 0.
+             \u2022 LATENT CAPABILITY: the current /
+               (DiscoverOrDashboard) unmounts HomePillarGrid as
+               soon as hasGenomeResults() turns true \u2014 the
+               user is routed to Dashboard/FirstLook instead. So
+               the reorder logic runs correctly but is invisible
+               until a future toggle chooses to render
+               HomePillarGrid inside a genome-loaded view (e.g.,
+               under the existing "Discover" pill). Touching the
+               Dashboard-vs-Discover swap logic was out of scope
+               per Issue #3's "do not change /dashboard" clause.
+             \u2022 Verified baseline canonical order renders on /
+               when no genome is loaded:
+               ['Genomics','Nutrition','Performance','Longevity',
+                'Wellness'].
+
+          Zero regression on new-user hero, WelcomeBackStrip,
+          /how-it-works, /pillars, or Dashboard. Compiles clean.
+
+          Hand-off:
+          Suggested PR title:
+            "Phase 4 UX: pillar landings + CTA tracking + latent
+             personalised order (part of #3)"
+          User will open the PR via Emergent "Save to Github".
+
+
