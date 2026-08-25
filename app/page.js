@@ -15,6 +15,7 @@ import {
 import SiteNav, { PILLARS } from '@/components/site-nav'
 import StartHereBanner from '@/components/StartHereBanner'
 import WelcomeBackStrip from '@/components/WelcomeBackStrip'
+import HomePillarGrid from '@/components/HomePillarGrid'
 import HomeStepsExplainer from '@/components/HomeStepsExplainer'
 import { ResultCard } from '@/components/result-card'
 import { EditorialFeatured } from '@/components/editorial-featured'
@@ -493,6 +494,18 @@ function DiscoverHome() {
             <Sparkles size={12} className="text-ss-orange" /> New here? Take a 2-minute tour →
           </a>
 
+          {/* Phase 4 UX (issue #3) — reframe the DNA upload as OPTIONAL
+              personalisation, not a gate. Anyone can explore any pillar
+              without ever uploading a file. */}
+          <p className="mt-3 max-w-md text-center text-[11px] leading-relaxed text-white/60">
+            Uploading a DNA file is <span className="font-semibold text-white/85">optional</span> &mdash; it only
+            personalises what you see inside a pillar. You can{' '}
+            <a href="/pillars" className="font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white">
+              explore any pillar first
+            </a>{' '}
+            and bring data later.
+          </p>
+
           {/* Secondary — small search link for returning visitors. Visually
               de-emphasized so it doesn't compete with the primary CTA. */}
           <form onSubmit={handleSubmit} className="mt-14 hidden w-full max-w-2xl md:block">
@@ -530,6 +543,13 @@ function DiscoverHome() {
           ss_tier_state, or a live genome session). New visitors see
           nothing here and continue to HomeStepsExplainer below. */}
       <WelcomeBackStrip />
+
+      {/* Phase 4 UX (issue #3) — pillar-first entry point. Persistent
+          for every visitor: promotes the 10 canonical pillars to a
+          top-level card set so users can pick a lens BEFORE thinking
+          about data. Links to /pillars for the full explainer and
+          /search?pillar=X for the pre-filtered research feed. */}
+      <HomePillarGrid />
 
       {/* 3-step explainer strip (Phase A · Part 1) — placed directly under
           the hero so first-time visitors see WHY / WHAT / HOW immediately. */}

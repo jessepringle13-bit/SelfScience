@@ -10021,3 +10021,112 @@ frontend:
             the personalised greeting, progress ring, or dismissal.
 
 
+
+# ─────────────────────────────────────────────────────────────
+# Phase 4 UX (Issue #3) — pillar-first navigation model
+# ─────────────────────────────────────────────────────────────
+frontend:
+  - task: "Phase 4 UX — /pillars explainer page + homepage pillar grid + nav footer link + optional-data reframe on hero"
+    implemented: true
+    working: true
+    file: "app/pillars/page.js, app/pillars/layout.js, components/HomePillarGrid.jsx, app/page.js, components/site-nav.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Implementation of Issue #3 (Phase 4 UX \u2014 pillar-first
+          navigation). Touches ONLY the following files; no changes to
+          /genome, /dashboard, /my-path, /onboarding/quiz, /start,
+          /how-it-works, or any backend/genomics logic.
+
+          A. /pillars explainer page \u2014 NEW
+              \u2022 /app/app/pillars/page.js (client component so it
+                can import the canonical PILLARS array from
+                components/site-nav.jsx, which is a Client Component;
+                RSC boundaries block non-component values crossing).
+              \u2022 /app/app/pillars/layout.js (metadata for the route
+                kept in a Server layout so canonical, OG title, and
+                description still register).
+              \u2022 Sections: hero (explains what a pillar is), a
+                "Before you explore" callout that makes it explicit
+                pillars are educational and data is fully optional,
+                a 10-card grid (one per canonical pillar) with a
+                plain-English one-sentence description, a "Tools &
+                content inside" list linking to real routes, and an
+                orange "Explore this pillar" CTA pointing at
+                /search?pillar=<Name>. Footer offers three natural
+                next steps: search, tour, or DNA upload.
+              \u2022 Pillar \u2192 tool mapping uses only existing routes:
+                Genomics \u2192 /genome, /genome/findings.
+                Nutrition \u2192 /nutrition, /reading-list.
+                Sports Performance \u2192 /training, /tools/training.
+                Longevity \u2192 /goals, /tracker.
+                Wellness \u2192 /journal, /tracker, /goals.
+                Pharmacogenomics \u2192 /drug-check.
+                Mental Health \u2192 /search?pillar=..., /reading-list.
+                Environment \u2192 /search?pillar=...
+                Hormones \u2192 /biomarkers.
+                Developmental \u2192 /pillars/youth, /ancestry.
+
+          B. Homepage pillar-first entry \u2014 NEW component
+              \u2022 /app/components/HomePillarGrid.jsx renders a
+                persistent "What do you want to explore?" band with
+                all 10 pillar tiles (2-col mobile, 3-col tablet,
+                5-col desktop) plus a footer link to /pillars.
+              \u2022 Mounted in /app/app/page.js between the
+                WelcomeBackStrip and HomeStepsExplainer sections so
+                every visitor \u2014 new or returning \u2014 sees pillars
+                immediately below the hero.
+
+          C. Hero reframed as optional personalisation
+              \u2022 Added a compact caption directly under the tour
+                pill on the homepage hero:
+                "Uploading a DNA file is optional \u2014 it only
+                 personalises what you see inside a pillar. You can
+                 explore any pillar first and bring data later."
+              \u2022 Link points to /pillars so users can bypass the
+                upload gate.
+
+          D. Nav dropdown footer link
+              \u2022 Added a "Learn what each pillar contains \u2192"
+                footer inside the existing Pillars dropdown in
+                components/site-nav.jsx so /pillars is discoverable
+                from the top nav without restructuring the current
+                dropdown or breaking guided-mode nav.
+
+          Verified via Playwright:
+              \u2022 /pillars H1 = "Ten pillars. One taxonomy for
+                your whole biology." Card count = 10. All 10
+                canonical pillars render in correct order. 12 pillar
+                links present (10 primary CTAs + 2 dev-pillar
+                secondary route links). "Before you explore"
+                callout renders.
+              \u2022 Homepage: hasOptionalCaption = true;
+                hasPillarGrid = true; 11 pillar-grid links
+                (10 tiles + "Learn what each pillar contains"
+                footer).
+              \u2022 No compile errors, no runtime warnings.
+
+          Not-in-scope (per issue constraints): A/B tests, admin
+          dashboards, streaming, or safety systems.
+
+          Hand-off:
+          Suggested PR title:
+            "Phase 4 UX: pillar-first nav model + /pillars
+             explainer (closes #3)"
+          Suggested PR body:
+            \u2022 Adds /pillars explainer with 10 canonical cards.
+            \u2022 Adds HomePillarGrid on / for a persistent
+              pillar-first entry point.
+            \u2022 Reframes DNA upload as optional personalisation.
+            \u2022 Adds nav dropdown footer link to /pillars.
+            \u2022 No changes to /genome, /dashboard, /my-path,
+              /onboarding/quiz, /start, /how-it-works, or any
+              backend logic.
+          User will open the PR via Emergent "Save to Github" \u2014
+          agent cannot open PRs directly.
+
+

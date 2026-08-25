@@ -423,6 +423,18 @@ export function SiteNav({ variant = 'light' }) {
                     )
                   })}
                 </div>
+                {/* Phase 4 UX (issue #3) — footer link to the /pillars
+                    explainer so anyone who wants a fuller "what is a
+                    pillar and what tools live inside" landing can find
+                    it directly from the nav. */}
+                <a
+                  href="/pillars"
+                  onClick={() => setPillarsOpen(false)}
+                  className="mt-2 flex items-center justify-between rounded-lg border-t border-ss-border-warm/60 px-3 py-2.5 pt-3 text-sm font-semibold text-ss-teal transition hover:bg-ss-bg"
+                >
+                  <span>Learn what each pillar contains</span>
+                  <span aria-hidden="true">→</span>
+                </a>
               </div>
             )}
           </div>
