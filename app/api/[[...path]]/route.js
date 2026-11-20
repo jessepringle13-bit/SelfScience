@@ -1125,11 +1125,9 @@ async function handleCtaTrack(request) {
   return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
-// Admin-only GET returning the CTA snapshot. Auth via ?token=<ADMIN_TOKEN>.
+// Admin-only GET returning the CTA snapshot. Auth via the admin session cookie.
 async function handleAdminHeroCtaStats(request) {
-  const url = new URL(request.url)
-  const token = url.searchParams.get('token') || ''
-  if (!process.env.ADMIN_TOKEN || token !== process.env.ADMIN_TOKEN) {
+  if (!isAdminAuthenticated(request)) {
     return NextResponse.json({ error: 'unauthorised' }, { status: 401 })
   }
   const snapshot = await getCtaSnapshot()
@@ -1510,21 +1508,15 @@ export async function DELETE(request, { params }) {
 
 /**
  * Admin — AI usage / cost snapshot.
- *   GET /api/admin/ai-usage?token=<ADMIN_TOKEN>
+ *   GET /api/admin/ai-usage
  *
  * Returns:
  *   - In-app usage snapshot (calls, tokens, USD, per-model + per-day)
  *   - Live OpenRouter remaining credit balance
- * Auth: shared secret via ?token query param compared to ADMIN_TOKEN env.
+ * Auth: admin session cookie (set by /api/admin/login), never a URL token.
  */
 async function handleAdminAiUsage(request) {
-  const url = new URL(request.url)
-  const token = url.searchParams.get('token') || ''
-  const expected = process.env.ADMIN_TOKEN || ''
-  if (!expected) {
-    return NextResponse.json({ error: 'ADMIN_TOKEN not configured on server' }, { status: 500 })
-  }
-  if (token !== expected) {
+  if (!isAdminAuthenticated(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 

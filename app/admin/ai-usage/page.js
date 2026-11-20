@@ -1,34 +1,28 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import AdminGate from '@/components/admin/AdminGate'
 
 /**
- * AI-usage admin dashboard. Very simple — no auth UI beyond the ?token=
- * query param that gets forwarded to the API. Access:
- *
- *   /admin/ai-usage?token=<ADMIN_TOKEN>
+ * AI-usage admin dashboard. Requires the admin login cookie (via AdminGate);
+ * the token is never put in the URL, so analytics and browser history can't see it.
  *
  * Refresh manually or with the button. Not linked from the site nav.
  */
 export default function AiUsagePage() {
-  const [token, setToken] = useState('')
+  return <AdminGate title="AI usage"><AiUsage /></AdminGate>
+}
+
+function AiUsage() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Read token from URL once on mount.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const t = new URLSearchParams(window.location.search).get('token') || ''
-    setToken(t)
-  }, [])
-
   const load = async () => {
-    if (!token) return
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/ai-usage?token=${encodeURIComponent(token)}`)
+      const res = await fetch('/api/admin/ai-usage', { cache: 'no-store' })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error || `HTTP ${res.status}`)
@@ -41,7 +35,7 @@ export default function AiUsagePage() {
     }
   }
 
-  useEffect(() => { if (token) load() }, [token])
+  useEffect(() => { load() }, [])
 
   const snap = data?.snapshot
   const totals = snap?.totals
@@ -58,18 +52,13 @@ export default function AiUsagePage() {
           <h1 className="text-2xl font-extrabold text-[#1B474D]">SelfScience · AI Usage</h1>
           <button
             onClick={load}
-            disabled={!token || loading}
+            disabled={loading}
             className="rounded-full bg-[#1B474D] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
           >
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
 
-        {!token && (
-          <div className="mt-6 rounded-lg border border-[#B07D00] bg-[#FFFBEA] p-4">
-            No token provided. Add <code>?token=&lt;ADMIN_TOKEN&gt;</code> to the URL.
-          </div>
-        )}
         {error && (
           <div className="mt-6 rounded-lg border border-red-400 bg-red-50 p-4 text-red-800">
             {error}
