@@ -2,27 +2,24 @@
 
 // /app/app/admin/hero-cta/page.js
 // Simple admin dashboard for the homepage-hero quiz-CTA A/B test.
-// Auth via ?token=<ADMIN_TOKEN>. Reads /api/admin/hero-cta-stats.
+// Auth via the admin login cookie (AdminGate), never a URL token. Reads /api/admin/hero-cta-stats.
 
 import { useEffect, useMemo, useState } from 'react'
+import AdminGate from '@/components/admin/AdminGate'
 
-export default function HeroCtaAdmin() {
-  const [token, setToken] = useState('')
+export default function HeroCtaAdminPage() {
+  return <AdminGate title="Hero CTA A/B"><HeroCtaAdmin /></AdminGate>
+}
+
+function HeroCtaAdmin() {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const t = new URLSearchParams(window.location.search).get('token') || ''
-    setToken(t)
-  }, [])
-
   const load = async () => {
-    if (!token) return
     setLoading(true); setError('')
     try {
-      const res = await fetch(`/api/admin/hero-cta-stats?token=${encodeURIComponent(token)}`)
+      const res = await fetch('/api/admin/hero-cta-stats', { cache: 'no-store' })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error || `HTTP ${res.status}`)
@@ -32,7 +29,7 @@ export default function HeroCtaAdmin() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { if (token) load() }, [token])
+  useEffect(() => { load() }, [])
 
   // Compute per-variant totals + CTR from the raw byKey map.
   const rows = useMemo(() => {
@@ -98,16 +95,11 @@ export default function HeroCtaAdmin() {
       <div className="mx-auto max-w-4xl">
         <div className="flex items-baseline justify-between">
           <h1 className="text-2xl font-extrabold text-[#1B474D]">SelfScience · Hero CTA A/B</h1>
-          <button onClick={load} disabled={!token || loading} className="rounded-full bg-[#1B474D] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+          <button onClick={load} disabled={loading} className="rounded-full bg-[#1B474D] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
 
-        {!token && (
-          <div className="mt-6 rounded-lg border border-[#B07D00] bg-[#FFFBEA] p-4">
-            No token. Append <code>?token=&lt;ADMIN_TOKEN&gt;</code> to the URL.
-          </div>
-        )}
         {error && (
           <div className="mt-6 rounded-lg border border-red-400 bg-red-50 p-4 text-red-800">{error}</div>
         )}

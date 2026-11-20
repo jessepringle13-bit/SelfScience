@@ -1,6 +1,7 @@
 'use client'
 
 import Script from 'next/script'
+import { usePathname } from 'next/navigation'
 
 /**
  * Analytics loader.
@@ -12,6 +13,9 @@ import Script from 'next/script'
  * Custom event tracking is handled by lib/analytics.js (see trackEvent()).
  */
 export default function Analytics() {
+  // Admin screens show private stats; never record them in GA/Clarity.
+  const pathname = usePathname() || ''
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) return null
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
   const clarityId = process.env.NEXT_PUBLIC_CLARITY_ID
 
